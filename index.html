@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nagi Todo with Firebase</title>
+  <!-- 파비콘 적용 -->
+  <link rel="icon" href="./favi.ico" type="image/x-icon" />
+
+  <!-- 사용자 정의 폰트 사용 -->
+  <style>
+    @font-face {
+      font-family: 'HJSS';
+      src: url('./HJSS.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'HJSS', sans-serif;
+      background: #f5f5f5;
+      box-sizing: border-box;
+    }
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+
+    /* 우클릭/더블클릭 메뉴 스타일 */
+    .context-menu {
+      position: fixed;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 0.25rem;
+      padding: 0.25rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .context-menu button {
+      padding: 0.5rem 0.75rem;
+      background: #fff;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+    }
+    .context-menu button:hover {
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React, ReactDOM, Babel (CDN) -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase (v9 compat) - Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
+
+  <script type="text/babel">
+    // 1) Firebase 설정
+    const firebaseConfig = {
+      apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
+      authDomain: "nagi-todo.firebaseapp.com",
+      databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com/",
+      projectId: "nagi-todo",
+      storageBucket: "nagi-todo.firebasestorage.app",
+      messagingSenderId: "923414063910",
+      appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
+    };
+
+    // 2) Firebase 초기화
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // 3) App 컴포넌트
+    function App() {
+      // 상태들
+      const [text, setText] = React.useState('');
+      const [categoryText, setCategoryText] = React.useState('');
+      const [selectedDate, setSelectedDate] = React.useState(new Date());
+      const [showSidebar, setShowSidebar] = React.useState(true);
+      const [allTodos, setAllTodos] = React.useState({});
+      const [accentColor, setAccentColor] = React.useState('#3B82F6');
+      const [draggedItem, setDraggedItem] = React.useState(null);
+      const [draggedOverItem, setDraggedOverItem] = React.useState(null);
+
+      // 우클릭/더블클릭 메뉴 상태
+      const [contextMenu, setContextMenu] = React.useState({
+        visible: false,
+        x: 0,
+        y: 0,
+        index: null
+      });
+
+      const bulletStates = ['☐', '☑', '☒'];
+      const dateKey = selectedDate.toISOString().split('T')[0];
+      const items = allTodos[dateKey] || [];
+
+      // 달력 계산
+      const daysInMonth = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth() + 1,
+        0
+      ).getDate();
+      const firstDay = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        1
+      ).getDay();
+
+      // 이전/다음 달 이동
+      function handlePrevMonth() {
+        setSelectedDate((prev) => {
+          const newDate = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+          return newDate;
+        });
+      }
+      function handleNextMonth() {
+        setSelectedDate((prev) => {
+          const newDate = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+          return newDate;
+        });
+      }
+
+      // 달력 데이터 실시간 구독
+      React.useEffect(() => {
+        const todosRef = database.ref('todos/' + dateKey);
+        const onValueChange = todosRef.on('value', (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            setAllTodos((prev) => ({
+              ...prev,
+              [dateKey]: data
+            }));
+          } else {
+            // 해당 날짜에 데이터가 없으면 빈 배열로
+            setAllTodos((prev) => ({
+              ...prev,
+              [dateKey]: []
+            }));
+          }
+        });
+        return () => todosRef.off('value', onValueChange);
+      }, [dateKey]);
+
+      // local + Firebase 동시 업데이트
+      const updateAllTodos = (updater) => {
+        setAllTodos((prev) => {
+          const newAll = typeof updater === 'function' ? updater(prev) : updater;
+          database
+            .ref('todos/' + dateKey)
+            .set(newAll[dateKey])
+            .catch((err) => console.error('DB write error:', err));
+          return newAll;
+        });
+      };
+
+      // 새 항목 추가
+      function handleKeyDown(event, type) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (type === 'todo' && text.trim()) {
+            updateAllTodos((prev) => ({
+              ...prev,
+              [dateKey]: [
+                ...(prev[dateKey] || []),
+                { type: 'todo', text: text.trim(), state: 0 }
+              ]
+            }));
+            setText('');
+          } else if (type === 'category' && categoryText.trim()) {
+            updateAllTodos((prev) => ({
+              ...prev,
+              [dateKey]: [
+                ...(prev[dateKey] || []),
+                { type: 'category', text: categoryText.trim() }
+              ]
+            }));
+            setCategoryText('');
+          }
+        }
+      }
+
+      function addDivider() {
+        updateAllTodos((prev) => ({
+          ...prev,
+          [dateKey]: [...(prev[dateKey] || []), { type: 'divider' }]
+        }));
+      }
+
+      // Todo 체크박스 토글
+      function toggleState(index) {
+        updateAllTodos((prev) => ({
+          ...prev,
+          [dateKey]: prev[dateKey].map((item, i) =>
+            i === index && item.type === 'todo'
+              ? { ...item, state: (item.state + 1) % bulletStates.length }
+              : item
+          )
+        }));
+      }
+
+      // 삭제
+      function deleteItem(index) {
+        updateAllTodos((prev) => ({
+          ...prev,
+          [dateKey]: prev[dateKey].filter((_, i) => i !== index)
+        }));
+      }
+
+      // 텍스트 파일로 내보내기
+      function exportToText() {
+        const title = selectedDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        let content = `${title}\n\n`;
+        items.forEach((item) => {
+          if (item.type === 'divider') {
+            content += '-------------------\n';
+          } else if (item.type === 'category') {
+            content += `\n${item.text}\n`;
+          } else {
+            content += `${bulletStates[item.state]} ${item.text}\n`;
+          }
+        });
+
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `todos-${dateKey}.txt`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      // 해당 날짜에 할 일 있는지 체크
+      const hasTodos = (date) => {
+        const key = date.toISOString().split('T')[0];
+        return allTodos[key] && allTodos[key].length > 0;
+      };
+
+      // 드래그앤드롭
+      function handleDragStart(e, index) {
+        setDraggedItem(index);
+        e.currentTarget.style.opacity = '0.4';
+      }
+      function handleDragEnd(e) {
+        e.currentTarget.style.opacity = '1';
+        setDraggedItem(null);
+        setDraggedOverItem(null);
+      }
+      function handleDragOver(e, index) {
+        e.preventDefault();
+        setDraggedOverItem(index);
+      }
+      function handleDrop(e, index) {
+        e.preventDefault();
+        const itemsCopy = [...items];
+        const draggedItemContent = itemsCopy[draggedItem];
+        itemsCopy.splice(draggedItem, 1);
+        itemsCopy.splice(index, 0, draggedItemContent);
+
+        updateAllTodos((prev) => ({
+          ...prev,
+          [dateKey]: itemsCopy
+        }));
+
+        setDraggedItem(null);
+        setDraggedOverItem(null);
+      }
+
+      // 우클릭/더블클릭 컨텍스트 메뉴
+      function handleContextMenu(e, index) {
+        e.preventDefault(); 
+        setContextMenu({
+          visible: true,
+          x: e.clientX,
+          y: e.clientY,
+          index
+        });
+      }
+      function handleCloseContextMenu() {
+        setContextMenu({ visible: false, x: 0, y: 0, index: null });
+      }
+      function handleContextEdit() {
+        const idx = contextMenu.index;
+        if (idx == null) return;
+        const item = items[idx];
+        if (item) {
+          const newText = prompt('Edit text:', item.text);
+          if (newText !== null) {
+            updateAllTodos((prev) => {
+              const newItems = [...prev[dateKey]];
+              newItems[idx] = { ...newItems[idx], text: newText };
+              return { ...prev, [dateKey]: newItems };
+            });
+          }
+        }
+        handleCloseContextMenu();
+      }
+      function handleContextDelete() {
+        const idx = contextMenu.index;
+        if (idx == null) return;
+        deleteItem(idx);
+        handleCloseContextMenu();
+      }
+
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex' }}>
+          {/* 모바일용 사이드바 토글 버튼 */}
+          <button
+            onClick={() => setShowSidebar(!showSidebar)}
+            style={{
+              position: 'fixed',
+              left: '1rem',
+              top: '1rem',
+              zIndex: 10,
+              background: '#fff',
+              padding: '0.5rem',
+              borderRadius: '9999px',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+              cursor: 'pointer'
+            }}
+            className="md:hidden"
+          >
+            {showSidebar ? '←' : '→'}
+          </button>
+
+          {/* 사이드바 */}
+          <div
+            style={{
+              position: 'fixed',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: '16rem', /* 사이드바 폭을 16rem으로 */
+              background: '#fff',
+              boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+              zIndex: 20,
+              overflow: 'visible',
+              transform: showSidebar ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.3s ease-in-out'
+            }}
+            className="md:translate-x-0"
+          >
+            <div style={{ padding: '1rem' }}>
+              {/* 년/월 표시 */}
+              <h2
+                style={{
+                  fontWeight: 'bold',
+                  whiteSpace: 'pre-line',
+                  textAlign: 'center',
+                  marginBottom: '1rem'
+                }}
+              >
+                {selectedDate.toLocaleString('en-US', { year: 'numeric' })}
+                {'\n'}
+                {selectedDate.toLocaleString('en-US', { month: 'long' })}
+              </h2>
+
+              {/* accentColor 선택 (달력 상단 중앙) */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginBottom: '1rem'
+                }}
+              >
+                <input
+                  type="color"
+                  value={accentColor}
+                  onChange={(e) => setAccentColor(e.target.value)}
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    borderRadius: '9999px',
+                    cursor: 'pointer'
+                  }}
+                  title="Select accent color"
+                />
+              </div>
+
+              {/* 달력 (요일 헤더) */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '0.25rem',
+                  fontSize: '0.875rem'
+                }}
+              >
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
+                  <div
+                    key={d}
+                    style={{ textAlign: 'center', fontWeight: '500', color: '#666' }}
+                  >
+                    {d}
+                  </div>
+                ))}
+                {Array(firstDay)
+                  .fill(null)
+                  .map((_, i) => (
+                    <div key={`empty-${i}`} />
+                  ))}
+                {Array.from({ length: daysInMonth }, (_, i) => {
+                  const date = new Date(
+                    selectedDate.getFullYear(),
+                    selectedDate.getMonth(),
+                    i + 1
+                  );
+                  const isSelected = date.toDateString() === selectedDate.toDateString();
+                  const isToday = date.toDateString() === new Date().toDateString();
+                  const hasItemsVar = hasTodos(date);
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setSelectedDate(date);
+                        if (window.innerWidth < 768) setShowSidebar(false);
+                      }}
+                      style={{
+                        width: '1.8rem',
+                        height: '1.8rem',
+                        margin: '0 auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border:
+                          isToday && !isSelected ? '1px solid #ccc' : 'none',
+                        backgroundColor: isSelected ? accentColor : 'transparent',
+                        color: isSelected ? '#fff' : '#000',
+                        borderRadius: '9999px',
+                        transition: 'background-color 0.2s',
+                        position: 'relative',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <span>{i + 1}</span>
+                      {hasItemsVar && (
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            color: isSelected ? '#fff' : accentColor,
+                            position: 'absolute',
+                            bottom: '-0.3rem'
+                          }}
+                        >
+                          •
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ← → 버튼 (사이드바 하단) */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '1rem'
+                }}
+              >
+                <button
+                  onClick={handlePrevMonth}
+                  style={{
+                    background: '#f0f0f0',
+                    border: 'none',
+                    padding: '0.25rem 0.5rem',
+                    cursor: 'pointer',
+                    borderRadius: '0.25rem'
+                  }}
+                >
+                  ←
+                </button>
+                <button
+                  onClick={handleNextMonth}
+                  style={{
+                    background: '#f0f0f0',
+                    border: 'none',
+                    padding: '0.25rem 0.5rem',
+                    cursor: 'pointer',
+                    borderRadius: '0.25rem'
+                  }}
+                >
+                  →
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 메인 컨텐츠 영역 */}
+          <div
+            style={{
+              flex: 1,
+              padding: '1rem',
+              transition: 'margin-left 0.3s',
+              marginLeft: showSidebar ? '16rem' : '0'
+            }}
+          >
+            <div
+              style={{
+                maxWidth: '42rem',
+                margin: '0 auto',
+                background: '#fff',
+                borderRadius: '0.5rem',
+                boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                padding: '1.5rem'
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '1.25rem',
+                  fontWeight: 'bold',
+                  marginBottom: '1rem'
+                }}
+              >
+                {selectedDate.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </h2>
+
+              {/* Add a task, Divider, Category를 하나의 grid로 묶어 폭 정렬 */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr',
+                  columnGap: '0.5rem',
+                  rowGap: '0.75rem'
+                }}
+              >
+                {/* 첫 번째 줄: Add a Task가 두 칸 전체를 차지 */}
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, 'todo')}
+                  placeholder="Add a task..."
+                  style={{
+                    gridColumn: '1 / 3',
+                    border: '1px solid #ccc',
+                    padding: '0.5rem',
+                    borderRadius: '0.25rem',
+                    width: '100%'
+                  }}
+                />
+
+                {/* 두 번째 줄: Add Divider / Add category */}
+                <button
+                  onClick={addDivider}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    fontSize: '0.875rem',
+                    background: '#f0f0f0',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Add Divider
+                </button>
+                <input
+                  type="text"
+                  value={categoryText}
+                  onChange={(e) => setCategoryText(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, 'category')}
+                  placeholder="Add category..."
+                  style={{
+                    border: '1px solid #ccc',
+                    padding: '0.25rem',
+                    borderRadius: '0.25rem',
+                    fontSize: '0.875rem'
+                  }}
+                />
+              </div>
+
+              {/* 할 일 목록 */}
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {items.map((item, index) => {
+                  const commonDnDProps = {
+                    draggable: true,
+                    onDragStart: (e) => handleDragStart(e, index),
+                    onDragEnd: handleDragEnd,
+                    onDragOver: (e) => handleDragOver(e, index),
+                    onDrop: (e) => handleDrop(e, index),
+                    onContextMenu: (e) => handleContextMenu(e, index),
+                    onDoubleClick: (e) => handleContextMenu(e, index)
+                  };
+
+                  if (item.type === 'divider') {
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          position: 'relative',
+                          borderTop:
+                            draggedOverItem === index
+                              ? `2px solid ${accentColor}`
+                              : 'none',
+                          margin: '0.5rem 0'
+                        }}
+                        {...commonDnDProps}
+                      >
+                        <hr
+                          style={{
+                            borderTop: `1px solid ${accentColor}`,
+                            margin: '0.5rem 0'
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+
+                  if (item.type === 'category') {
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'move',
+                          borderTop:
+                            draggedOverItem === index
+                              ? `2px solid ${accentColor}`
+                              : 'none'
+                        }}
+                        {...commonDnDProps}
+                      >
+                        <div style={{ fontWeight: '600', color: '#555' }}>
+                          {item.text}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // 일반 todo 항목
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem',
+                        borderRadius: '0.25rem',
+                        cursor: 'move',
+                        background: '#fafafa',
+                        borderTop:
+                          draggedOverItem === index
+                            ? `2px solid ${accentColor}`
+                            : 'none'
+                      }}
+                      {...commonDnDProps}
+                    >
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleState(index);
+                        }}
+                        style={{
+                          color: accentColor,
+                          fontFamily: 'monospace',
+                          fontSize: '1.25rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {bulletStates[item.state]}
+                      </span>
+                      <span style={{ flex: 1 }}>{item.text}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Export as Text 버튼 (accentColor 배경, 흰색 글자) */}
+              {items.length > 0 && (
+                <button
+                  onClick={exportToText}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    fontSize: '0.875rem',
+                    background: accentColor,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '0.25rem',
+                    cursor: 'pointer',
+                    marginTop: '1rem'
+                  }}
+                >
+                  Export as Text
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 우클릭/더블클릭 컨텍스트 메뉴 */}
+          {contextMenu.visible && (
+            <div
+              className="context-menu"
+              style={{
+                top: contextMenu.y,
+                left: contextMenu.x
+              }}
+              onMouseLeave={handleCloseContextMenu}
+            >
+              <button onClick={handleContextEdit}>Edit</button>
+              <button onClick={handleContextDelete}>Delete</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 4) ReactDOM으로 렌더링
+    const rootElement = document.getElementById('root');
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>
