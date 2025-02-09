@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>𝐝 : ᴛᴏᴅᴏ</title>
+  <link rel="icon" href="./favi.ico" type="image/x-icon" />
+  <style>
+    @font-face {
+      font-family: 'HJSS';
+      src: url('./HJSS.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'HJSS', sans-serif;
+      background: #f5f5f5;
+      box-sizing: border-box;
+    }
+
+    input, textarea, button {
+      font-family: 'HJSS', sans-serif;
+    }
+
+    *, *::before, *::after {
+      box-sizing: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React, ReactDOM, Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    // Firebase 설정
+    const firebaseConfig = {
+      apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
+      authDomain: "nagi-todo.firebaseapp.com",
+      databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com/",
+      projectId: "nagi-todo",
+      storageBucket: "nagi-todo.firebasestorage.app",
+      messagingSenderId: "923414063910",
+      appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
+    };
+
+    // Firebase 초기화
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    function App() {
+      const [text, setText] = React.useState('');
+      const [selectedDate, setSelectedDate] = React.useState(new Date());
+      const [items, setItems] = React.useState([]);
+
+      // 할 일 추가
+      function handleKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          if (text.trim()) {
+            setItems((prev) => [...prev, { text: text.trim(), completed: false }]);
+            setText('');
+          }
+        }
+      }
+
+      // TXT 내보내기 (로컬 날짜에 맞게 저장)
+      function exportToText() {
+        const localDateKey = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD 형식
+        let content = `Todos for ${selectedDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}\n\n`;
+
+        items.forEach((item, i) => {
+          content += `${i + 1}. ${item.completed ? '[x]' : '[ ]'} ${item.text}\n`;
+        });
+
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `todos-${localDateKey}.txt`;
+        link.click();
+        URL.revokeObjectURL(url);
+      }
+
+      return (
+        <div style={{ padding: '2rem', fontFamily: 'HJSS' }}>
+          <h1 style={{ textAlign: 'center', marginBottom: '1rem' }}>Todo List</h1>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a task... (Shift+Enter for newline)"
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              fontSize: '1rem',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              resize: 'vertical',
+              marginBottom: '1rem',
+            }}
+          />
+          <div id="taskListContainer" style={{ marginBottom: '1rem' }}>
+            {items.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '0.5rem',
+                  borderBottom: '1px solid #ddd',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={exportToText}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#3B82F6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            Export as Text
+          </button>
+        </div>
+      );
+    }
+
+    const rootElement = document.getElementById('root');
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>
