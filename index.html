@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>𝐝 : ᴛᴏᴅᴏ </title>
+  <title>𝐝 : ᴛᴏᴅᴏ</title>
   <!-- 파비콘 적용 -->
   <link rel="icon" href="./favi.ico" type="image/x-icon" />
 
@@ -25,27 +25,14 @@
       box-sizing: inherit;
     }
 
-    /* 우클릭/더블클릭 메뉴 스타일 */
-    .context-menu {
-      position: fixed;
-      background: #fff;
-      border: 1px solid #ccc;
-      border-radius: 0.25rem;
-      padding: 0.25rem;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-    .context-menu button {
-      padding: 0.5rem 0.75rem;
-      background: #fff;
+    /* 할일 편집/삭제 버튼 최소 스타일 */
+    .edit-delete-btn {
+      font-size: 0.75rem;
+      color: #888;
+      background: none;
       border: none;
-      text-align: left;
       cursor: pointer;
-    }
-    .context-menu button:hover {
-      background: #f0f0f0;
+      margin-left: 0.5rem;
     }
   </style>
 </head>
@@ -89,13 +76,21 @@
       const [draggedItem, setDraggedItem] = React.useState(null);
       const [draggedOverItem, setDraggedOverItem] = React.useState(null);
 
-      // 우클릭/더블클릭 메뉴 상태
-      const [contextMenu, setContextMenu] = React.useState({
-        visible: false,
-        x: 0,
-        y: 0,
-        index: null
-      });
+      // Edit 모드 여부
+      const [editMode, setEditMode] = React.useState(false);
+
+      // 로컬 스토리지에서 accentColor 로드
+      React.useEffect(() => {
+        const savedColor = localStorage.getItem('accentColor');
+        if (savedColor) {
+          setAccentColor(savedColor);
+        }
+      }, []);
+
+      // accentColor가 바뀔 때마다 로컬 스토리지에 저장
+      React.useEffect(() => {
+        localStorage.setItem('accentColor', accentColor);
+      }, [accentColor]);
 
       const bulletStates = ['☐', '☑', '☒'];
       const dateKey = selectedDate.toISOString().split('T')[0];
@@ -213,6 +208,21 @@
         }));
       }
 
+      // 편집(수정)
+      function editItem(index) {
+        // prompt로 텍스트 수정
+        const item = items[index];
+        if (!item) return;
+        const newText = prompt('Edit text:', item.text);
+        if (newText !== null && newText.trim()) {
+          updateAllTodos((prev) => {
+            const newItems = [...prev[dateKey]];
+            newItems[index] = { ...newItems[index], text: newText.trim() };
+            return { ...prev, [dateKey]: newItems };
+          });
+        }
+      }
+
       // 텍스트 파일로 내보내기
       function exportToText() {
         const title = selectedDate.toLocaleDateString('en-US', {
@@ -248,21 +258,25 @@
         return allTodos[key] && allTodos[key].length > 0;
       };
 
-      // 드래그앤드롭
+      // 드래그앤드롭 (editMode일 때만 활성화)
       function handleDragStart(e, index) {
+        if (!editMode) return;
         setDraggedItem(index);
         e.currentTarget.style.opacity = '0.4';
       }
       function handleDragEnd(e) {
+        if (!editMode) return;
         e.currentTarget.style.opacity = '1';
         setDraggedItem(null);
         setDraggedOverItem(null);
       }
       function handleDragOver(e, index) {
+        if (!editMode) return;
         e.preventDefault();
         setDraggedOverItem(index);
       }
       function handleDrop(e, index) {
+        if (!editMode) return;
         e.preventDefault();
         const itemsCopy = [...items];
         const draggedItemContent = itemsCopy[draggedItem];
@@ -276,42 +290,6 @@
 
         setDraggedItem(null);
         setDraggedOverItem(null);
-      }
-
-      // 우클릭/더블클릭 컨텍스트 메뉴
-      function handleContextMenu(e, index) {
-        e.preventDefault(); 
-        setContextMenu({
-          visible: true,
-          x: e.clientX,
-          y: e.clientY,
-          index
-        });
-      }
-      function handleCloseContextMenu() {
-        setContextMenu({ visible: false, x: 0, y: 0, index: null });
-      }
-      function handleContextEdit() {
-        const idx = contextMenu.index;
-        if (idx == null) return;
-        const item = items[idx];
-        if (item) {
-          const newText = prompt('Edit text:', item.text);
-          if (newText !== null) {
-            updateAllTodos((prev) => {
-              const newItems = [...prev[dateKey]];
-              newItems[idx] = { ...newItems[idx], text: newText };
-              return { ...prev, [dateKey]: newItems };
-            });
-          }
-        }
-        handleCloseContextMenu();
-      }
-      function handleContextDelete() {
-        const idx = contextMenu.index;
-        if (idx == null) return;
-        deleteItem(idx);
-        handleCloseContextMenu();
       }
 
       return (
@@ -342,7 +320,7 @@
               left: 0,
               top: 0,
               bottom: 0,
-              width: '16rem', /* 사이드바 폭을 16rem으로 */
+              width: '16rem',
               background: '#fff',
               boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
               zIndex: 20,
@@ -590,15 +568,16 @@
               {/* 할 일 목록 */}
               <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {items.map((item, index) => {
-                  const commonDnDProps = {
-                    draggable: true,
-                    onDragStart: (e) => handleDragStart(e, index),
-                    onDragEnd: handleDragEnd,
-                    onDragOver: (e) => handleDragOver(e, index),
-                    onDrop: (e) => handleDrop(e, index),
-                    onContextMenu: (e) => handleContextMenu(e, index),
-                    onDoubleClick: (e) => handleContextMenu(e, index)
-                  };
+                  // 편집 모드일 때만 DnD 이벤트를 부여
+                  const dndProps = editMode
+                    ? {
+                        draggable: true,
+                        onDragStart: (e) => handleDragStart(e, index),
+                        onDragEnd: handleDragEnd,
+                        onDragOver: (e) => handleDragOver(e, index),
+                        onDrop: (e) => handleDrop(e, index)
+                      }
+                    : {};
 
                   if (item.type === 'divider') {
                     return (
@@ -607,12 +586,12 @@
                         style={{
                           position: 'relative',
                           borderTop:
-                            draggedOverItem === index
+                            editMode && draggedOverItem === index
                               ? `2px solid ${accentColor}`
                               : 'none',
                           margin: '0.5rem 0'
                         }}
-                        {...commonDnDProps}
+                        {...dndProps}
                       >
                         <hr
                           style={{
@@ -620,6 +599,17 @@
                             margin: '0.5rem 0'
                           }}
                         />
+                        {/* 편집 모드일 때만 수정/삭제 버튼 노출 */}
+                        {editMode && (
+                          <div style={{ textAlign: 'right' }}>
+                            <button
+                              className="edit-delete-btn"
+                              onClick={() => deleteItem(index)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -632,17 +622,33 @@
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          cursor: 'move',
+                          cursor: editMode ? 'move' : 'default',
                           borderTop:
-                            draggedOverItem === index
+                            editMode && draggedOverItem === index
                               ? `2px solid ${accentColor}`
                               : 'none'
                         }}
-                        {...commonDnDProps}
+                        {...dndProps}
                       >
                         <div style={{ fontWeight: '600', color: '#555' }}>
                           {item.text}
                         </div>
+                        {editMode && (
+                          <div>
+                            <button
+                              className="edit-delete-btn"
+                              onClick={() => editItem(index)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="edit-delete-btn"
+                              onClick={() => deleteItem(index)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -657,71 +663,90 @@
                         gap: '0.5rem',
                         padding: '0.5rem',
                         borderRadius: '0.25rem',
-                        cursor: 'move',
+                        cursor: editMode ? 'move' : 'default',
                         background: '#fafafa',
                         borderTop:
-                          draggedOverItem === index
+                          editMode && draggedOverItem === index
                             ? `2px solid ${accentColor}`
                             : 'none'
                       }}
-                      {...commonDnDProps}
+                      {...dndProps}
                     >
                       <span
                         onClick={(e) => {
-                          e.stopPropagation();
-                          toggleState(index);
+                          if (!editMode) {
+                            // 편집 모드 아닐 때만 체크박스 클릭
+                            e.stopPropagation();
+                            toggleState(index);
+                          }
                         }}
                         style={{
                           color: accentColor,
                           fontFamily: 'monospace',
                           fontSize: '1.25rem',
-                          cursor: 'pointer'
+                          cursor: editMode ? 'default' : 'pointer'
                         }}
                       >
                         {bulletStates[item.state]}
                       </span>
                       <span style={{ flex: 1 }}>{item.text}</span>
+                      {editMode && (
+                        <>
+                          <button
+                            className="edit-delete-btn"
+                            onClick={() => editItem(index)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="edit-delete-btn"
+                            onClick={() => deleteItem(index)}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Export as Text 버튼 (accentColor 배경, 흰색 글자) */}
-              {items.length > 0 && (
+              {/* Export as Text / Edit 버튼 */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                {items.length > 0 && (
+                  <button
+                    onClick={exportToText}
+                    style={{
+                      flex: 1,
+                      padding: '0.5rem',
+                      fontSize: '0.875rem',
+                      background: accentColor,
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Export as Text
+                  </button>
+                )}
                 <button
-                  onClick={exportToText}
+                  onClick={() => setEditMode((prev) => !prev)}
                   style={{
-                    width: '100%',
+                    flex: items.length > 0 ? 'unset' : 1,
                     padding: '0.5rem',
                     fontSize: '0.875rem',
-                    background: accentColor,
-                    color: '#fff',
+                    background: editMode ? '#dddddd' : '#f0f0f0',
                     border: 'none',
                     borderRadius: '0.25rem',
-                    cursor: 'pointer',
-                    marginTop: '1rem'
+                    cursor: 'pointer'
                   }}
                 >
-                  Export as Text
+                  {editMode ? 'Done' : 'Edit'}
                 </button>
-              )}
+              </div>
             </div>
           </div>
-
-          {/* 우클릭/더블클릭 컨텍스트 메뉴 */}
-          {contextMenu.visible && (
-            <div
-              className="context-menu"
-              style={{
-                top: contextMenu.y,
-                left: contextMenu.x
-              }}
-              onMouseLeave={handleCloseContextMenu}
-            >
-              <button onClick={handleContextEdit}>Edit</button>
-              <button onClick={handleContextDelete}>Delete</button>
-            </div>
-          )}
         </div>
       );
     }
