@@ -11,6 +11,7 @@
       font-weight: normal;
       font-style: normal;
     }
+
     body {
       margin: 0;
       padding: 0;
@@ -18,9 +19,15 @@
       background: #f5f5f5;
       box-sizing: border-box;
     }
+
+    input, textarea, button {
+      font-family: 'HJSS', sans-serif;
+    }
+
     *, *::before, *::after {
       box-sizing: inherit;
     }
+
     .edit-delete-btn {
       font-size: 0.75rem;
       color: #888;
@@ -34,17 +41,16 @@
 <body>
   <div id="root"></div>
 
-  <!-- React, ReactDOM, Babel (CDN) -->
+  <!-- HTML2Canvas 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- React, ReactDOM, Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Firebase (v9 compat) - Realtime Database -->
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
-
   <script type="text/babel">
-    // 1) Firebase 설정
+    // Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
       authDomain: "nagi-todo.firebaseapp.com",
@@ -55,714 +61,158 @@
       appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
     };
 
-    // 2) Firebase 초기화
+    // Firebase 초기화
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // 3) App 컴포넌트
     function App() {
       const [text, setText] = React.useState('');
-      const [categoryText, setCategoryText] = React.useState('');
       const [selectedDate, setSelectedDate] = React.useState(new Date());
-      const [showSidebar, setShowSidebar] = React.useState(true);
-      const [allTodos, setAllTodos] = React.useState({});
-      const [accentColor, setAccentColor] = React.useState('#3B82F6');
-      const [draggedItem, setDraggedItem] = React.useState(null);
-      const [draggedOverItem, setDraggedOverItem] = React.useState(null);
+      const [items, setItems] = React.useState([]);
+      const [showExportModal, setShowExportModal] = React.useState(false);
 
-      // 편집 모드
-      const [editMode, setEditMode] = React.useState(false);
-
-      // 날짜별 색상 (원한다면 그대로 사용, 생략 가능)
-      const [dateColors, setDateColors] = React.useState({});
-
-      const bulletStates = ['☐', '☑', '☒'];
-      const dateKey = selectedDate.toISOString().split('T')[0];
-      const items = allTodos[dateKey] || [];
-
-      // 달 계산
-      const daysInMonth = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth() + 1,
-        0
-      ).getDate();
-      const firstDay = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        1
-      ).getDay();
-
-      // Firebase 구독: todos
-      React.useEffect(() => {
-        const refPath = 'todos/' + dateKey;
-        const todosRef = database.ref(refPath);
-        const onValueChange = todosRef.on('value', (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            setAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: data
-            }));
-          } else {
-            setAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: []
-            }));
-          }
-        });
-        return () => todosRef.off('value', onValueChange);
-      }, [dateKey]);
-
-      // Firebase 구독: dateColors (날짜별 색상) - 사용 안 해도 되면 생략 가능
-      React.useEffect(() => {
-        const colorsRef = database.ref('dateColors');
-        const onValueChange = colorsRef.on('value', (snapshot) => {
-          if (snapshot.exists()) {
-            setDateColors(snapshot.val());
-          } else {
-            setDateColors({});
-          }
-        });
-        return () => colorsRef.off('value', onValueChange);
-      }, []);
-
-      // accentColor (LocalStorage)
-      React.useEffect(() => {
-        const savedColor = localStorage.getItem('accentColor');
-        if (savedColor) setAccentColor(savedColor);
-      }, []);
-      React.useEffect(() => {
-        localStorage.setItem('accentColor', accentColor);
-      }, [accentColor]);
-
-      // allTodos 업데이트 + Firebase에 동기화
-      const updateAllTodos = (updater) => {
-        setAllTodos((prev) => {
-          const newAll = typeof updater === 'function' ? updater(prev) : updater;
-          database.ref('todos/' + dateKey).set(newAll[dateKey] || []);
-          return newAll;
-        });
-      };
-
-      // dateColors 업데이트 + Firebase
-      const updateDateColors = (dk, color) => {
-        setDateColors((prev) => {
-          const newColors = { ...prev, [dk]: color };
-          database.ref('dateColors').set(newColors);
-          return newColors;
-        });
-      };
-
-      // 달 이동
-      function handlePrevMonth() {
-        setSelectedDate((prev) => {
-          const newDate = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
-          return newDate;
-        });
-      }
-      function handleNextMonth() {
-        setSelectedDate((prev) => {
-          const newDate = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
-          return newDate;
-        });
-      }
-
-      // 할 일 추가 / 구분선 추가
-      function handleKeyDownTodo(e) {
-        // Shift+Enter => 줄바꿈, 그냥 Enter => 등록
+      // 할 일 추가
+      function handleKeyDown(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           if (text.trim()) {
-            updateAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: [
-                ...(prev[dateKey] || []),
-                { type: 'todo', text: text.trim(), state: 0 }
-              ]
-            }));
+            setItems((prev) => [...prev, { text: text.trim(), completed: false }]);
             setText('');
           }
         }
       }
-      function handleKeyDownCategory(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          if (categoryText.trim()) {
-            updateAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: [
-                ...(prev[dateKey] || []),
-                { type: 'category', text: categoryText.trim() }
-              ]
-            }));
-            setCategoryText('');
-          }
-        }
-      }
-      function addDivider() {
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: [...(prev[dateKey] || []), { type: 'divider' }]
-        }));
-      }
 
-      // 할 일 상태 토글
-      function toggleState(index) {
-        if (editMode) return; // 편집 모드일 때는 클릭X
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: prev[dateKey].map((item, i) =>
-            i === index && item.type === 'todo'
-              ? { ...item, state: (item.state + 1) % bulletStates.length }
-              : item
-          )
-        }));
-      }
-
-      // 삭제 / 편집
-      function deleteItem(index) {
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: prev[dateKey].filter((_, i) => i !== index)
-        }));
-      }
-      function editItem(index) {
-        const item = items[index];
-        if (!item) return;
-        const newText = prompt('Edit text:', item.text);
-        if (newText !== null && newText.trim()) {
-          updateAllTodos((prev) => {
-            const newItems = [...prev[dateKey]];
-            newItems[index] = { ...newItems[index], text: newText.trim() };
-            return { ...prev, [dateKey]: newItems };
-          });
-        }
-      }
-
-      // Export
+      // TXT 내보내기
       function exportToText() {
-  const title = selectedDate.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+        const localDateKey = selectedDate.toLocaleDateString('en-CA');
+        let content = `Todos for ${selectedDate.toLocaleDateString('en-US')}\n\n`;
+        items.forEach((item, i) => {
+          content += `${i + 1}. ${item.completed ? '[x]' : '[ ]'} ${item.text}\n`;
+        });
 
-  // 로컬 날짜를 YYYY-MM-DD로 가져오기 (toLocaleDateString 사용)
-  const localDateKey = selectedDate.toLocaleDateString('en-CA'); // 'YYYY-MM-DD' 형식
-
-  let content = `${title}\n\n`;
-  items.forEach((item) => {
-    if (item.type === 'divider') {
-      content += '-------------------\n';
-    } else if (item.type === 'category') {
-      content += `\n${item.text}\n`;
-    } else {
-      content += `${bulletStates[item.state]} ${item.text}\n`;
-    }
-  });
-
-  const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `todos-${localDateKey}.txt`; // 수정된 부분: 로컬 날짜 사용
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-
-      // 해당 날짜 할 일 존재 여부
-      const hasTodos = (d) => {
-        const key = d.toISOString().split('T')[0];
-        return allTodos[key] && allTodos[key].length > 0;
-      };
-
-      // DnD (editMode에서만 가능)
-      function handleDragStart(e, index) {
-        if (!editMode) return;
-        setDraggedItem(index);
-        e.currentTarget.style.opacity = '0.4';
-      }
-      function handleDragEnd(e) {
-        if (!editMode) return;
-        e.currentTarget.style.opacity = '1';
-        setDraggedItem(null);
-        setDraggedOverItem(null);
-      }
-      function handleDragOver(e, index) {
-        if (!editMode) return;
-        e.preventDefault();
-        setDraggedOverItem(index);
-      }
-      function handleDrop(e, index) {
-        if (!editMode) return;
-        e.preventDefault();
-        const itemsCopy = [...items];
-        const draggedItemContent = itemsCopy[draggedItem];
-        itemsCopy.splice(draggedItem, 1);
-        itemsCopy.splice(index, 0, draggedItemContent);
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: itemsCopy
-        }));
-        setDraggedItem(null);
-        setDraggedOverItem(null);
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `todos-${localDateKey}.txt`;
+        link.click();
+        URL.revokeObjectURL(url);
       }
 
-      // 날짜별 색상
-      const currentDateColor = dateColors[dateKey] || '#888888';
-      function handleCurrentDateColorChange(e) {
-        updateDateColors(dateKey, e.target.value);
+      // PNG 내보내기
+      async function exportToImage() {
+        const targetElement = document.getElementById('taskListContainer');
+        const canvas = await html2canvas(targetElement, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+        const link = document.createElement('a');
+        link.download = `todos-${selectedDate.toLocaleDateString('en-CA')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
       }
 
-      // Render
       return (
-        <div style={{ minHeight: '100vh', display: 'flex' }}>
-          {/* 모바일 사이드바 토글 버튼 */}
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
+        <div style={{ padding: '2rem', fontFamily: 'HJSS' }}>
+          <h1 style={{ textAlign: 'center', marginBottom: '1rem' }}>Todo List</h1>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a task... (Shift+Enter for newline)"
+            rows={3}
             style={{
-              position: 'fixed',
-              left: '1rem',
-              top: '1rem',
-              zIndex: 10,
-              background: '#fff',
+              width: '100%',
               padding: '0.5rem',
-              borderRadius: '9999px',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
+              fontSize: '1rem',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              resize: 'vertical',
+              marginBottom: '1rem',
             }}
-            className="md:hidden"
+          />
+          <div id="taskListContainer" style={{ marginBottom: '1rem' }}>
+            {items.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  padding: '0.5rem',
+                  borderBottom: '1px solid #ddd',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{item.text}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowExportModal(true)}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: '#3B82F6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
           >
-            {showSidebar ? '←' : '→'}
+            Export
           </button>
 
-          {/* 사이드바 */}
-          <div
-            style={{
-              position: 'fixed',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: '16rem',
-              background: '#fff',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-              zIndex: 20,
-              overflow: 'visible',
-              transform: showSidebar ? 'translateX(0)' : 'translateX(-100%)',
-              transition: 'transform 0.3s ease-in-out'
-            }}
-            className="md:translate-x-0"
-          >
-            <div style={{ padding: '1rem' }}>
-              {/* 년/월 */}
-              <h2
-                style={{
-                  fontWeight: 'bold',
-                  whiteSpace: 'pre-line',
-                  textAlign: 'center',
-                  marginBottom: '1rem'
-                }}
-              >
-                {selectedDate.toLocaleString('en-US', { year: 'numeric' })}
-                {'\n'}
-                {selectedDate.toLocaleString('en-US', { month: 'long' })}
-              </h2>
-
-              {/* 전체 accentColor */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                <input
-                  type="color"
-                  value={accentColor}
-                  onChange={(e) => setAccentColor(e.target.value)}
-                  style={{
-                    width: '1.5rem',
-                    height: '1.5rem',
-                    borderRadius: '9999px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              {/* 달력 (요일 헤더) */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(7, 1fr)',
-                  gap: '0.25rem',
-                  fontSize: '0.875rem'
-                }}
-              >
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
-                  <div
-                    key={d}
-                    style={{ textAlign: 'center', fontWeight: '500', color: '#666' }}
-                  >
-                    {d}
-                  </div>
-                ))}
-                {/* 첫 주 공백 채우기 */}
-                {Array(firstDay)
-                  .fill(null)
-                  .map((_, i) => (
-                    <div key={`empty-${i}`} />
-                  ))}
-                {Array.from({ length: daysInMonth }, (_, i) => {
-                  const dateObj = new Date(
-                    selectedDate.getFullYear(),
-                    selectedDate.getMonth(),
-                    i + 1
-                  );
-                  const isToday = dateObj.toDateString() === new Date().toDateString();
-                  const dKey = dateObj.toISOString().split('T')[0];
-                  const isSelected = dKey === dateKey;
-                  const hasItemsVar = hasTodos(dateObj);
-
-                  // 해당 날짜 색상 (없으면 accentColor)
-                  const dateCircleColor = dateColors[dKey] || accentColor;
-
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setSelectedDate(dateObj);
-                        if (window.innerWidth < 768) setShowSidebar(false);
-                      }}
-                      style={{
-                        width: '1.8rem',
-                        height: '1.8rem',
-                        margin: '0 auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: isToday && !isSelected ? '1px solid #ccc' : 'none',
-                        backgroundColor: isSelected ? dateCircleColor : 'transparent',
-                        color: isSelected ? '#fff' : '#000',
-                        borderRadius: '9999px',
-                        transition: 'background-color 0.2s',
-                        position: 'relative',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <span>{i + 1}</span>
-                      {hasItemsVar && (
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            color: isSelected ? '#fff' : dateCircleColor,
-                            position: 'absolute',
-                            bottom: '-0.3rem'
-                          }}
-                        >
-                          •
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 이전/다음 달 버튼 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                <button
-                  onClick={handlePrevMonth}
-                  style={{
-                    background: '#f0f0f0',
-                    border: 'none',
-                    padding: '0.25rem 0.5rem',
-                    cursor: 'pointer',
-                    borderRadius: '0.25rem'
-                  }}
-                >
-                  ←
-                </button>
-                <button
-                  onClick={handleNextMonth}
-                  style={{
-                    background: '#f0f0f0',
-                    border: 'none',
-                    padding: '0.25rem 0.5rem',
-                    cursor: 'pointer',
-                    borderRadius: '0.25rem'
-                  }}
-                >
-                  →
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 메인 영역 */}
-          <div
-            style={{
-              flex: 1,
-              padding: '1rem',
-              transition: 'margin-left 0.3s',
-              marginLeft: showSidebar ? '16rem' : '0'
-            }}
-          >
+          {showExportModal && (
             <div
               style={{
-                maxWidth: '42rem',
-                margin: '0 auto',
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
                 background: '#fff',
-                borderRadius: '0.5rem',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                padding: '1.5rem'
+                padding: '1rem',
+                borderRadius: '8px',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
               }}
             >
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-                {selectedDate.toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </h2>
-
-              {/* 이 날짜 전용 색상 (Optional) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.9rem' }}>This date's color:</span>
-                <input
-                  type="color"
-                  value={dateColors[dateKey] || '#888888'}
-                  onChange={handleCurrentDateColorChange}
-                  style={{
-                    width: '1.5rem',
-                    height: '1.5rem',
-                    borderRadius: '9999px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              {/* 할 일 입력부: textarea로 변경해서 Shift+Enter가 줄바꿈 되도록 */}
-              <div
+              <p>Select export format:</p>
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  exportToText();
+                }}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr',
-                  columnGap: '0.5rem',
-                  rowGap: '0.75rem'
+                  marginRight: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#3B82F6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
                 }}
               >
-                {/* (1) 할 일 입력 (textarea) */}
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={handleKeyDownTodo}
-                  placeholder="_"
-                  rows={3}
-                  style={{
-                    gridColumn: '1 / 3',
-                    border: '1px solid #ccc',
-                    padding: '0.5rem',
-                    borderRadius: '0.25rem',
-                    resize: 'vertical'
-                  }}
-                />
-
-                {/* (2) Divider / Category */}
-                <button
-                  onClick={addDivider}
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    background: '#f0f0f0',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Add Divider
-                </button>
-                <input
-                  type="text"
-                  value={categoryText}
-                  onChange={(e) => setCategoryText(e.target.value)}
-                  onKeyDown={handleKeyDownCategory}
-                  placeholder="Add category..."
-                  style={{
-                    border: '1px solid #ccc',
-                    padding: '0.25rem',
-                    borderRadius: '0.25rem',
-                    fontSize: '0.875rem'
-                  }}
-                />
-              </div>
-
-              {/* 할 일 목록 */}
-              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {items.map((item, index) => {
-                  const dndProps = editMode
-                    ? {
-                        draggable: true,
-                        onDragStart: (e) => handleDragStart(e, index),
-                        onDragEnd: handleDragEnd,
-                        onDragOver: (e) => handleDragOver(e, index),
-                        onDrop: (e) => handleDrop(e, index)
-                      }
-                    : {};
-
-                  if (item.type === 'divider') {
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          position: 'relative',
-                          borderTop:
-                            editMode && draggedOverItem === index
-                              ? `2px solid ${accentColor}`
-                              : 'none',
-                          margin: '0.5rem 0'
-                        }}
-                        {...dndProps}
-                      >
-                        <hr
-                          style={{
-                            borderTop: `1px solid ${accentColor}`,
-                            margin: '0.5rem 0'
-                          }}
-                        />
-                        {editMode && (
-                          <div style={{ textAlign: 'right' }}>
-                            <button className="edit-delete-btn" onClick={() => deleteItem(index)}>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  if (item.type === 'category') {
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          cursor: editMode ? 'move' : 'default',
-                          borderTop:
-                            editMode && draggedOverItem === index
-                              ? `2px solid ${accentColor}`
-                              : 'none'
-                        }}
-                        {...dndProps}
-                      >
-                        <div style={{ fontWeight: '600', color: '#555' }}>
-                          {item.text}
-                        </div>
-                        {editMode && (
-                          <div>
-                            <button className="edit-delete-btn" onClick={() => editItem(index)}>
-                              Edit
-                            </button>
-                            <button className="edit-delete-btn" onClick={() => deleteItem(index)}>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // 일반 todo 항목
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem',
-                        borderRadius: '0.25rem',
-                        cursor: editMode ? 'move' : 'default',
-                        background: '#fafafa',
-                        borderTop:
-                          editMode && draggedOverItem === index
-                            ? `2px solid ${accentColor}`
-                            : 'none'
-                      }}
-                      {...dndProps}
-                    >
-                      <span
-                        onClick={(e) => {
-                          if (!editMode) {
-                            e.stopPropagation();
-                            toggleState(index);
-                          }
-                        }}
-                        style={{
-                          color: accentColor,
-                          fontFamily: 'monospace',
-                          fontSize: '1.25rem',
-                          cursor: editMode ? 'default' : 'pointer'
-                        }}
-                      >
-                        {bulletStates[item.state]}
-                      </span>
-                      {/* 여러줄 지원 */}
-                      <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>
-                        {item.text}
-                      </span>
-                      {editMode && (
-                        <>
-                          <button className="edit-delete-btn" onClick={() => editItem(index)}>
-                            Edit
-                          </button>
-                          <button className="edit-delete-btn" onClick={() => deleteItem(index)}>
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Export, Edit 버튼 */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                {items.length > 0 && (
-                  <button
-                    onClick={exportToText}
-                    style={{
-                      flex: 1,
-                      padding: '0.5rem',
-                      fontSize: '0.875rem',
-                      background: accentColor,
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.25rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Export as Text
-                  </button>
-                )}
-                <button
-                  onClick={() => setEditMode((prev) => !prev)}
-                  style={{
-                    flex: items.length > 0 ? 'unset' : 1,
-                    padding: '0.5rem',
-                    fontSize: '0.875rem',
-                    background: editMode ? '#dddddd' : '#f0f0f0',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {editMode ? 'Done' : 'Edit'}
-                </button>
-              </div>
+                TXT
+              </button>
+              <button
+                onClick={() => {
+                  setShowExportModal(false);
+                  exportToImage();
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#3B82F6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                PNG
+              </button>
             </div>
-          </div>
+          )}
         </div>
       );
     }
 
-    // 4) ReactDOM으로 렌더링
     const rootElement = document.getElementById('root');
     const root = ReactDOM.createRoot(rootElement);
     root.render(<App />);
