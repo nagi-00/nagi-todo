@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <title>𝐝 : ᴛᴏᴅᴏ</title>
-  <!-- 파비콘 적용 -->
+  <!-- 파비콘 -->
   <link rel="icon" href="./favi.ico" type="image/x-icon" />
 
-  <!-- 사용자 정의 폰트 사용 -->
+  <!-- 사용자 정의 폰트: HJSS.ttf가 index.html과 동일 폴더에 있다고 가정 -->
   <style>
     @font-face {
       font-family: 'HJSS';
@@ -17,15 +17,13 @@
     body {
       margin: 0;
       padding: 0;
-      font-family: 'HJSS', sans-serif;
+      font-family: 'HJSS', sans-serif; /* 여기서 폰트 이름 사용 */
       background: #f5f5f5;
       box-sizing: border-box;
     }
     *, *:before, *:after {
       box-sizing: inherit;
     }
-
-    /* 할일 편집/삭제 버튼 최소 스타일 */
     .edit-delete-btn {
       font-size: 0.75rem;
       color: #888;
@@ -66,7 +64,9 @@
 
     // 3) App 컴포넌트
     function App() {
-      // 상태들
+      //-----------------------------
+      //  (A) 상태값들
+      //-----------------------------
       const [text, setText] = React.useState('');
       const [categoryText, setCategoryText] = React.useState('');
       const [selectedDate, setSelectedDate] = React.useState(new Date());
@@ -75,22 +75,10 @@
       const [accentColor, setAccentColor] = React.useState('#3B82F6');
       const [draggedItem, setDraggedItem] = React.useState(null);
       const [draggedOverItem, setDraggedOverItem] = React.useState(null);
-
-      // Edit 모드 여부
       const [editMode, setEditMode] = React.useState(false);
 
-      // 로컬 스토리지에서 accentColor 로드
-      React.useEffect(() => {
-        const savedColor = localStorage.getItem('accentColor');
-        if (savedColor) {
-          setAccentColor(savedColor);
-        }
-      }, []);
-
-      // accentColor가 바뀔 때마다 로컬 스토리지에 저장
-      React.useEffect(() => {
-        localStorage.setItem('accentColor', accentColor);
-      }, [accentColor]);
+      // 날짜별 색상 (Firebase에 dateColors라는 노드를 둬서 sync)
+      const [dateColors, setDateColors] = React.useState({});
 
       const bulletStates = ['☐', '☑', '☒'];
       const dateKey = selectedDate.toISOString().split('T')[0];
@@ -108,7 +96,76 @@
         1
       ).getDay();
 
-      // 이전/다음 달 이동
+      //-----------------------------
+      //  (B) Firebase: 날짜별 데이터
+      //-----------------------------
+      // Realtime DB로부터 allTodos 구독
+      React.useEffect(() => {
+        const todosRef = database.ref('todos/' + dateKey);
+        const onValueChange = todosRef.on('value', (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            setAllTodos((prev) => ({
+              ...prev,
+              [dateKey]: data
+            }));
+          } else {
+            // 해당 날짜에 데이터가 없으면 빈 배열
+            setAllTodos((prev) => ({
+              ...prev,
+              [dateKey]: []
+            }));
+          }
+        });
+        return () => todosRef.off('value', onValueChange);
+      }, [dateKey]);
+
+      // 날짜별 색상(dateColors) 구독
+      React.useEffect(() => {
+        const colorsRef = database.ref('dateColors');
+        const onValueChange = colorsRef.on('value', (snapshot) => {
+          if (snapshot.exists()) {
+            setDateColors(snapshot.val());
+          } else {
+            setDateColors({});
+          }
+        });
+        return () => colorsRef.off('value', onValueChange);
+      }, []);
+
+      // allTodos, dateColors 를 DB에 저장/갱신
+      const updateAllTodos = (updater) => {
+        setAllTodos((prev) => {
+          const newAll = typeof updater === 'function' ? updater(prev) : updater;
+          database
+            .ref('todos/' + dateKey)
+            .set(newAll[dateKey])
+            .catch((err) => console.error('DB write error:', err));
+          return newAll;
+        });
+      };
+      const updateDateColors = (dateKey, color) => {
+        setDateColors((prev) => {
+          const newColors = { ...prev, [dateKey]: color };
+          database.ref('dateColors').set(newColors).catch((err) => console.error(err));
+          return newColors;
+        });
+      };
+
+      //-----------------------------
+      //  (C) Local Storage로 accentColor 보존
+      //-----------------------------
+      React.useEffect(() => {
+        const savedColor = localStorage.getItem('accentColor');
+        if (savedColor) setAccentColor(savedColor);
+      }, []);
+      React.useEffect(() => {
+        localStorage.setItem('accentColor', accentColor);
+      }, [accentColor]);
+
+      //-----------------------------
+      //  (D) 달 이동 함수
+      //-----------------------------
       function handlePrevMonth() {
         setSelectedDate((prev) => {
           const newDate = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
@@ -122,40 +179,9 @@
         });
       }
 
-      // 달력 데이터 실시간 구독
-      React.useEffect(() => {
-        const todosRef = database.ref('todos/' + dateKey);
-        const onValueChange = todosRef.on('value', (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            setAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: data
-            }));
-          } else {
-            // 해당 날짜에 데이터가 없으면 빈 배열로
-            setAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: []
-            }));
-          }
-        });
-        return () => todosRef.off('value', onValueChange);
-      }, [dateKey]);
-
-      // local + Firebase 동시 업데이트
-      const updateAllTodos = (updater) => {
-        setAllTodos((prev) => {
-          const newAll = typeof updater === 'function' ? updater(prev) : updater;
-          database
-            .ref('todos/' + dateKey)
-            .set(newAll[dateKey])
-            .catch((err) => console.error('DB write error:', err));
-          return newAll;
-        });
-      };
-
-      // 새 항목 추가
+      //-----------------------------
+      //  (E) 입력 핸들러
+      //-----------------------------
       function handleKeyDown(event, type) {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -180,7 +206,6 @@
           }
         }
       }
-
       function addDivider() {
         updateAllTodos((prev) => ({
           ...prev,
@@ -188,8 +213,12 @@
         }));
       }
 
-      // Todo 체크박스 토글
+      //-----------------------------
+      //  (F) 할 일 목록 관련
+      //-----------------------------
       function toggleState(index) {
+        // 편집 모드 아닐 때만 체크박스 클릭 동작
+        if (editMode) return;
         updateAllTodos((prev) => ({
           ...prev,
           [dateKey]: prev[dateKey].map((item, i) =>
@@ -199,18 +228,13 @@
           )
         }));
       }
-
-      // 삭제
       function deleteItem(index) {
         updateAllTodos((prev) => ({
           ...prev,
           [dateKey]: prev[dateKey].filter((_, i) => i !== index)
         }));
       }
-
-      // 편집(수정)
       function editItem(index) {
-        // prompt로 텍스트 수정
         const item = items[index];
         if (!item) return;
         const newText = prompt('Edit text:', item.text);
@@ -223,7 +247,6 @@
         }
       }
 
-      // 텍스트 파일로 내보내기
       function exportToText() {
         const title = selectedDate.toLocaleDateString('en-US', {
           weekday: 'long',
@@ -252,13 +275,15 @@
         URL.revokeObjectURL(url);
       }
 
-      // 해당 날짜에 할 일 있는지 체크
+      // 날짜별로 할 일 존재 여부
       const hasTodos = (date) => {
         const key = date.toISOString().split('T')[0];
         return allTodos[key] && allTodos[key].length > 0;
       };
 
-      // 드래그앤드롭 (editMode일 때만 활성화)
+      //-----------------------------
+      //  (G) 드래그앤드롭 (편집 모드에서만 활성)
+      //-----------------------------
       function handleDragStart(e, index) {
         if (!editMode) return;
         setDraggedItem(index);
@@ -292,6 +317,19 @@
         setDraggedOverItem(null);
       }
 
+      //-----------------------------
+      //  (H) 현재 날짜의 색상 설정
+      //-----------------------------
+      const currentDateColor = dateColors[dateKey] || '#888888'; // 지정 안된 경우 임시 회색
+
+      function handleCurrentDateColorChange(e) {
+        const newColor = e.target.value;
+        updateDateColors(dateKey, newColor);
+      }
+
+      //-----------------------------
+      //  (I) Render
+      //-----------------------------
       return (
         <div style={{ minHeight: '100vh', display: 'flex' }}>
           {/* 모바일용 사이드바 토글 버튼 */}
@@ -345,7 +383,7 @@
                 {selectedDate.toLocaleString('en-US', { month: 'long' })}
               </h2>
 
-              {/* accentColor 선택 (달력 상단 중앙) */}
+              {/* 앱 전체 accentColor 변경 */}
               <div
                 style={{
                   display: 'flex',
@@ -363,11 +401,11 @@
                     borderRadius: '9999px',
                     cursor: 'pointer'
                   }}
-                  title="Select accent color"
+                  title="Select global accent color"
                 />
               </div>
 
-              {/* 달력 (요일 헤더) */}
+              {/* 달력: 요일 헤더 */}
               <div
                 style={{
                   display: 'grid',
@@ -384,20 +422,26 @@
                     {d}
                   </div>
                 ))}
+                {/* 첫 주 공백 채우기 */}
                 {Array(firstDay)
                   .fill(null)
                   .map((_, i) => (
                     <div key={`empty-${i}`} />
                   ))}
+                {/* 날짜 버튼 */}
                 {Array.from({ length: daysInMonth }, (_, i) => {
                   const date = new Date(
                     selectedDate.getFullYear(),
                     selectedDate.getMonth(),
                     i + 1
                   );
-                  const isSelected = date.toDateString() === selectedDate.toDateString();
+                  const dateKeyCal = date.toISOString().split('T')[0];
+                  const isSelected = dateKeyCal === dateKey;
                   const isToday = date.toDateString() === new Date().toDateString();
                   const hasItemsVar = hasTodos(date);
+
+                  // 해당 날짜에 설정된 색상 있으면 사용, 없으면 accentColor
+                  const dateCircleColor = dateColors[dateKeyCal] || accentColor;
 
                   return (
                     <button
@@ -413,9 +457,8 @@
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        border:
-                          isToday && !isSelected ? '1px solid #ccc' : 'none',
-                        backgroundColor: isSelected ? accentColor : 'transparent',
+                        border: isToday && !isSelected ? '1px solid #ccc' : 'none',
+                        backgroundColor: isSelected ? dateCircleColor : 'transparent',
                         color: isSelected ? '#fff' : '#000',
                         borderRadius: '9999px',
                         transition: 'background-color 0.2s',
@@ -428,7 +471,7 @@
                         <span
                           style={{
                             fontSize: '0.75rem',
-                            color: isSelected ? '#fff' : accentColor,
+                            color: isSelected ? '#fff' : dateCircleColor,
                             position: 'absolute',
                             bottom: '-0.3rem'
                           }}
@@ -441,7 +484,7 @@
                 })}
               </div>
 
-              {/* ← → 버튼 (사이드바 하단) */}
+              {/* 이전/다음 달 */}
               <div
                 style={{
                   display: 'flex',
@@ -496,6 +539,7 @@
                 padding: '1.5rem'
               }}
             >
+              {/* 현재 날짜 표기 */}
               <h2
                 style={{
                   fontSize: '1.25rem',
@@ -510,6 +554,22 @@
                   day: 'numeric'
                 })}
               </h2>
+
+              {/* 이 날짜 전용 색상: dateColors[dateKey] */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                <span style={{ fontSize: '0.9rem' }}>This date's color:</span>
+                <input
+                  type="color"
+                  value={currentDateColor}
+                  onChange={handleCurrentDateColorChange}
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    borderRadius: '9999px',
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
 
               {/* Add a task, Divider, Category를 하나의 grid로 묶어 폭 정렬 */}
               <div
@@ -568,7 +628,7 @@
               {/* 할 일 목록 */}
               <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {items.map((item, index) => {
-                  // 편집 모드일 때만 DnD 이벤트를 부여
+                  // 편집 모드에서만 DnD 가능
                   const dndProps = editMode
                     ? {
                         draggable: true,
@@ -599,7 +659,7 @@
                             margin: '0.5rem 0'
                           }}
                         />
-                        {/* 편집 모드일 때만 수정/삭제 버튼 노출 */}
+                        {/* 편집 모드일 때만 삭제 버튼 */}
                         {editMode && (
                           <div style={{ textAlign: 'right' }}>
                             <button
@@ -675,7 +735,6 @@
                       <span
                         onClick={(e) => {
                           if (!editMode) {
-                            // 편집 모드 아닐 때만 체크박스 클릭
                             e.stopPropagation();
                             toggleState(index);
                           }
