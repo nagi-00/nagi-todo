@@ -34,16 +34,17 @@
 <body>
   <div id="root"></div>
 
-   <!-- HTML2Canvas 라이브러리 -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
-  <!-- React, ReactDOM, Babel -->
+  <!-- React, ReactDOM, Babel (CDN) -->
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!-- Firebase (v9 compat) - Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
+
   <script type="text/babel">
-    // Firebase 설정
+    // 1) Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
       authDomain: "nagi-todo.firebaseapp.com",
@@ -53,6 +54,10 @@
       messagingSenderId: "923414063910",
       appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
     };
+
+    // 2) Firebase 초기화
+    const app = firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
     // 3) App 컴포넌트
     function App() {
@@ -251,126 +256,7 @@
         URL.revokeObjectURL(url);
       }
 
-      // PNG 내보내기
-      async function exportToImage() {
-        const targetElement = document.getElementById('taskListContainer');
-        const canvas = await html2canvas(targetElement, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-        });
-        const link = document.createElement('a');
-        link.download = `todos-${selectedDate.toLocaleDateString('en-CA')}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      }
 
-      return (
-        <div style={{ padding: '2rem', fontFamily: 'HJSS' }}>
-          <h1 style={{ textAlign: 'center', marginBottom: '1rem' }}>Todo List</h1>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Add a task... (Shift+Enter for newline)"
-            rows={3}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              fontSize: '1rem',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              resize: 'vertical',
-              marginBottom: '1rem',
-            }}
-          />
-          <div id="taskListContainer" style={{ marginBottom: '1rem' }}>
-            {items.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  padding: '0.5rem',
-                  borderBottom: '1px solid #ddd',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <span>{item.text}</span>
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={() => setShowExportModal(true)}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: '#3B82F6',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Export
-          </button>
-
-          {showExportModal && (
-            <div
-              style={{
-                position: 'fixed',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: '#fff',
-                padding: '1rem',
-                borderRadius: '8px',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-              }}
-            >
-              <p>Select export format:</p>
-              <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  exportToText();
-                }}
-                style={{
-                  marginRight: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#3B82F6',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                TXT
-              </button>
-              <button
-                onClick={() => {
-                  setShowExportModal(false);
-                  exportToImage();
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#3B82F6',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
-              >
-                PNG
-              </button>
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    const rootElement = document.getElementById('root');
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(<App />);
-  </script>
-</body>
-</html>
 
       // 해당 날짜 할 일 존재 여부
       const hasTodos = (d) => {
