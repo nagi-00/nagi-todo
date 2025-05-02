@@ -47,6 +47,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <script type="text/babel">
+    // Firebase 초기화
     const firebaseConfig = {
       apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
       authDomain: "nagi-todo.firebaseapp.com",
@@ -59,12 +60,15 @@
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
+    // 제대로 된 KST 계산 (UTC→KST)
     function getSeoulDate() {
-      return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+      const now = new Date();
+      const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+      return new Date(utc + 9 * 60 * 60000);
     }
 
     function App() {
-      // --- 기존 상태들 ---
+      // 기본 상태
       const [selectedDate, setSelectedDate] = React.useState(getSeoulDate());
       const [showSidebar, setShowSidebar] = React.useState(true);
       const [allTodos, setAllTodos] = React.useState({});
@@ -78,208 +82,216 @@
       const [draggedItem, setDraggedItem] = React.useState(null);
       const [draggedOverItem, setDraggedOverItem] = React.useState(null);
 
-      // --- 새로 추가된 “세 구획 입력” 상태 ---
+      // 세 구획 입력 상태
       const [textNec, setTextNec] = React.useState('');
       const [textGro, setTextGro] = React.useState('');
       const [textFree, setTextFree] = React.useState('');
 
-      const bulletStates = ['☐', '☑', '☒'];
+      const bulletStates = ['☐','☑','☒'];
       const dateKey = selectedDate.toISOString().split('T')[0];
       const items = allTodos[dateKey] || [];
 
-      // --- Firebase 구독들 ---
-      React.useEffect(() => {
-        const ref = database.ref('todos/' + dateKey);
-        const handler = ref.on('value', snap => {
-          setAllTodos(prev => ({
-            ...prev,
-            [dateKey]: snap.val() || []
-          }));
+      // Firebase 구독: todos
+      React.useEffect(()=>{
+        const ref = database.ref('todos/'+dateKey);
+        const handler = ref.on('value', snap=>{
+          setAllTodos(prev=>({...prev, [dateKey]: snap.val()||[]}));
         });
-        return () => ref.off('value', handler);
+        return ()=>ref.off('value', handler);
       }, [dateKey]);
 
-      React.useEffect(() => {
+      // Firebase 구독: dateColors
+      React.useEffect(()=>{
         const ref = database.ref('dateColors');
-        const handler = ref.on('value', snap => {
-          setDateColors(snap.val() || {});
+        const handler = ref.on('value', snap=>{
+          setDateColors(snap.val()||{});
         });
-        return () => ref.off('value', handler);
+        return ()=>ref.off('value', handler);
       }, []);
 
-      React.useEffect(() => {
+      // Firebase 구독: notes (현재 날짜)
+      React.useEffect(()=>{
         setNotesEditMode(false);
-        const ref = database.ref('notes/' + dateKey);
-        const handler = ref.on('value', snap => {
-          setNoteText(snap.val() || '');
+        const ref = database.ref('notes/'+dateKey);
+        const handler = ref.on('value', snap=>{
+          setNoteText(snap.val()||'');
         });
-        return () => ref.off('value', handler);
+        return ()=>ref.off('value', handler);
       }, [dateKey]);
 
-      React.useEffect(() => {
+      // Firebase 구독: all notes
+      React.useEffect(()=>{
         const ref = database.ref('notes');
-        const handler = ref.on('value', snap => {
-          setNotes(snap.val() || {});
+        const handler = ref.on('value', snap=>{
+          setNotes(snap.val()||{});
         });
-        return () => ref.off('value', handler);
+        return ()=>ref.off('value', handler);
       }, []);
 
-      React.useEffect(() => {
+      // accentColor 로컬 저장소
+      React.useEffect(()=>{
         const saved = localStorage.getItem('accentColor');
-        if (saved) setAccentColor(saved);
+        if(saved) setAccentColor(saved);
       }, []);
-      React.useEffect(() => {
+      React.useEffect(()=>{
         localStorage.setItem('accentColor', accentColor);
       }, [accentColor]);
 
-      // --- 월 이동 & Today (Notes 리스트 초기화 포함) ---
-      function handlePrevMonth() {
-        setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+      // 월 이동 & Today (Notes 리스트 자동 닫기)
+      function handlePrevMonth(){
+        setSelectedDate(prev=> new Date(prev.getFullYear(),prev.getMonth()-1,1));
       }
-      function handleNextMonth() {
-        setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+      function handleNextMonth(){
+        setSelectedDate(prev=> new Date(prev.getFullYear(),prev.getMonth()+1,1));
       }
-      function handleToday() {
+      function handleToday(){
         setSelectedDate(getSeoulDate());
         setShowNotesList(false);
       }
 
-      // --- 세 구획 입력 핸들러들 ---
-      function handleKeyDownNec(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+      // 세 구획별 할 일 추가
+      function handleKeyDownNec(e){
+        if(e.key==='Enter' && !e.shiftKey){
           e.preventDefault();
-          if (textNec.trim()) {
-            database.ref('todos/' + dateKey).set([...items, { type:'todo', text:textNec.trim(), state:0 }]);
+          if(textNec.trim()){
+            database.ref('todos/'+dateKey)
+              .set([...items, {type:'todo', category:'필연의 시간', text:textNec.trim(), state:0}]);
             setTextNec('');
           }
         }
       }
-      function handleKeyDownGro(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+      function handleKeyDownGro(e){
+        if(e.key==='Enter' && !e.shiftKey){
           e.preventDefault();
-          if (textGro.trim()) {
-            database.ref('todos/' + dateKey).set([...items, { type:'todo', text:textGro.trim(), state:0 }]);
+          if(textGro.trim()){
+            database.ref('todos/'+dateKey)
+              .set([...items, {type:'todo', category:'성장의 시간', text:textGro.trim(), state:0}]);
             setTextGro('');
           }
         }
       }
-      function handleKeyDownFree(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+      function handleKeyDownFree(e){
+        if(e.key==='Enter' && !e.shiftKey){
           e.preventDefault();
-          if (textFree.trim()) {
-            database.ref('todos/' + dateKey).set([...items, { type:'todo', text:textFree.trim(), state:0 }]);
+          if(textFree.trim()){
+            database.ref('todos/'+dateKey)
+              .set([...items, {type:'todo', category:'자유의 시간', text:textFree.trim(), state:0}]);
             setTextFree('');
           }
         }
       }
 
-      // --- 기존 핸들러들 (토글·삭제·편집·드래그·내보내기·Notes 저장) ---
-      function toggleState(index) {
-        if (editMode) return;
-        const updated = items.map((it, i) =>
-          i === index && it.type === 'todo'
-            ? { ...it, state:(it.state+1)%bulletStates.length }
+      // 상태 토글
+      function toggleState(idx){
+        if(editMode) return;
+        const updated = items.map((it,i)=>
+          i===idx && it.type==='todo' 
+            ? {...it, state:(it.state+1)%bulletStates.length} 
             : it
         );
-        database.ref('todos/' + dateKey).set(updated);
+        database.ref('todos/'+dateKey).set(updated);
       }
-      function deleteItem(index) {
-        const filtered = items.filter((_, i)=>i!==index);
-        database.ref('todos/' + dateKey).set(filtered);
+      // 삭제
+      function deleteItem(idx){
+        const filtered = items.filter((_,i)=>i!==idx);
+        database.ref('todos/'+dateKey).set(filtered);
       }
-      function editItem(index) {
-        const it = items[index];
-        if (!it) return;
-        const newText = prompt('Edit text:', it.text);
-        if (newText!=null && newText.trim()) {
-          const copy = [...items];
-          copy[index].text = newText.trim();
-          database.ref('todos/' + dateKey).set(copy);
+      // 편집 (기존 방식)
+      function editItem(idx){
+        const it = items[idx];
+        if(!it) return;
+        const nt = prompt('Edit text:', it.text);
+        if(nt!=null && nt.trim()){
+          const copy=[...items];
+          copy[idx].text=nt.trim();
+          database.ref('todos/'+dateKey).set(copy);
         }
       }
-      function handleKeyDownNote(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+
+      // Notes 저장
+      function handleKeyDownNote(e){
+        if(e.key==='Enter' && !e.shiftKey){
           e.preventDefault();
-          database.ref('notes/' + dateKey).set(noteText.trim());
+          database.ref('notes/'+dateKey).set(noteText.trim());
           setNotesEditMode(false);
         }
       }
-      function handleCurrentDateColorChange(e) {
-        database.ref('dateColors/' + dateKey).set(e.target.value);
+      // 날짜별 컬러 변경
+      function handleCurrentDateColorChange(e){
+        database.ref('dateColors/'+dateKey).set(e.target.value);
       }
-      function handleDragStart(e, idx) {
-        if (!editMode) return;
-        setDraggedItem(idx);
-        e.currentTarget.style.opacity = '0.4';
-      }
-      function handleDragEnd(e) {
-        if (!editMode) return;
-        e.currentTarget.style.opacity = '1';
-        setDraggedItem(null); setDraggedOverItem(null);
-      }
-      function handleDragOver(e, idx) {
-        if (!editMode) return;
-        e.preventDefault(); setDraggedOverItem(idx);
-      }
-      function handleDrop(e, idx) {
-        if (!editMode) return;
+
+      // DnD (생략: 이전과 동일)
+      function handleDragStart(e,i){ if(!editMode)return; setDraggedItem(i); e.currentTarget.style.opacity='0.4'; }
+      function handleDragEnd(e){ if(!editMode)return; e.currentTarget.style.opacity='1'; setDraggedItem(null); setDraggedOverItem(null); }
+      function handleDragOver(e,i){ if(!editMode)return; e.preventDefault(); setDraggedOverItem(i); }
+      function handleDrop(e,i){
+        if(!editMode)return;
         e.preventDefault();
-        const copy = [...items];
-        const moved = copy.splice(draggedItem,1)[0];
-        copy.splice(idx,0,moved);
-        database.ref('todos/' + dateKey).set(copy);
+        const copy=[...items];
+        const mv=copy.splice(draggedItem,1)[0];
+        copy.splice(i,0,mv);
+        database.ref('todos/'+dateKey).set(copy);
         setDraggedItem(null); setDraggedOverItem(null);
       }
-      async function exportAsImage() {
+
+      // 이미지 내보내기 (생략: 이전과 동일)
+      async function exportAsImage(){
         const container = document.querySelector('.todo-container');
-        const canvas = await html2canvas(container, { backgroundColor:'#fff' });
-        canvas.toBlob(async blob => {
-          try {
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        const canvas = await html2canvas(container,{backgroundColor:'#fff'});
+        canvas.toBlob(async blob=>{
+          try{
+            await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
             alert('클립보드에 이미지를 복사했어.');
-          } catch {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `todo-${dateKey}.png`;
-            a.click(); URL.revokeObjectURL(url);
+          }catch{
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');
+            a.href=url; a.download=`todo-${dateKey}.png`; a.click();
+            URL.revokeObjectURL(url);
             alert('이미지를 다운로드했어.');
           }
         });
       }
 
-      // --- 캘린더 계산 & 헬퍼 ---
-      const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth()+1,0).getDate();
-      const firstDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(),1).getDay();
-      const todayKey = getSeoulDate().toISOString().split('T')[0];
-      const hasTodos = d => {
+      // 달력 계산
+      const daysInMonth = new Date(selectedDate.getFullYear(),selectedDate.getMonth()+1,0).getDate();
+      const firstDay = new Date(selectedDate.getFullYear(),selectedDate.getMonth(),1).getDay();
+      const hasTodos = d=>{
         const k = d.toISOString().split('T')[0];
-        return allTodos[k] && allTodos[k].length > 0;
+        return allTodos[k] && allTodos[k].length>0;
       };
 
+      // 범주별 배열 생성
+      const categories = ['필연의 시간','성장의 시간','자유의 시간'];
+      const tasksByCategory = categories.map(cat=>
+        items.map((it,i)=>
+          it.type==='todo' && it.category===cat ? {...it, index:i} : null
+        ).filter(x=>x)
+      );
+
       return (
-        <div style={{ display:'flex', minHeight:'100vh' }}>
-          {/* 모바일 사이드바 토글 */}
+        <div style={{display:'flex',minHeight:'100vh'}}>
+          {/* 사이드바 토글 */}
           <button onClick={()=>setShowSidebar(v=>!v)}
-            style={{ position:'fixed',left:'1rem',top:'1rem',zIndex:10,
+            style={{
+              position:'fixed',left:'1rem',top:'1rem',zIndex:10,
               background:'#fff',padding:'0.5rem',borderRadius:'9999px',
-              boxShadow:'0 2px 5px rgba(0,0,0,0.1)',cursor:'pointer'}}
-            className="md:hidden">
-            {showSidebar?'←':'→'}
-          </button>
+              boxShadow:'0 2px 5px rgba(0,0,0,0.1)',cursor:'pointer'
+            }}
+            className="md:hidden"
+          >{showSidebar?'←':'→'}</button>
 
           {/* 사이드바 */}
           <div style={{
             position:'fixed',left:0,top:0,bottom:0,width:'16rem',
             background:'#fff',boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
-            zIndex:20,overflow:'auto',
-            transform: showSidebar?'translateX(0)':'translateX(-100%)',
-            transition:'transform 0.3s ease-in-out'
+            overflow:'auto',transform:showSidebar?'translateX(0)':'translateX(-100%)',
+            transition:'transform 0.3s ease-in-out',zIndex:20
           }}>
-            <div style={{ padding:'1rem' }}>
+            <div style={{padding:'1rem'}}>
               <h2 style={{
-                fontWeight:'bold',whiteSpace:'pre-line',textAlign:'center',
-                marginBottom:'1rem'
+                textAlign:'center',fontWeight:'bold',
+                whiteSpace:'pre-line',marginBottom:'1rem'
               }}>
                 {selectedDate.toLocaleString('en-US',{year:'numeric'})}{'\n'}
                 {selectedDate.toLocaleString('en-US',{month:'long'})}
@@ -287,7 +299,8 @@
 
               {/* ← Today → */}
               <div style={{
-                display:'flex',justifyContent:'center',gap:'0.5rem',margin:'0.5rem 0'
+                display:'flex',justifyContent:'center',
+                gap:'0.5rem',margin:'0.5rem 0'
               }}>
                 <button onClick={handlePrevMonth}
                   style={{background:'#fff',border:'none',padding:'0.25rem 0.5rem',cursor:'pointer'}}>←</button>
@@ -297,36 +310,37 @@
                   style={{background:'#fff',border:'none',padding:'0.25rem 0.5rem',cursor:'pointer'}}>→</button>
               </div>
 
+              {/* Notes 토글 */}
               <button onClick={()=>setShowNotesList(v=>!v)}
                 style={{
                   width:'100%',padding:'0.5rem',marginBottom:'1rem',
                   background:'#f0f0f0',border:'none',cursor:'pointer'
-                }}>
-                {showNotesList?'Back':'Notes'}
-              </button>
+                }}
+              >{showNotesList?'Back':'Notes'}</button>
 
               {showNotesList
-                ? Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,text])=>(
-                    <div key={d} style={{
-                      background:'#fff',borderRadius:'0.5rem',
-                      padding:'0.75rem',marginBottom:'0.5rem',
-                      boxShadow:'0 1px 3px rgba(0,0,0,0.1)'
-                    }}>
-                      <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>
-                        {new Date(d).toLocaleString('en-US',{
-                          weekday:'long',year:'numeric',month:'long',day:'numeric'
-                        })}
+                ? Object.entries(notes)
+                    .sort((a,b)=>b[0].localeCompare(a[0]))
+                    .map(([d,txt])=>(
+                      <div key={d} style={{
+                        background:'#fff',borderRadius:'0.5rem',
+                        padding:'0.75rem',marginBottom:'0.5rem',
+                        boxShadow:'0 1px 3px rgba(0,0,0,0.1)'
+                      }}>
+                        <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>
+                          {new Date(d).toLocaleString('en-US',{
+                            weekday:'long',year:'numeric',month:'long',day:'numeric'
+                          })}
+                        </div>
+                        <div style={{
+                          fontWeight:'bold',whiteSpace:'pre-wrap',
+                          color: dateColors[d]||accentColor
+                        }}>{txt}</div>
+                        <button className="edit-delete-btn"
+                          onClick={()=>database.ref('notes/'+d).remove()}
+                        >Delete</button>
                       </div>
-                      <div style={{
-                        fontWeight:'bold',whiteSpace:'pre-wrap',
-                        color:dateColors[d]||accentColor
-                      }}>{text}</div>
-                      <button className="edit-delete-btn"
-                        onClick={()=>database.ref('notes/'+d).remove()}>
-                        Delete
-                      </button>
-                    </div>
-                  ))
+                    ))
                 : <div style={{
                     display:'grid',gridTemplateColumns:'repeat(7,1fr)',
                     gap:'0.25rem',fontSize:'0.875rem'
@@ -337,16 +351,16 @@
                       }}>{d}</div>
                     ))}
                     {Array(firstDay).fill(null).map((_,i)=>(
-                      <div key={`e-${i}`}/>
+                      <div key={'e'+i}/>
                     ))}
                     {Array.from({length:daysInMonth},(_,i)=>{
-                      const dateObj = new Date(
+                      const dateObj=new Date(
                         selectedDate.getFullYear(),
                         selectedDate.getMonth(),i+1
                       );
-                      const dKey = dateObj.toISOString().split('T')[0];
-                      const isSel = dKey===dateKey;
-                      const circleColor = dateColors[dKey]||accentColor;
+                      const dKey=dateObj.toISOString().split('T')[0];
+                      const isSel=dKey===dateKey;
+                      const circleColor=dateColors[dKey]||accentColor;
                       return (
                         <button key={i}
                           onClick={()=>{
@@ -354,14 +368,16 @@
                             if(window.innerWidth<768) setShowSidebar(false);
                           }}
                           style={{
-                            width:'1.8rem',height:'1.8rem',margin:'0 auto',
-                            display:'flex',alignItems:'center',justifyContent:'center',
+                            width:'1.8rem',height:'1.8rem',
+                            margin:'0 auto',display:'flex',
+                            alignItems:'center',justifyContent:'center',
                             border:'none',
                             backgroundColor:isSel?circleColor:'transparent',
                             color:isSel?'#fff':'#000',
                             borderRadius:'9999px',cursor:'pointer',
                             position:'relative'
-                          }}>
+                          }}
+                        >
                           <span>{i+1}</span>
                           {hasTodos(dateObj)&&(
                             <span style={{
@@ -378,7 +394,7 @@
             </div>
           </div>
 
-          {/* 메인 영역 */}
+          {/* 메인 */}
           <div style={{
             flex:1,padding:'1rem',
             marginLeft:showSidebar?'16rem':'0',
@@ -400,12 +416,13 @@
 
               {/* Notes 입력부 */}
               <div style={{
-                display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'1rem'
+                display:'flex',alignItems:'center',gap:'0.5rem',
+                marginBottom:'1rem'
               }}>
                 {(!notesEditMode && noteText.trim())
                   ? <div style={{
                       fontWeight:'bold',whiteSpace:'pre-wrap',
-                      color:dateColors[dateKey]||accentColor
+                      color: dateColors[dateKey]||accentColor
                     }}
                     onDoubleClick={()=>setNotesEditMode(true)}
                     onContextMenu={e=>{e.preventDefault();setNotesEditMode(true)}}>
@@ -422,7 +439,7 @@
                         width:'100%',border:'1px solid #ccc',
                         padding:'0.5rem',borderRadius:'0.25rem',
                         resize:'vertical',fontWeight:'bold',
-                        color:dateColors[dateKey]||accentColor
+                        color: dateColors[dateKey]||accentColor
                       }}
                     />
                 }
@@ -437,154 +454,91 @@
                 />
               </div>
 
-              {/* 세 구획 할 일 입력부 */}
+              {/* 세 구획 입력 */}
               <div style={{
                 display:'grid',
                 gridTemplateColumns:'repeat(3,1fr)',
                 gap:'0.5rem',marginBottom:'1rem'
               }}>
                 <div>
-                  <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>필연의 시간</div>
+                  <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>필연의 시간</div>
                   <textarea
                     value={textNec}
                     onChange={e=>setTextNec(e.target.value)}
                     onKeyDown={handleKeyDownNec}
-                    placeholder="필연의 시간 (Enter 저장, Shift+Enter 줄바꿈)"
+                    placeholder="필연의 시간 (Enter 저장)"
                     rows={3}
                     style={{
                       border:'1px solid #ccc',
-                      padding:'0.5rem',
-                      borderRadius:'0.25rem',
+                      padding:'0.5rem',borderRadius:'0.25rem',
                       resize:'vertical'
                     }}
                   />
+
+```html
                 </div>
                 <div>
-                  <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>성장의 시간</div>
+                  <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>성장의 시간</div>
                   <textarea
                     value={textGro}
                     onChange={e=>setTextGro(e.target.value)}
                     onKeyDown={handleKeyDownGro}
-                    placeholder="성장의 시간 (Enter 저장, Shift+Enter 줄바꿈)"
+                    placeholder="성장의 시간 (Enter 저장)"
                     rows={3}
                     style={{
                       border:'1px solid #ccc',
-                      padding:'0.5rem',
-                      borderRadius:'0.25rem',
+                      padding:'0.5rem',borderRadius:'0.25rem',
                       resize:'vertical'
                     }}
                   />
                 </div>
                 <div>
-                  <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>자유의 시간</div>
+                  <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>자유의 시간</div>
                   <textarea
                     value={textFree}
                     onChange={e=>setTextFree(e.target.value)}
                     onKeyDown={handleKeyDownFree}
-                    placeholder="자유의 시간 (Enter 저장, Shift+Enter 줄바꿈)"
+                    placeholder="자유의 시간 (Enter 저장)"
                     rows={3}
                     style={{
                       border:'1px solid #ccc',
-                      padding:'0.5rem',
-                      borderRadius:'0.25rem',
+                      padding:'0.5rem',borderRadius:'0.25rem',
                       resize:'vertical'
                     }}
                   />
                 </div>
               </div>
 
-              {/* 카테고리 / Divider (기존 기능 유지) */}
-              <div style={{
-                display:'grid',gridTemplateColumns:'auto 1fr',
-                columnGap:'0.5rem',rowGap:'0.75rem'
-              }}>
-                <button onClick={()=>{
-                  database.ref('todos/'+dateKey).set([...items,{type:'divider'}]);
-                }} style={{
-                  padding:'0.5rem 0.75rem',fontSize:'0.875rem',
-                  background:'#f0f0f0',border:'none',
-                  borderRadius:'0.25rem',cursor:'pointer'
-                }}>Add Divider</button>
-                <input
-                  type="text"
-                  value={ /* categoryText 상태가 있었던 부분 */ '' }
-                  onChange={()=>{}}
-                  onKeyDown={()=>{}}
-                  placeholder="Add category..."
-                  style={{
-                    border:'1px solid #ccc',padding:'0.25rem',
-                    borderRadius:'0.25rem',fontSize:'0.875rem'
-                  }}
-                />
-              </div>
-
-              {/* 할 일 목록 */}
-              <div style={{
-                marginTop:'1rem',display:'flex',
-                flexDirection:'column',gap:'0.5rem'
-              }}>
-                {items.map((item,i)=>{
-                  const dndProps = editMode?{
-                    draggable:true,
-                    onDragStart:e=>handleDragStart(e,i),
-                    onDragEnd:handleDragEnd,
-                    onDragOver:e=>handleDragOver(e,i),
-                    onDrop:e=>handleDrop(e,i)
-                  }:{};
-
-                  if(item.type==='divider'){
-                    return (
-                      <div key={i} style={{
-                        position:'relative',
-                        borderTop:editMode&&draggedOverItem===i?`2px solid ${accentColor}`:'none',
-                        margin:'0.5rem 0'
-                      }} {...dndProps}>
-                        <hr style={{
-                          borderTop:`1px solid ${accentColor}`,
-                          margin:'0.5rem 0'
-                        }} />
-                        {editMode&&(
-                          <div style={{ textAlign:'right' }}>
-                            <button className="edit-delete-btn" onClick={()=>deleteItem(i)}>Delete</button>
-                          </div>
-                        )}
+              {/* 범주별 그룹 표시 */}
+              <div style={{marginTop:'1rem'}}>
+                {categories.map((cat, idx) => (
+                  <div key={cat} style={{marginBottom:'1rem'}}>
+                    <div style={{fontWeight:'600',marginBottom:'0.5rem'}}>{cat}</div>
+                    {tasksByCategory[idx].map(item=>(
+                      <div key={item.index} style={{
+                        display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.25rem'
+                      }}>
+                        <span onClick={()=>toggleState(item.index)}
+                          style={{color:accentColor,cursor:'pointer',fontFamily:'monospace'}}>
+                          {bulletStates[item.state]}
+                        </span>
+                        <span style={{flex:1,whiteSpace:'pre-wrap'}}>
+                          {item.text}
+                        </span>
                       </div>
-                    );
-                  }
-                  return (
-                    <div key={i} style={{
-                      display:'flex',alignItems:'center',gap:'0.5rem',
-                      padding:'0.5rem',borderRadius:'0.25rem',
-                      cursor:editMode?'move':'default',
-                      background:'#fafafa',
-                      borderTop:editMode&&draggedOverItem===i?`2px solid ${accentColor}`:'none'
-                    }} {...dndProps}>
-                      <span
-                        onClick={e=>{e.stopPropagation();toggleState(i);}}
-                        onContextMenu={e=>{e.preventDefault();toggleState(i);}}
-                        style={{
-                          color:accentColor,fontFamily:'monospace',
-                          fontSize:'1.25rem',
-                          cursor:editMode?'default':'pointer'
-                        }}>
-                        {bulletStates[item.state]}
-                      </span>
-                      <span style={{ flex:1,whiteSpace:'pre-wrap' }}>
-                        {item.text}
-                      </span>
-                      {editMode&&(
-                        <>
-                          <button className="edit-delete-btn" onClick={()=>editItem(i)}>Edit</button>
-                          <button className="edit-delete-btn" onClick={()=>deleteItem(i)}>Delete</button>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
+                    ))}
+                    {idx < categories.length-1 && (
+                      <hr style={{
+                        borderTop:`1px solid ${accentColor}`,
+                        width:'33%',margin:'0.75rem 0'
+                      }}/>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {/* Export / Edit */}
-              <div style={{ display:'flex',gap:'0.5rem',marginTop:'1rem' }}>
+              <div style={{display:'flex',gap:'0.5rem',marginTop:'1rem'}}>
                 {items.length>0 && (
                   <button onClick={exportAsImage} style={{
                     flex:1,padding:'0.5rem',
@@ -601,15 +555,13 @@
                   cursor:'pointer'
                 }}>{editMode?'Done':'Edit'}</button>
               </div>
-
             </div>
           </div>
         </div>
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
 </body>
 </html>
