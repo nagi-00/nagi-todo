@@ -26,6 +26,8 @@
     hr.divider { border: none; border-top: 2px solid var(--today-color); margin: 0.5rem 0; }
     .todo-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #fafafa; border-radius: 4px; }
     .todo-item.dragging { opacity: 0.5; }
+    /* 체크박스(불릿) 컬러를 오늘의 컬러로 적용 */
+    .todo-item span:first-child { color: var(--today-color); }
     .note-display { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.875rem; }
     .footer-buttons { display: flex; gap: 0.5rem; }
   </style>
@@ -141,7 +143,7 @@
           <div id="export-container" className="main-container">
             <h2>{date.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</h2>
             {locked?
-              <div className="note-display" style={{color:colors[dateKey]||'#888'}} onDoubleClick={unlockNote}>{note}</div>
+              <div className="note-display" style={{color:colors[dateKey]||'#888}}" onDoubleClick={unlockNote}>{note}</div>
               :
               <textarea className="note-input" value={note} onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveNote(note);lockNote();}}} placeholder="오늘의 한마디" rows={2}/>
             }
@@ -154,12 +156,7 @@
               <input className="category-input" value={cat} onChange={e=>setCat(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){addCat();}}} placeholder="카테고리 추가"/>
             </div>
             <div className="section">
-              {todos.map((it,i)=>it.type==='divider'?<hr key={i} className="divider"/>:it.type==='category'?<div key={i} style={{fontWeight:600}}>{it.text}</div>:(
-                <div key={i} className="todo-item" draggable={editMode} onDragStart={e=>e.currentTarget.classList.add('dragging')} onDragEnd={e=>e.currentTarget.classList.remove('dragging')} onClick={()=>!editMode&&toggle(i)}>
-                  <span>{['☐','☑','☒'][it.state]}</span><span style={{flex:1}}>{it.text}</span>
-                  {editMode&&<><button onClick={()=>edit(i)}>Edit</button><button onClick={()=>remove(i)}>Del</button></>}
-                </div>
-              ))}
+              {todos.map((it,i)=>it.type==='divider'?<hr key={i} className="divider"/>:it.type==='category'?<div key={i} style={{fontWeight:600}}>{it.text}</div>:<div key={i} className="todo-item" draggable={editMode} onDragStart={e=>e.currentTarget.classList.add('dragging')} onDragEnd={e=>e.currentTarget.classList.remove('dragging')} onClick={()=>!editMode&&toggle(i)}><span>{['☐','☑','☒'][it.state]}</span><span style={{flex:1}}>{it.text}</span>{editMode&&<><button onClick={()=>edit(i)}>Edit</button><button onClick={()=>remove(i)}>Del</button></>}</div>)}
             </div>
             <div className="footer-buttons">
               <button className="action" onClick={exportImg}>Export as Image</button>
