@@ -1,16 +1,16 @@
 <!DOCTYPE html>
-
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>𝐝 : ᴛᴏᴅᴏ</title>
   <link rel="icon" href="./favi.ico" type="image/x-icon" />
   <style>
-    @font-face {
-      font-family: 'HJSS';
-      src: url('./HJSS.ttf') format('truetype');
-      font-weight: normal;
-      font-style: normal;
+    :root {
+      --today-color: #000;
+      --primary-color: #3498db;
+      --sidebar-width: 250px;
+      --border-radius: 8px;
     }
     body {
       margin: 0;
@@ -22,743 +22,804 @@
     *, *::before, *::after {
       box-sizing: inherit;
     }
-    .edit-delete-btn {
-      font-size: 0.75rem;
-      color: #888;
+    #app {
+      max-width: 800px;
+      margin: auto;
+      padding: 1rem;
+      background: #fff;
+      min-height: 100vh;
+      position: relative;
+      transition: margin-left 0.3s;
+    }
+    .with-sidebar {
+      margin-left: var(--sidebar-width) !important;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .day {
+      padding: 0.5rem;
+      text-align: center;
+      cursor: pointer;
+      border-radius: var(--border-radius);
+      transition: background-color 0.2s;
+    }
+    .day:hover:not(.empty) {
+      background-color: #eee;
+    }
+    .day-header {
+      font-weight: bold;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    .sat { color: #7192C8; }
+    .sun { color: #C87171; }
+    .today { 
+      background: var(--today-color); 
+      color: #fff; 
+      border-radius: var(--border-radius);
+    }
+    .selected-day {
+      border: 2px solid var(--today-color);
+      border-radius: var(--border-radius);
+    }
+    .controls button {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 0.5rem 0.8rem;
+      cursor: pointer;
+      margin: 0 0.25rem;
+      border-radius: var(--border-radius);
+      transition: background-color 0.2s;
+    }
+    .controls button:hover {
+      background-color: #f0f0f0;
+    }
+    .quotes-input {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius);
+      resize: vertical;
+      min-height: 80px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .quotes-input:focus {
+      outline: none;
+      border-color: var(--today-color);
+    }
+    .quotes-input[readonly] {
+      font-weight: bold;
+      color: var(--today-color);
+      cursor: pointer;
+      background-color: #f9f9f9;
+    }
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: var(--sidebar-width);
+      background: #2c3e50;
+      color: white;
+      padding: 1rem;
+      z-index: 1000;
+      transform: translateX(-100%);
+      transition: transform 0.3s;
+    }
+    .sidebar.active {
+      transform: translateX(0);
+    }
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    .sidebar-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+    .close-sidebar {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .sidebar button.nav-btn {
+      display: block;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      padding: 0.8rem;
+      margin-bottom: 1rem;
+      text-align: left;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .sidebar button.nav-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .menu-toggle {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem;
+    }
+    .quotes-page .card {
+      border: 1px solid #ddd;
+      margin-bottom: 1rem;
+      padding: 1rem;
+      border-radius: var(--border-radius);
+      background: #fff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    .quotes-page .card-date {
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    .quotes-page .card-content {
+      color: var(--today-color);
+    }
+    .todo-section {
+      margin-top: 2rem;
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .todo-list {
+      margin-top: 1rem;
+    }
+    .todo-item {
+      display: flex;
+      align-items: center;
+      padding: 0.8rem;
+      border-bottom: 1px solid #eee;
+      border-radius: var(--border-radius);
+      background: #fff;
+      transition: background-color 0.2s;
+      margin-bottom: 0.5rem;
+    }
+    .todo-item:hover {
+      background-color: #f9f9f9;
+    }
+    .todo-checkbox {
+      margin-right: 0.8rem;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    .todo-text {
+      flex-grow: 1;
+      user-select: none;
+    }
+    .todo-item.done .todo-text {
+      text-decoration: line-through;
+      color: #999;
+    }
+    .todo-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .todo-btn {
       background: none;
       border: none;
       cursor: pointer;
+      opacity: 0.6;
+      transition: opacity 0.2s;
+      font-size: 1rem;
+    }
+    .todo-btn:hover {
+      opacity: 1;
+    }
+    .add-todo {
+      display: flex;
+      margin-bottom: 1rem;
+    }
+    .add-todo input {
+      flex-grow: 1;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius) 0 0 var(--border-radius);
+      font-family: inherit;
+    }
+    .add-todo input:focus {
+      outline: none;
+      border-color: var(--today-color);
+    }
+    .add-todo button {
+      padding: 0.8rem 1.2rem;
+      background: var(--today-color);
+      color: white;
+      border: none;
+      border-radius: 0 var(--border-radius) var(--border-radius) 0;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .add-todo button:hover {
+      opacity: 0.9;
+    }
+    .export-btn {
+      display: block;
+      width: 100%;
+      padding: 0.8rem;
+      background: var(--today-color);
+      color: white;
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      margin-top: 2rem;
+      transition: opacity 0.2s;
+    }
+    .export-btn:hover {
+      opacity: 0.9;
+    }
+    .notification-settings {
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius);
+    }
+    .notification-toggle {
+      display: flex;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .notification-toggle label {
       margin-left: 0.5rem;
+    }
+    .date-selector {
+      margin-top: 0.5rem;
+    }
+    .date-selector input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius);
+    }
+    .deadline-picker {
+      display: flex;
+      align-items: center;
+      margin-top: 0.5rem;
+    }
+    .deadline-picker input {
+      flex-grow: 1;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: var(--border-radius);
+      margin-right: 0.5rem;
+    }
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+      display: none;
+    }
+    .overlay.active {
+      display: block;
+    }
+    
+    /* 모바일 최적화 */
+    @media (max-width: 768px) {
+      #app {
+        padding: 0.5rem;
+      }
+      .with-sidebar {
+        margin-left: 0 !important;
+      }
+      .calendar {
+        gap: 0.25rem;
+      }
+      .day {
+        padding: 0.4rem;
+        font-size: 0.9rem;
+      }
+      .todo-item {
+        padding: 0.6rem;
+      }
+      .add-todo input,
+      .add-todo button {
+        padding: 0.6rem;
+      }
     }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="app"></div>
 
-  <!-- React, ReactDOM, Babel (CDN) -->
-
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Firebase (v9 compat) - Realtime Database -->
-
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
-
-  <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
-
+  <script src="https://unpkg.com/react/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://unpkg.com/babel-standalone/babel.min.js"></script>
   <script type="text/babel">
-    // 1) Firebase 설정
-    const firebaseConfig = {
-      apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
-      authDomain: "nagi-todo.firebaseapp.com",
-      databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com/",
-      projectId: "nagi-todo",
-      storageBucket: "nagi-todo.firebasestorage.app",
-      messagingSenderId: "923414063910",
-      appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
+    const { useState, useEffect, useRef } = React;
+
+    // 요일 헤더 컴포넌트
+    const DayHeader = () => {
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      return days.map((day, index) => (
+        <div key={index} className={`day-header ${index === 0 ? 'sun' : index === 6 ? 'sat' : ''}`}>
+          {day}
+        </div>
+      ));
     };
 
-    // 2) Firebase 초기화
-    const app = firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-
-    // 3) App 컴포넌트
-    function App() {
-      const [text, setText] = React.useState('');
-      const [categoryText, setCategoryText] = React.useState('');
-      const [selectedDate, setSelectedDate] = React.useState(new Date());
-      const [showSidebar, setShowSidebar] = React.useState(true);
-      const [allTodos, setAllTodos] = React.useState({});
-      const [accentColor, setAccentColor] = React.useState('#3B82F6');
-      const [draggedItem, setDraggedItem] = React.useState(null);
-      const [draggedOverItem, setDraggedOverItem] = React.useState(null);
-
-      // 편집 모드
-      const [editMode, setEditMode] = React.useState(false);
-
-      // 날짜별 색상 (원한다면 그대로 사용, 생략 가능)
-      const [dateColors, setDateColors] = React.useState({});
-
-      const bulletStates = ['☐', '☑', '☒'];
-      const dateKey = selectedDate.toISOString().split('T')[0];
-      const items = allTodos[dateKey] || [];
-
-      // 달 계산
-      const daysInMonth = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth() + 1,
-        0
-      ).getDate();
-      const firstDay = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        1
-      ).getDay();
-
-      // Firebase 구독: todos
-      React.useEffect(() => {
-        const refPath = 'todos/' + dateKey;
-        const todosRef = database.ref(refPath);
-        const onValueChange = todosRef.on('value', (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.val();
-            setAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: data
-            }));
-          } else {
-            setAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: []
-            }));
-          }
-        });
-        return () => todosRef.off('value', onValueChange);
-      }, [dateKey]);
-
-      // Firebase 구독: dateColors (날짜별 색상) - 사용 안 해도 되면 생략 가능
-      React.useEffect(() => {
-        const colorsRef = database.ref('dateColors');
-        const onValueChange = colorsRef.on('value', (snapshot) => {
-          if (snapshot.exists()) {
-            setDateColors(snapshot.val());
-          } else {
-            setDateColors({});
-          }
-        });
-        return () => colorsRef.off('value', onValueChange);
-      }, []);
-
-      // accentColor (LocalStorage)
-      React.useEffect(() => {
-        const savedColor = localStorage.getItem('accentColor');
-        if (savedColor) setAccentColor(savedColor);
-      }, []);
-      React.useEffect(() => {
-        localStorage.setItem('accentColor', accentColor);
-      }, [accentColor]);
-
-      // allTodos 업데이트 + Firebase에 동기화
-      const updateAllTodos = (updater) => {
-        setAllTodos((prev) => {
-          const newAll = typeof updater === 'function' ? updater(prev) : updater;
-          database.ref('todos/' + dateKey).set(newAll[dateKey] || []);
-          return newAll;
-        });
-      };
-
-      // dateColors 업데이트 + Firebase
-      const updateDateColors = (dk, color) => {
-        setDateColors((prev) => {
-          const newColors = { ...prev, [dk]: color };
-          database.ref('dateColors').set(newColors);
-          return newColors;
-        });
-      };
-
-      // 달 이동
-      function handlePrevMonth() {
-        setSelectedDate((prev) => {
-          const newDate = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
-          return newDate;
-        });
-      }
-      function handleNextMonth() {
-        setSelectedDate((prev) => {
-          const newDate = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
-          return newDate;
-        });
-      }
-
-      // 할 일 추가 / 구분선 추가
-      function handleKeyDownTodo(e) {
-        // Shift+Enter => 줄바꿈, 그냥 Enter => 등록
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          if (text.trim()) {
-            updateAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: [
-                ...(prev[dateKey] || []),
-                { type: 'todo', text: text.trim(), state: 0 }
-              ]
-            }));
-            setText('');
-          }
-        }
-      }
-      function handleKeyDownCategory(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          if (categoryText.trim()) {
-            updateAllTodos((prev) => ({
-              ...prev,
-              [dateKey]: [
-                ...(prev[dateKey] || []),
-                { type: 'category', text: categoryText.trim() }
-              ]
-            }));
-            setCategoryText('');
-          }
-        }
-      }
-      function addDivider() {
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: [...(prev[dateKey] || []), { type: 'divider' }]
-        }));
-      }
-
-      // 할 일 상태 토글
-      function toggleState(index) {
-        if (editMode) return; // 편집 모드일 때는 클릭X
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: prev[dateKey].map((item, i) =>
-            i === index && item.type === 'todo'
-              ? { ...item, state: (item.state + 1) % bulletStates.length }
-              : item
-          )
-        }));
-      }
-
-      // 삭제 / 편집
-      function deleteItem(index) {
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: prev[dateKey].filter((_, i) => i !== index)
-        }));
-      }
-      function editItem(index) {
-        const item = items[index];
-        if (!item) return;
-        const newText = prompt('Edit text:', item.text);
-        if (newText !== null && newText.trim()) {
-          updateAllTodos((prev) => {
-            const newItems = [...prev[dateKey]];
-            newItems[index] = { ...newItems[index], text: newText.trim() };
-            return { ...prev, [dateKey]: newItems };
+    // 캘린더 컴포넌트
+    const Calendar = ({ date, selectedDate, onDateSelect }) => {
+      const renderCalendar = () => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const firstDay = new Date(year, month, 1).getDay();
+        const days = [];
+        
+        // 이전 달의 마지막 날짜들
+        const prevMonthLastDate = new Date(year, month, 0).getDate();
+        for (let i = 0; i < firstDay; i++) {
+          days.push({ 
+            date: new Date(year, month-1, prevMonthLastDate - firstDay + i + 1), 
+            currentMonth: false 
           });
         }
-      }
+        
+        // 현재 달의 날짜들
+        const lastDate = new Date(year, month + 1, 0).getDate();
+        for (let d = 1; d <= lastDate; d++) {
+          days.push({ 
+            date: new Date(year, month, d), 
+            currentMonth: true 
+          });
+        }
+        
+        // 다음 달의 첫 날짜들 (캘린더를 채우기 위해)
+        const remainingDays = 7 - (days.length % 7);
+        if (remainingDays < 7) {
+          for (let d = 1; d <= remainingDays; d++) {
+            days.push({ 
+              date: new Date(year, month+1, d), 
+              currentMonth: false 
+            });
+          }
+        }
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    // TXT 내보내기
-      function exportToText() {
-        const localDateKey = selectedDate.toLocaleDateString('en-CA');
-        let content = `Todos for ${selectedDate.toLocaleDateString('en-US')}\n\n`;
-        items.forEach((item, i) => {
-          content += `${i + 1}. ${item.completed ? '[x]' : '[ ]'} ${item.text}\n`;
+        return days.map((dayObj, i) => {
+          const d = dayObj.date;
+          const isToday = d.toDateString() === today.toDateString();
+          const isSelected = selectedDate && d.toDateString() === selectedDate.toDateString();
+          const dayClass = `day 
+            ${!dayObj.currentMonth ? 'empty' : ''} 
+            ${d.getDay() === 0 ? 'sun' : ''} 
+            ${d.getDay() === 6 ? 'sat' : ''} 
+            ${isToday ? 'today' : ''} 
+            ${isSelected && !isToday ? 'selected-day' : ''}`;
+            
+          return (
+            <div 
+              key={i} 
+              className={dayClass}
+              onClick={() => dayObj.currentMonth && onDateSelect(d)}
+              style={{ opacity: dayObj.currentMonth ? 1 : 0.3 }}
+            >
+              {d.getDate()}
+            </div>
+          );
         });
-
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `todos-${localDateKey}.txt`;
-        link.click();
-        URL.revokeObjectURL(url);
-      }
-
-
-
-      // 해당 날짜 할 일 존재 여부
-      const hasTodos = (d) => {
-        const key = d.toISOString().split('T')[0];
-        return allTodos[key] && allTodos[key].length > 0;
       };
 
-      // DnD (editMode에서만 가능)
-      function handleDragStart(e, index) {
-        if (!editMode) return;
-        setDraggedItem(index);
-        e.currentTarget.style.opacity = '0.4';
-      }
-      function handleDragEnd(e) {
-        if (!editMode) return;
-        e.currentTarget.style.opacity = '1';
-        setDraggedItem(null);
-        setDraggedOverItem(null);
-      }
-      function handleDragOver(e, index) {
-        if (!editMode) return;
-        e.preventDefault();
-        setDraggedOverItem(index);
-      }
-      function handleDrop(e, index) {
-        if (!editMode) return;
-        e.preventDefault();
-        const itemsCopy = [...items];
-        const draggedItemContent = itemsCopy[draggedItem];
-        itemsCopy.splice(draggedItem, 1);
-        itemsCopy.splice(index, 0, draggedItemContent);
-        updateAllTodos((prev) => ({
-          ...prev,
-          [dateKey]: itemsCopy
-        }));
-        setDraggedItem(null);
-        setDraggedOverItem(null);
-      }
-
-      // 날짜별 색상
-      const currentDateColor = dateColors[dateKey] || '#888888';
-      function handleCurrentDateColorChange(e) {
-        updateDateColors(dateKey, e.target.value);
-      }
-
-      // Render
       return (
-        <div style={{ minHeight: '100vh', display: 'flex' }}>
-          {/* 모바일 사이드바 토글 버튼 */}
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            style={{
-              position: 'fixed',
-              left: '1rem',
-              top: '1rem',
-              zIndex: 10,
-              background: '#fff',
-              padding: '0.5rem',
-              borderRadius: '9999px',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-              cursor: 'pointer'
-            }}
-            className="md:hidden"
-          >
-            {showSidebar ? '←' : '→'}
-          </button>
+        <>
+          <DayHeader />
+          {renderCalendar()}
+        </>
+      );
+    };
 
-          {/* 사이드바 */}
-          <div
-            style={{
-              position: 'fixed',
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: '16rem',
-              background: '#fff',
-              boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-              zIndex: 20,
-              overflow: 'visible',
-              transform: showSidebar ? 'translateX(0)' : 'translateX(-100%)',
-              transition: 'transform 0.3s ease-in-out'
-            }}
-            className="md:translate-x-0"
-          >
-            <div style={{ padding: '1rem' }}>
-              {/* 년/월 */}
-              <h2
-                style={{
-                  fontWeight: 'bold',
-                  whiteSpace: 'pre-line',
-                  textAlign: 'center',
-                  marginBottom: '1rem'
-                }}
-              >
-                {selectedDate.toLocaleString('en-US', { year: 'numeric' })}
-                {'\n'}
-                {selectedDate.toLocaleString('en-US', { month: 'long' })}
-              </h2>
-
-              {/* 전체 accentColor */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                <input
-                  type="color"
-                  value={accentColor}
-                  onChange={(e) => setAccentColor(e.target.value)}
-                  style={{
-                    width: '1.5rem',
-                    height: '1.5rem',
-                    borderRadius: '9999px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              {/* 달력 (요일 헤더) */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(7, 1fr)',
-                  gap: '0.25rem',
-                  fontSize: '0.875rem'
-                }}
-              >
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
-                  <div
-                    key={d}
-                    style={{ textAlign: 'center', fontWeight: '500', color: '#666' }}
-                  >
-                    {d}
-                  </div>
-                ))}
-                {/* 첫 주 공백 채우기 */}
-                {Array(firstDay)
-                  .fill(null)
-                  .map((_, i) => (
-                    <div key={`empty-${i}`} />
-                  ))}
-                {Array.from({ length: daysInMonth }, (_, i) => {
-                  const dateObj = new Date(
-                    selectedDate.getFullYear(),
-                    selectedDate.getMonth(),
-                    i + 1
-                  );
-                  const isToday = dateObj.toDateString() === new Date().toDateString();
-                  const dKey = dateObj.toISOString().split('T')[0];
-                  const isSelected = dKey === dateKey;
-                  const hasItemsVar = hasTodos(dateObj);
-
-                  // 해당 날짜 색상 (없으면 accentColor)
-                  const dateCircleColor = dateColors[dKey] || accentColor;
-
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setSelectedDate(dateObj);
-                        if (window.innerWidth < 768) setShowSidebar(false);
-                      }}
-                      style={{
-                        width: '1.8rem',
-                        height: '1.8rem',
-                        margin: '0 auto',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: isToday && !isSelected ? '1px solid #ccc' : 'none',
-                        backgroundColor: isSelected ? dateCircleColor : 'transparent',
-                        color: isSelected ? '#fff' : '#000',
-                        borderRadius: '9999px',
-                        transition: 'background-color 0.2s',
-                        position: 'relative',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <span>{i + 1}</span>
-                      {hasItemsVar && (
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            color: isSelected ? '#fff' : dateCircleColor,
-                            position: 'absolute',
-                            bottom: '-0.3rem'
-                          }}
-                        >
-                          •
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 이전/다음 달 버튼 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                <button
-                  onClick={handlePrevMonth}
-                  style={{
-                    background: '#f0f0f0',
-                    border: 'none',
-                    padding: '0.25rem 0.5rem',
-                    cursor: 'pointer',
-                    borderRadius: '0.25rem'
-                  }}
-                >
-                  ←
-                </button>
-                <button
-                  onClick={handleNextMonth}
-                  style={{
-                    background: '#f0f0f0',
-                    border: 'none',
-                    padding: '0.25rem 0.5rem',
-                    cursor: 'pointer',
-                    borderRadius: '0.25rem'
-                  }}
-                >
-                  →
-                </button>
-              </div>
+    // Todo 항목 컴포넌트
+    const TodoItem = ({ todo, onToggle, onDelete, onEditDeadline }) => {
+      const [showDeadlinePicker, setShowDeadlinePicker] = useState(false);
+      const [deadline, setDeadline] = useState(todo.deadline || '');
+      
+      const handleDeadlineChange = (e) => {
+        setDeadline(e.target.value);
+      };
+      
+      const saveDeadline = () => {
+        onEditDeadline(todo.id, deadline);
+        setShowDeadlinePicker(false);
+      };
+      
+      const formatDeadline = (deadline) => {
+        if (!deadline) return '';
+        const date = new Date(deadline);
+        return date.toLocaleDateString('ko-KR');
+      };
+      
+      return (
+        <div className={`todo-item ${todo.done ? 'done' : ''}`}>
+          <input 
+            type="checkbox" 
+            className="todo-checkbox" 
+            checked={todo.done}
+            onChange={() => onToggle(todo.id)}
+            aria-label="완료 여부"
+          />
+          <div className="todo-text">{todo.text}</div>
+          {todo.deadline && (
+            <div style={{fontSize: '0.8rem', color: '#777', marginRight: '10px'}}>
+              ~{formatDeadline(todo.deadline)}
             </div>
+          )}
+          <div className="todo-actions">
+            <button className="todo-btn" onClick={() => setShowDeadlinePicker(!showDeadlinePicker)} aria-label="마감일 설정">
+              ⏰
+            </button>
+            <button className="todo-btn" onClick={() => onDelete(todo.id)} aria-label="삭제">
+              🗑️
+            </button>
           </div>
-
-          {/* 메인 영역 */}
-          <div
-            style={{
-              flex: 1,
-              padding: '1rem',
-              transition: 'margin-left 0.3s',
-              marginLeft: showSidebar ? '16rem' : '0'
-            }}
-          >
-            <div
-              style={{
-                maxWidth: '42rem',
-                margin: '0 auto',
-                background: '#fff',
-                borderRadius: '0.5rem',
-                boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                padding: '1.5rem'
-              }}
-            >
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-                {selectedDate.toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </h2>
-
-              {/* 이 날짜 전용 색상 (Optional) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <span style={{ fontSize: '0.9rem' }}>This date's color:</span>
-                <input
-                  type="color"
-                  value={dateColors[dateKey] || '#888888'}
-                  onChange={handleCurrentDateColorChange}
-                  style={{
-                    width: '1.5rem',
-                    height: '1.5rem',
-                    borderRadius: '9999px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              {/* 할 일 입력부: textarea로 변경해서 Shift+Enter가 줄바꿈 되도록 */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr',
-                  columnGap: '0.5rem',
-                  rowGap: '0.75rem'
-                }}
-              >
-                {/* (1) 할 일 입력 (textarea) */}
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onKeyDown={handleKeyDownTodo}
-                  placeholder="Add a task (Enter to save, Shift+Enter for newline)"
-                  rows={3}
-                  style={{
-                    gridColumn: '1 / 3',
-                    border: '1px solid #ccc',
-                    padding: '0.5rem',
-                    borderRadius: '0.25rem',
-                    resize: 'vertical'
-                  }}
-                />
-
-                {/* (2) Divider / Category */}
-                <button
-                  onClick={addDivider}
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    fontSize: '0.875rem',
-                    background: '#f0f0f0',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Add Divider
-                </button>
-                <input
-                  type="text"
-                  value={categoryText}
-                  onChange={(e) => setCategoryText(e.target.value)}
-                  onKeyDown={handleKeyDownCategory}
-                  placeholder="Add category..."
-                  style={{
-                    border: '1px solid #ccc',
-                    padding: '0.25rem',
-                    borderRadius: '0.25rem',
-                    fontSize: '0.875rem'
-                  }}
-                />
-              </div>
-
-              {/* 할 일 목록 */}
-              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {items.map((item, index) => {
-                  const dndProps = editMode
-                    ? {
-                        draggable: true,
-                        onDragStart: (e) => handleDragStart(e, index),
-                        onDragEnd: handleDragEnd,
-                        onDragOver: (e) => handleDragOver(e, index),
-                        onDrop: (e) => handleDrop(e, index)
-                      }
-                    : {};
-
-                  if (item.type === 'divider') {
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          position: 'relative',
-                          borderTop:
-                            editMode && draggedOverItem === index
-                              ? `2px solid ${accentColor}`
-                              : 'none',
-                          margin: '0.5rem 0'
-                        }}
-                        {...dndProps}
-                      >
-                        <hr
-                          style={{
-                            borderTop: `1px solid ${accentColor}`,
-                            margin: '0.5rem 0'
-                          }}
-                        />
-                        {editMode && (
-                          <div style={{ textAlign: 'right' }}>
-                            <button className="edit-delete-btn" onClick={() => deleteItem(index)}>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  if (item.type === 'category') {
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          cursor: editMode ? 'move' : 'default',
-                          borderTop:
-                            editMode && draggedOverItem === index
-                              ? `2px solid ${accentColor}`
-                              : 'none'
-                        }}
-                        {...dndProps}
-                      >
-                        <div style={{ fontWeight: '600', color: '#555' }}>
-                          {item.text}
-                        </div>
-                        {editMode && (
-                          <div>
-                            <button className="edit-delete-btn" onClick={() => editItem(index)}>
-                              Edit
-                            </button>
-                            <button className="edit-delete-btn" onClick={() => deleteItem(index)}>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // 일반 todo 항목
-                  return (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem',
-                        borderRadius: '0.25rem',
-                        cursor: editMode ? 'move' : 'default',
-                        background: '#fafafa',
-                        borderTop:
-                          editMode && draggedOverItem === index
-                            ? `2px solid ${accentColor}`
-                            : 'none'
-                      }}
-                      {...dndProps}
-                    >
-                      <span
-                        onClick={(e) => {
-                          if (!editMode) {
-                            e.stopPropagation();
-                            toggleState(index);
-                          }
-                        }}
-                        style={{
-                          color: accentColor,
-                          fontFamily: 'monospace',
-                          fontSize: '1.25rem',
-                          cursor: editMode ? 'default' : 'pointer'
-                        }}
-                      >
-                        {bulletStates[item.state]}
-                      </span>
-                      {/* 여러줄 지원 */}
-                      <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>
-                        {item.text}
-                      </span>
-                      {editMode && (
-                        <>
-                          <button className="edit-delete-btn" onClick={() => editItem(index)}>
-                            Edit
-                          </button>
-                          <button className="edit-delete-btn" onClick={() => deleteItem(index)}>
-                            Delete
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Export, Edit 버튼 */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                {items.length > 0 && (
-                  <button
-                    onClick={exportToText}
-                    style={{
-                      flex: 1,
-                      padding: '0.5rem',
-                      fontSize: '0.875rem',
-                      background: accentColor,
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.25rem',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Export as Text
-                  </button>
-                )}
-                <button
-                  onClick={() => setEditMode((prev) => !prev)}
-                  style={{
-                    flex: items.length > 0 ? 'unset' : 1,
-                    padding: '0.5rem',
-                    fontSize: '0.875rem',
-                    background: editMode ? '#dddddd' : '#f0f0f0',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {editMode ? 'Done' : 'Edit'}
-                </button>
-              </div>
+          {showDeadlinePicker && (
+            <div className="deadline-picker" style={{position: 'absolute', background: 'white', padding: '10px', border: '1px solid #ddd', borderRadius: '5px', zIndex: 10}}>
+              <input 
+                type="date" 
+                value={deadline}
+                onChange={handleDeadlineChange}
+              />
+              <button onClick={saveDeadline}>저장</button>
             </div>
-          </div>
+          )}
         </div>
       );
-    }
+    };
 
-    // 4) ReactDOM으로 렌더링
-    const rootElement = document.getElementById('root');
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(<App />);
-  </script>
+    // 메인 앱 컴포넌트
+    function App() {
+      const [view, setView] = useState('todo');
+      const [date, setDate] = useState(new Date());
+      const [selectedDate, setSelectedDate] = useState(new Date());
+      const [quotes, setQuotes] = useState(JSON.parse(localStorage.getItem('quotes') || '{}'));
+      const [todosData, setTodosData] = useState(JSON.parse(localStorage.getItem('todos') || '{}'));
+      const [quoteEditing, setQuoteEditing] = useState(false);
+      const [quoteText, setQuoteText] = useState('');
+      const [newTodo, setNewTodo] = useState('');
+      const [sidebarActive, setSidebarActive] = useState(false);
+      const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+      const appRef = useRef();
 
-</body>
-</html>
+      // 선택된 날짜의 할 일 목록
+      const selectedDateKey = selectedDate.toDateString();
+      const todos = todosData[selectedDateKey] || [];
+
+      // 할 일 목록 불러오기
+      useEffect(() => {
+        const savedTodos = JSON.parse(localStorage.getItem('todos') || '{}');
+        setTodosData(savedTodos);
+      }, []);
+
+      // 선택된 날짜가 변경될 때 해당 날짜의 메모 불러오기
+      useEffect(() => {
+        const savedQuote = quotes[selectedDateKey] || '';
+        setQuoteText(savedQuote);
+      }, [selectedDate, quotes]);
+
+      // 오늘 날짜 색상 설정
+      useEffect(() => {
+        const savedColor = localStorage.getItem('todayColor') || '#000';
+        document.documentElement.style.setProperty('--today-color', savedColor);
+      }, []);
+
+      // 알림 권한 요청
+      useEffect(() => {
+        if (notificationsEnabled && 'Notification' in window) {
+          Notification.requestPermission();
+        }
+      }, [notificationsEnabled]);
+
+      // 알림 체크
+      useEffect(() => {
+        if (notificationsEnabled && 'Notification' in window) {
+          const checkDeadlines = () => {
+            const now = new Date();
+            Object.entries(todosData).forEach(([dateKey, dateTodos]) => {
+              dateTodos.forEach(todo => {
+                if (todo.deadline && !todo.notified) {
+                  const deadlineDate = new Date(todo.deadline);
+                  // 마감 30분 전 알림
+                  const timeDiff = deadlineDate - now;
+                  if (timeDiff > 0 && timeDiff <= 30 * 60 * 1000) {
+                    new Notification('할 일 마감 임박', {
+                      body: `"${todo.text}" 마감까지 30분 이내 남았습니다.`,
+                      icon: './favi.ico'
+                    });
+                    
+                    // 알림 표시 후 상태 업데이트
+                    const updatedTodosData = {...todosData};
+                    const todoIndex = updatedTodosData[dateKey].findIndex(t => t.id === todo.id);
+                    if (todoIndex !== -1) {
+                      updatedTodosData[dateKey][todoIndex].notified = true;
+                      setTodosData(updatedTodosData);
+                      localStorage.setItem('todos', JSON.stringify(updatedTodosData));
+                    }
+                  }
+                }
+              });
+            });
+          };
+          
+          const intervalId = setInterval(checkDeadlines, 60000); // 1분마다 체크
+          return () => clearInterval(intervalId);
+        }
+      }, [notificationsEnabled, todosData]);
+
+      // 캘린더 이동 함수
+      function prevMonth() {
+        setDate(new Date(date.getFullYear(), date.getMonth() - 1, 1));
+      }
+      
+      function nextMonth() {
+        setDate(new Date(date.getFullYear(), date.getMonth() + 1, 1));
+      }
+      
+      function goToday() {
+        const today = new Date();
+        setDate(today);
+        setSelectedDate(today);
+      }
+
+      // 메모 저장 함수
+      function saveQuote() {
+        const updatedQuotes = { ...quotes, [selectedDateKey]: quoteText };
+        setQuotes(updatedQuotes);
+        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+        setQuoteEditing(false);
+      }
+
+      // 색상 변경 함수
+      function handleColorChange(e) {
+        const color = e.target.value;
+        document.documentElement.style.setProperty('--today-color', color);
+        localStorage.setItem('todayColor', color);
+      }
+
+      // Todo 항목 추가 함수
+      function addTodo(e) {
+        e.preventDefault();
+        if (!newTodo.trim()) return;
+        
+        const todo = {
+          id: Date.now(),
+          text: newTodo,
+          done: false,
+          createdAt: new Date().toISOString(),
+        };
+        
+        const dateKey = selectedDate.toDateString();
+        const updatedTodos = { 
+          ...todosData,
+          [dateKey]: [...(todosData[dateKey] || []), todo]
+        };
+        
+        setTodosData(updatedTodos);
+        localStorage.setItem('todos', JSON.stringify(updatedTodos));
+        setNewTodo('');
+      }
+
+      // Todo 완료 상태 토글 함수
+      function toggleTodo(id) {
+        const dateKey = selectedDate.toDateString();
+        const updatedTodos = { ...todosData };
+        
+        if (updatedTodos[dateKey]) {
+          const todoIndex = updatedTodos[dateKey].findIndex(todo => todo.id === id);
+          if (todoIndex !== -1) {
+            updatedTodos[dateKey][todoIndex].done = !updatedTodos[dateKey][todoIndex].done;
+            setTodosData(updatedTodos);
+            localStorage.setItem('todos', JSON.stringify(updatedTodos));
+          }
+        }
+      }
+
+      // Todo 항목 삭제 함수
+      function deleteTodo(id) {
+        const dateKey = selectedDate.toDateString();
+        const updatedTodos = { ...todosData };
+        
+        if (updatedTodos[dateKey]) {
+          updatedTodos[dateKey] = updatedTodos[dateKey].filter(todo => todo.id !== id);
+          setTodosData(updatedTodos);
+          localStorage.setItem('todos', JSON.stringify(updatedTodos));
+        }
+      }
+
+      // Todo 마감일 설정 함수
+      function editTodoDeadline(id, deadline) {
+        const dateKey = selectedDate.toDateString();
+        const updatedTodos = { ...todosData };
+        
+        if (updatedTodos[dateKey]) {
+          const todoIndex = updatedTodos[dateKey].findIndex(todo => todo.id === id);
+          if (todoIndex !== -1) {
+            updatedTodos[dateKey][todoIndex].deadline = deadline;
+            updatedTodos[dateKey][todoIndex].notified = false; // 마감일 변경시 알림 상태 리셋
+            setTodosData(updatedTodos);
+            localStorage.setItem('todos', JSON.stringify(updatedTodos));
+          }
+        }
+      }
+
+      // 이미지로 내보내기 함수
+      function exportImage() {
+        html2canvas(appRef.current, { backgroundColor: '#fff' }).then(canvas => {
+          canvas.toBlob(blob => {
+            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).catch(() => {
+              const link = document.createElement('a');
+              link.download = `todo_${selectedDate.toLocaleDateString('ko-KR').replace(/\./g, '')}.png`;
+              link.href = canvas.toDataURL();
+              link.click();
+            });
+          });
+        });
+      }
+
+      // 사이드바 토글 함수
+      function toggleSidebar() {
+        setSidebarActive(!sidebarActive);
+      }
+
+      // KST 날짜 표시
+      const kstDate = new Date(selectedDate.getTime() + 9 * 60 * 60000);
+
+      // Quotes 페이지 렌더링
+      if (view === 'quotes') {
+        return (
+          <div className="quotes-page">
+            <div className="header">
+              <button onClick={() => setView('todo')}>뒤로 가기</button>
+              <h2>저장된 메모 목록</h2>
+            </div>
+            {Object.entries(quotes).length === 0 ? (
+              <div className="card">저장된 메모가 없습니다.</div>
+            ) : (
+              Object.entries(quotes).map(([d, q]) => {
+                if (!q) return null;
+                const quoteDate = new Date(d);
+                return (
+                  <div key={d} className="card">
+                    <div className="card-date">
+                      {quoteDate.toLocaleDateString('ko-KR')} ({['일','월','화','수','목','금','토'][quoteDate.getDay()]})
+                    </div>
+                    <div className="card-content">{q}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <>
+          <div className={`overlay ${sidebarActive ? 'active' : ''}`} onClick={toggleSidebar}></div>
+          <div ref={appRef} id="app" className={sidebarActive ? 'with-sidebar' : ''}>
+            <div className="header">
+              <button className="menu-toggle" onClick={toggleSidebar} aria-label="메뉴">
+                ☰
+              </button>
+              <div className="controls">
+                <button onClick={prevMonth} aria-label="이전 달">◀</button>
+                <button onClick={goToday}>오늘</button>
+                <button onClick={nextMonth} aria-label="다음 달">▶</button>
+              </div>
+              <div>
+                {date.getFullYear()}년 {date.getMonth() + 1}월
+              </div>
+              <input 
+                type="color" 
+                title="날짜 색상 선택" 
+                onChange={handleColorChange} 
+                defaultValue={localStorage.getItem('todayColor') || '#000'}
+              />
+            </div>
+            
+            <div className="calendar">
+              <Calendar 
+                date={date} 
+                selectedDate={selectedDate} 
+                onDateSelect={setSelectedDate} 
+              />
+            </div>
+            
+            <div style={{marginTop: '1rem'}}>
+              선택 날짜: {kstDate.toLocaleDateString('ko-KR')} ({['일','월','화','수','목','금','토'][kstDate.getDay()]})
+            </div>
+            
+            <textarea
+              className="quotes-input"
+              value={quoteText}
+              readOnly={!quoteEditing}
+              onDoubleClick={() => setQuoteEditing(true)}
+              onChange={e => setQuoteText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  saveQuote();
+                }
+              }}
+              onBlur={() => quoteEditing && saveQuote()}
+              placeholder="메모를 작성하려면 더블클릭하세요"
+              aria-label="메모"
+            />
+            
+            <div className="todo-section">
+              <div className="section-header">
+                <h3>할 일 목록</h3>
+                {notificationsEnabled && (
+                  <div>🔔 알림 활성화됨</div>
+                )}
+              </div>
+              
+              <form className="add-todo" onSubmit={addTodo}>
+                <input
+                  type="text"
+                  value={newTodo}
+                  onChange={e => setNewTodo(e.target.value)}
+                  placeholder="새 할 일 추가..."
+                  aria-label="새 할 일"
+                />
+                <button type="submit" aria-label="추가">추가</button>
+              </form>
+              
+              <div className="todo-list">
+                {todos.length === 0 ? (
+                  <div style={{textAlign: 'center', color: '#999', padding: '1rem'}}>
+                    할 일이 없습니다. 새로운 할 일을 추가해보세요!
+                  </div>
+                ) : (
+                  todos.map(todo => (
+                    <TodoItem
+                      key={todo.id}
+                      todo={todo}
+                      onToggle={toggleTodo}
+                      onDelete={deleteTodo}
+                      onEditDeadline={editTodoDeadline}
+                    />
+                  ))
+                )}
+              </div>
+              
+              <div className="notification-settings">
+                <div className="notification-toggle">
+                  <input
+                    type="checkbox"
+                    id="enable-notifications"
+                    checked={notificationsEnabled}
+                    onChange={() => setNotificationsEnabled(!notificationsEnabled)}
+                  />
+                  <label htmlFor="enable-notifications">마감일 알림 활성화</label>
+                </div>
