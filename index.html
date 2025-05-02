@@ -5,350 +5,172 @@
   <title>𝐝 : ᴛᴏᴅᴏ</title>
   <link rel="icon" href="./favi.ico" type="image/x-icon" />
   <style>
-    @font-face { font-family: 'HJSS'; src: url('./HJSS.ttf') format('truetype'); }
     body { margin: 0; padding: 0; font-family: 'HJSS', sans-serif; background: #f5f5f5; }
-    *, *::before, *::after { box-sizing: border-box; }
-    button, input, textarea { font-family: inherit; }
+    #root { display: flex; min-height: 100vh; }
     .sidebar { width: 16rem; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .sidebar-nav { text-align: center; padding: 1rem; }
-    .sidebar-nav h2 { margin: 0; line-height: 1.2; }
-    .sidebar-controls { display: flex; justify-content: center; gap: 0.5rem; margin: 1rem 0; }
-    .sidebar-controls button { background: #f0f0f0; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer; }
-    .calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 0.25rem; text-align: center; margin-bottom: 1rem; }
-    .main-container { max-width: 42rem; margin: 0 auto; background: #fff; border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .note-display { padding: 0.5rem; background: #fafafa; border-radius: 0.25rem; margin-bottom: 1rem; cursor: pointer; white-space: pre-wrap; }
-    .note-input { width: 100%; border: 1px solid #ccc; padding: 0.5rem; border-radius: 0.25rem; resize: vertical; margin-bottom: 1rem; }
-    .todo-input, .category-input { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.25rem; margin-bottom: 1rem; resize: vertical; }
-    .notes-list { display: flex; flex-direction: column; gap: 1rem; }
-    .note-card { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 0.25rem; background: #fafafa; }
-    .note-color { width: 1rem; height: 1rem; border-radius: 0.25rem; }
-    .back-btn { margin-bottom: 1rem; background: #f0f0f0; border: none; padding: 0.5rem 1rem; border-radius: 0.25rem; cursor: pointer; }
+    .sidebar h2 { margin: 1rem 0; text-align: center; line-height: 1.2; }
+    .sidebar-controls { display: flex; justify-content: center; gap: 0.5rem; margin: 0.5rem 0; }
+    .sidebar-controls button { background: #e0e0e0; border: none; padding: 0.5rem; cursor: pointer; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 0.25rem; padding: 0 0.5rem; }
+    .calendar-grid div, .calendar-grid button { width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; }
+    .calendar-grid div { font-weight: bold; }
+    .calendar-grid button { border: none; background: transparent; cursor: pointer; }
+    .calendar-grid button.selected { background-color: var(--today-color); color: #fff; border-radius: 50%; }
+    .calendar-grid button:hover { background: #ddd; border-radius: 50%; }
+    .main { flex: 1; padding: 1rem; background: #f5f5f5; }
+    .main-container { background: #fff; border-radius: 8px; padding: 1rem; margin: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 40rem; }
+    .section { margin-bottom: 1rem; }
+    textarea, input[type="text"] { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+    button.action { padding: 0.5rem 1rem; border: none; background: #1976d2; color: #fff; cursor: pointer; border-radius: 4px; }
+    button.secondary { background: #e0e0e0; color: #000; }
+    hr.divider { border: none; border-top: 2px solid var(--today-color); margin: 0.5rem 0; }
+    .todo-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: #fafafa; border-radius: 4px; }
+    .todo-item.dragging { opacity: 0.5; }
+    .note-display { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.875rem; }
+    .footer-buttons { display: flex; gap: 0.5rem; }
   </style>
 </head>
 <body>
   <div id="root"></div>
-
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
   <script type="text/babel">
-    // KST 시간 얻기
     const getKST = () => {
       const now = new Date();
       const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-      return new Date(utc + 9 * 3600000);
+      return new Date(utc + 9*3600000);
     };
-
-    // Firebase 초기화
-    const firebaseConfig = {
-      apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
-      authDomain: "nagi-todo.firebaseapp.com",
-      databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com/",
-      projectId: "nagi-todo",
-      storageBucket: "nagi-todo.firebasestorage.app",
-      messagingSenderId: "923414063910",
-      appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
-    };
+    const firebaseConfig = { /* your config */ };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     function App() {
-      const [selectedDate, setSelectedDate] = React.useState(getKST());
+      const [date, setDate] = React.useState(getKST());
       const [todos, setTodos] = React.useState([]);
       const [note, setNote] = React.useState('');
-      const [noteLocked, setNoteLocked] = React.useState(false);
+      const [locked, setLocked] = React.useState(false);
       const [allNotes, setAllNotes] = React.useState({});
-      const [dateColors, setDateColors] = React.useState({});
+      const [colors, setColors] = React.useState({});
       const [text, setText] = React.useState('');
-      const [category, setCategory] = React.useState('');
-      const [view, setView] = React.useState('todo');
+      const [cat, setCat] = React.useState('');
       const [editMode, setEditMode] = React.useState(false);
+      const dateKey = date.toISOString().split('T')[0];
+      const weekdays=['S','M','T','W','T','F','S'];
+      const weekdayColors=['#C87171','#666','#666','#666','#666','#666','#7192C8'];
 
-      const dateKey = selectedDate.toISOString().split('T')[0];
-      const weekdays = ['S','M','T','W','T','F','S'];
-      const weekdayColors = ['#C87171','#666','#666','#666','#666','#666','#7192C8'];
-
-      // 구독: todos
       React.useEffect(() => {
         const ref = db.ref(`todos/${dateKey}`);
-        const off = ref.on('value', snap => setTodos(snap.val()||[]));
-        return () => ref.off('value', off);
+        ref.on('value', snap => setTodos(snap.val()||[]));
+        return () => ref.off();
       }, [dateKey]);
-
-      // 구독: 오늘 노트
       React.useEffect(() => {
         const ref = db.ref(`notes/${dateKey}`);
-        const off = ref.on('value', snap => {
+        ref.on('value', snap => {
           const v = snap.val()||'';
           setNote(v);
-          setNoteLocked(!!v);
+          setLocked(!!v);
         });
-        return () => ref.off('value', off);
+        return () => ref.off();
       }, [dateKey]);
-
-      // 구독: 모든 노트
       React.useEffect(() => {
         const ref = db.ref('notes');
-        const off = ref.on('value', snap => setAllNotes(snap.val()||{}));
-        return () => ref.off('value', off);
+        ref.on('value', snap => setAllNotes(snap.val()||{}));
+        return () => ref.off();
       }, []);
-
-      // 구독: 날짜별 컬러
       React.useEffect(() => {
         const ref = db.ref('dateColors');
-        const off = ref.on('value', snap => setDateColors(snap.val()||{}));
-        return () => ref.off('value', off);
+        ref.on('value', snap => setColors(snap.val()||{}));
+        return () => ref.off();
       }, []);
 
-      // 노트 저장/고정
       const saveNote = v => db.ref(`notes/${dateKey}`).set(v);
-      const lockNote = () => setNoteLocked(true);
-      const unlockNote = () => setNoteLocked(false);
-
-      // 컬러 저장
+      const lockNote = () => setLocked(true);
+      const unlockNote = () => setLocked(false);
       const saveColor = e => db.ref('dateColors').update({ [dateKey]: e.target.value });
 
-      // 할 일 추가 등
       const addTodo = () => {
-        if (!text.trim()) return;
+        if(!text.trim()) return;
         db.ref(`todos/${dateKey}`).once('value').then(s => {
-          const a = s.val()||[];
-          a.push({ type:'todo', text: text.trim(), state:0 });
+          const a=s.val()||[];
+          a.push({type:'todo',text:text.trim(),state:0});
           db.ref(`todos/${dateKey}`).set(a);
           setText('');
         });
       };
-      const addCat = () => {
-        if (!category.trim()) return;
-        db.ref(`todos/${dateKey}`).once('value').then(s => {
-          const a = s.val()||[];
-          a.push({ type:'category', text: category.trim() });
-          db.ref(`todos/${dateKey}`).set(a);
-          setCategory('');
-        });
-      };
-      const addDiv = () =>
-        db.ref(`todos/${dateKey}`).once('value').then(s => {
-          const a = s.val()||[];
-          a.push({ type:'divider' });
-          db.ref(`todos/${dateKey}`).set(a);
-        });
-      const toggle = i =>
-        db.ref(`todos/${dateKey}`).once('value').then(s => {
-          const a = s.val()||[];
-          if (a[i].type==='todo') a[i].state = (a[i].state+1)%3;
-          db.ref(`todos/${dateKey}`).set(a);
-        });
-      const remove = i =>
-        db.ref(`todos/${dateKey}`).once('value').then(s => {
-          const a = s.val()||[];
-          a.splice(i,1);
-          db.ref(`todos/${dateKey}`).set(a);
-        });
-      const edit = i =>
-        db.ref(`todos/${dateKey}`).once('value').then(s => {
-          const a = s.val()||[];
-          const v = prompt('Edit:', a[i].text);
-          if (v!=null && v.trim()) {
-            a[i].text = v.trim();
-            db.ref(`todos/${dateKey}`).set(a);
-          }
-        });
+      const addCat=() => { if(!cat.trim()) return; db.ref(`todos/${dateKey}`).once('value').then(s=>{const a=s.val()||[];a.push({type:'category',text:cat.trim()});db.ref(`todos/${dateKey}`).set(a);setCat('');});};
+      const addDiv=() => db.ref(`todos/${dateKey}`).once('value').then(s=>{const a=s.val()||[];a.push({type:'divider'});db.ref(`todos/${dateKey}`).set(a);});
+      const toggle=i=>db.ref(`todos/${dateKey}`).once('value').then(s=>{const a=s.val()||[];if(a[i].type==='todo')a[i].state=(a[i].state+1)%3;db.ref(`todos/${dateKey}`).set(a);});
+      const remove=i=>db.ref(`todos/${dateKey}`).once('value').then(s=>{const a=s.val()||[];a.splice(i,1);db.ref(`todos/${dateKey}`).set(a);});
+      const edit=(i)=>db.ref(`todos/${dateKey}`).once('value').then(s=>{const a=s.val()||[];const v=prompt('Edit:',a[i].text);if(v!=null&&v.trim()){a[i].text=v.trim();db.ref(`todos/${dateKey}`).set(a);}});
 
-      // 이미지 내보내기
-      const exportImg = async () => {
-        await document.fonts.ready;
-        const c = document.getElementById('export-container');
-        c.style.background = '#fff';
-        const canvas = await html2canvas(c, {
-          scale: window.devicePixelRatio,
-          useCORS: true,
-          backgroundColor: '#fff'
-        });
-        canvas.toBlob(async blob => {
-          try {
-            const perm = await navigator.permissions.query({ name:'clipboard-write' });
-            if (perm.state==='granted' || perm.state==='prompt') {
-              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-              alert('이미지를 클립보드에 복사했어.');
-            } else {
-              alert('클립보드 권한이 필요해.');
-            }
-          } catch (err) {
-            console.error(err);
-            alert('복사에 실패했어.');
-          }
-        });
-      };
+      const exportImg=async()=>{await document.fonts.ready;const c=document.getElementById('export-container');c.style.background='#fff';const canvas=await html2canvas(c,{scale:window.devicePixelRatio,backgroundColor:'#fff'});canvas.toBlob(b=>navigator.clipboard.write([new ClipboardItem({'image/png':b})]));};
 
-      // 오늘로
-      const goToday = () => {
-        setSelectedDate(getKST());
-        setView('todo');
-      };
+      const navMonth=d=>setDate(d);
+      const goToday=()=>setDate(getKST());
 
-      // 달력 계산
-      const year = selectedDate.getFullYear();
-      const month = selectedDate.getMonth();
-      const daysInMonth = new Date(year, month+1, 0).getDate();
-      const firstDay = new Date(year, month, 1).getDay();
+      const year=date.getFullYear(),mo=date.getMonth();
+      const days=new Date(year,mo+1,0).getDate();
+      const start=new Date(year,mo,1).getDay();
 
-      return (
-        <div style={{ display:'flex', minHeight:'100vh' }}>
-          {/* 사이드바 */}
-          <div className="sidebar">
-            <div className="sidebar-nav">
-              <h2>{year}<br/>{selectedDate.toLocaleString('en-US',{month:'long'})}</h2>
-            </div>
-            <div className="sidebar-controls">
-              <button onClick={() => setSelectedDate(d => new Date(d.getFullYear(), d.getMonth()-1, 1))}>←</button>
-              <button onClick={goToday}>Today</button>
-              <button onClick={() => setSelectedDate(d => new Date(d.getFullYear(), d.getMonth()+1, 1))}>→</button>
-            </div>
-            <div className="calendar-grid">
-              {weekdays.map((w,i) => (
-                <div key={i} style={{ color: weekdayColors[i], fontWeight:500 }}>{w}</div>
-              ))}
-              {Array(firstDay).fill().map((_,i) => <div key={'e'+i}/>)}
-              {Array(daysInMonth).fill().map((_,i) => {
-                const dt = new Date(year, month, i+1);
-                const k = dt.toISOString().split('T')[0];
-                const sel = k===dateKey;
-                return (
-                  <button key={i}
-                    onClick={()=>setSelectedDate(dt)}
-                    style={{
-                      width:24, height:24, margin:'auto',
-                      border:'none', borderRadius:'50%',
-                      background: sel ? (dateColors[k]||'#888') : 'transparent',
-                      color: sel ? '#fff' : '#000', cursor:'pointer'
-                    }}>
-                    {i+1}
-                  </button>
-                );
-              })}
-            </div>
-            <button className="sidebar-controls" onClick={()=>setView('notes')}>Notes</button>
+      document.documentElement.style.setProperty('--today-color',colors[dateKey]||'#888');
+
+      return <>
+        <div className="sidebar">
+          <h2>{year}<br/>{date.toLocaleString('en-US',{month:'long'})}</h2>
+          <div className="sidebar-controls">
+            <button onClick={()=>navMonth(new Date(year,mo-1,1))}>←</button>
+            <button onClick={goToday}>Today</button>
+            <button onClick={()=>navMonth(new Date(year,mo+1,1))}>→</button>
           </div>
-
-          {/* 메인 */}
-          <div style={{ flex:1, padding:'1rem', background:'#f5f5f5' }}>
-            {view==='todo' ? (
-              <div id="export-container" className="main-container">
-                <h2 style={{ marginBottom:16 }}>
-                  {selectedDate.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
-                </h2>
-
-                {/* 오늘의 한마디 */}
-                {noteLocked ? (
-                  <div className="note-display" onDoubleClick={unlockNote}>{note}</div>
-                ) : (
-                  <textarea className="note-input"
-                    value={note}
-                    onChange={e=>setNote(e.target.value)}
-                    onKeyDown={e=>{
-                      if(e.key==='Enter' && !e.shiftKey){
-                        e.preventDefault();
-                        saveNote(note);
-                        lockNote();
-                      }
-                    }}
-                    placeholder="오늘의 한마디… (Enter 고정, Shift+Enter 줄바꿈)"
-                    rows={2}
-                  />
-                )}
-
-                {/* 날짜별 컬러 */}
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-                  <span>This date’s color:</span>
-                  <input type="color" value={dateColors[dateKey]||'#888'} onChange={saveColor}/>
+          <div className="calendar-grid">
+            {weekdays.map((w,i)=><div key={i} style={{color:weekdayColors[i]}}>{w}</div>)}
+            {Array(start).fill().map((_,i)=><div key={i}/>)}
+            {Array(days).fill().map((_,i)=>{const dt=new Date(year,mo,i+1),k=dt.toISOString().split('T')[0];return <button
+                key={i}
+                className={k===dateKey?'selected':''}
+                onClick={()=>setDate(dt)}>{i+1}</button>;
+            })}
+          </div>
+          <div className="sidebar-controls"><button onClick={()=>setView('notes')}>Notes</button></div>
+        </div>
+        <div className="main">
+          <div id="export-container" className="main-container">
+            <h2>{date.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</h2>
+            {locked?
+              <div className="note-display" style={{color:colors[dateKey]||'#888'}} onDoubleClick={unlockNote}>{note}</div>
+              :
+              <textarea className="note-input" value={note} onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveNote(note);lockNote();}}} placeholder="오늘의 한마디" rows={2}/>
+            }
+            <div className="section">
+              <span>This date’s color: </span><input type="color" value={colors[dateKey]||'#888'} onChange={saveColor}/>
+            </div>
+            <textarea className="todo-input" value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo();}}} placeholder="할 일 추가" rows={3}/>
+            <div className="section">
+              <button className="secondary" onClick={addDiv}>Add Divider</button>
+              <input className="category-input" value={cat} onChange={e=>setCat(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){addCat();}}} placeholder="카테고리 추가"/>
+            </div>
+            <div className="section">
+              {todos.map((it,i)=>it.type==='divider'?<hr key={i} className="divider"/>:it.type==='category'?<div key={i} style={{fontWeight:600}}>{it.text}</div>:(
+                <div key={i} className="todo-item" draggable={editMode} onDragStart={e=>e.currentTarget.classList.add('dragging')} onDragEnd={e=>e.currentTarget.classList.remove('dragging')} onClick={()=>!editMode&&toggle(i)}>
+                  <span>{['☐','☑','☒'][it.state]}</span><span style={{flex:1}}>{it.text}</span>
+                  {editMode&&<><button onClick={()=>edit(i)}>Edit</button><button onClick={()=>remove(i)}>Del</button></>}
                 </div>
-
-                {/* 할 일 입력 */}
-                <textarea className="todo-input"
-                  value={text}
-                  onChange={e=>setText(e.target.value)}
-                  onKeyDown={e=>{
-                    if(e.key==='Enter' && !e.shiftKey){
-                      e.preventDefault();
-                      addTodo();
-                    }
-                  }}
-                  placeholder="할 일 추가 (Enter 저장, Shift+Enter 줄바꿈)"
-                  rows={3}
-                />
-
-                <div style={{ display:'flex', gap:8, marginBottom:16 }}>
-                  <button onClick={addDiv}>Add Divider</button>
-                  <input className="category-input"
-                    value={category}
-                    onChange={e=>setCategory(e.target.value)}
-                    onKeyDown={e=>{
-                      if(e.key==='Enter'){
-                        addCat();
-                      }
-                    }}
-                    placeholder="카테고리 추가…"
-                  />
-                </div>
-
-                {/* 할 일 목록 */}
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  {todos.map((it,i)=>(
-                    it.type==='divider' ? <hr key={i}/> :
-                    it.type==='category' ? <div key={i} style={{ fontWeight:600 }}>{it.text}</div> : (
-                      <div key={i}
-                        onClick={()=>!editMode&&toggle(i)}
-                        style={{
-                          display:'flex', alignItems:'center', gap:8,
-                          padding:8, background:'#fff', borderRadius:4,
-                          cursor: editMode?'default':'pointer'
-                        }}>
-                        <span style={{ fontFamily:'monospace' }}>{['☐','☑','☒'][it.state]}</span>
-                        <span style={{ flex:1, whiteSpace:'pre-wrap' }}>{it.text}</span>
-                        {editMode && <>
-                          <button className="edit-delete-btn" onClick={()=>edit(i)}>Edit</button>
-                          <button className="edit-delete-btn" onClick={()=>remove(i)}>Del</button>
-                        </>}
-                      </div>
-                    )
-                  ))}
-                </div>
-
-                <div style={{ display:'flex', gap:8, marginTop:16 }}>
-                  <button onClick={exportImg}>Export as Image</button>
-                  <button onClick={()=>setEditMode(m=>!m)}>
-                    {editMode ? 'Done' : 'Edit'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="main-container">
-                <button className="back-btn" onClick={()=>setView('todo')}>Back</button>
-                <div className="notes-list">
-                  {Object.entries(allNotes).sort((a,b)=>b[0].localeCompare(a[0])).map(([k,v])=>{
-                    const d = new Date(k);
-                    return (
-                      <div key={k} className="note-card">
-                        <div className="note-color" style={{ background: dateColors[k]||'#888' }}/>
-                        <div><strong>{d.toLocaleDateString('en-US',{year:'numeric',month:'numeric',day:'numeric',weekday:'short'})}</strong></div>
-                        <div>{v}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              ))}
+            </div>
+            <div className="footer-buttons">
+              <button className="action" onClick={exportImg}>Export as Image</button>
+              <button className="secondary" onClick={()=>setEditMode(m=>!m)}>{editMode?'Done':'Edit'}</button>
+            </div>
           </div>
         </div>
-      );
+      </>;
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   </script>
 </body>
 </html>
