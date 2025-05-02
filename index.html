@@ -29,6 +29,33 @@
       cursor: pointer;
       margin-left: 0.5rem;
     }
+    /* color picker 텍스트 숨기기 */
+input[type=color] {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  padding: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+}
+/* WebKit 브라우저 스와치 내부 여백 제거 */
+input[type=color]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+/* WebKit 스와치 테두리 제거 */
+input[type=color]::-webkit-color-swatch {
+  border: none;
+}
+/* 스와치 텍스트(헥스코드) 숨기기 */
+input[type=color]::-webkit-color-swatch-text {
+  display: none;
+}
+/* Firefox */
+input[type=color]::-moz-color-swatch,
+input[type=color]::-moz-color-swatch-wrapper {
+  border: none;
+}
   </style>
 </head>
 <body>
