@@ -34,20 +34,19 @@
 <body>
   <div id="root"></div>
 
-  <!-- React, ReactDOM, Babel (CDN) -->
+  <!-- React, ReactDOM, Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Firebase (v9 compat) - Realtime Database -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
 
-  <!-- html2canvas for image export -->
+  <!-- html2canvas -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <script type="text/babel">
-    // Firebase 설정
     const firebaseConfig = {
       apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
       authDomain: "nagi-todo.firebaseapp.com",
@@ -60,7 +59,6 @@
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // KST 기준 현재 시간 반환
     function getSeoulDate() {
       return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
     }
@@ -71,7 +69,7 @@
       const [selectedDate, setSelectedDate] = React.useState(getSeoulDate());
       const [showSidebar, setShowSidebar] = React.useState(true);
       const [allTodos, setAllTodos] = React.useState({});
-      const [accentColor, setAccentColor] = React.useState('#888888'); // 기본 회색
+      const [accentColor, setAccentColor] = React.useState('#888888');
       const [dateColors, setDateColors] = React.useState({});
       const [noteText, setNoteText] = React.useState('');
       const [notes, setNotes] = React.useState({});
@@ -85,7 +83,6 @@
       const dateKey = selectedDate.toISOString().split('T')[0];
       const items = allTodos[dateKey] || [];
 
-      // 날짜별 todos 구독
       React.useEffect(() => {
         const ref = database.ref('todos/' + dateKey);
         const handler = ref.on('value', snap => {
@@ -94,7 +91,6 @@
         return () => ref.off('value', handler);
       }, [dateKey]);
 
-      // 날짜별 컬러 구독
       React.useEffect(() => {
         const ref = database.ref('dateColors');
         const handler = ref.on('value', snap => {
@@ -103,7 +99,6 @@
         return () => ref.off('value', handler);
       }, []);
 
-      // Notes 구독 (현재 날짜)
       React.useEffect(() => {
         setNotesEditMode(false);
         const ref = database.ref('notes/' + dateKey);
@@ -113,7 +108,6 @@
         return () => ref.off('value', handler);
       }, [dateKey]);
 
-      // 모든 Notes 구독
       React.useEffect(() => {
         const ref = database.ref('notes');
         const handler = ref.on('value', snap => {
@@ -122,7 +116,6 @@
         return () => ref.off('value', handler);
       }, []);
 
-      // accentColor 로컬 저장소는 그대로 유지해도 무방
       React.useEffect(() => {
         const saved = localStorage.getItem('accentColor');
         if (saved) setAccentColor(saved);
@@ -131,7 +124,6 @@
         localStorage.setItem('accentColor', accentColor);
       }, [accentColor]);
 
-      // 날짜 이동
       function handlePrevMonth() {
         setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
       }
@@ -142,13 +134,12 @@
         setSelectedDate(getSeoulDate());
       }
 
-      // 할 일 추가
       function handleKeyDownTodo(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           if (text.trim()) {
             database.ref('todos/' + dateKey).set([
-              ...(items),
+              ...items,
               { type: 'todo', text: text.trim(), state: 0 }
             ]);
             setText('');
@@ -160,7 +151,7 @@
           e.preventDefault();
           if (categoryText.trim()) {
             database.ref('todos/' + dateKey).set([
-              ...(items),
+              ...items,
               { type: 'category', text: categoryText.trim() }
             ]);
             setCategoryText('');
@@ -168,13 +159,9 @@
         }
       }
       function addDivider() {
-        database.ref('todos/' + dateKey).set([
-          ...items,
-          { type: 'divider' }
-        ]);
+        database.ref('todos/' + dateKey).set([...items, { type: 'divider' }]);
       }
 
-      // 상태 토글 (클릭, 꾹 누르기)
       function toggleState(index) {
         if (editMode) return;
         const updated = items.map((it, i) =>
@@ -185,7 +172,6 @@
         database.ref('todos/' + dateKey).set(updated);
       }
 
-      // 삭제 / 편집
       function deleteItem(index) {
         const filtered = items.filter((_, i) => i !== index);
         database.ref('todos/' + dateKey).set(filtered);
@@ -201,7 +187,6 @@
         }
       }
 
-      // Notes 입력 저장
       function handleKeyDownNote(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -209,8 +194,11 @@
           setNotesEditMode(false);
         }
       }
+      function handleCurrentDateColorChange(e) {
+        const col = e.target.value;
+        database.ref('dateColors/' + dateKey).set(col);
+      }
 
-      // 드래그 앤 드롭 (editMode)
       function handleDragStart(e, idx) {
         if (!editMode) return;
         setDraggedItem(idx);
@@ -238,7 +226,6 @@
         setDraggedOverItem(null);
       }
 
-      // 이미지 내보내기
       async function exportAsImage() {
         const container = document.querySelector('.todo-container');
         const canvas = await html2canvas(container, { backgroundColor: '#fff' });
@@ -258,7 +245,6 @@
         });
       }
 
-      // 달력 관련 계산
       const daysInMonth = new Date(
         selectedDate.getFullYear(),
         selectedDate.getMonth() + 1, 0
@@ -267,9 +253,8 @@
         selectedDate.getFullYear(),
         selectedDate.getMonth(), 1
       ).getDay();
-      const isToday = dateKey === getSeoulDate().toISOString().split('T')[0];
+      const todayKey = getSeoulDate().toISOString().split('T')[0];
 
-      // 한 날짜에 할 일 유무
       const hasTodos = d => {
         const key = d.toISOString().split('T')[0];
         return allTodos[key] && allTodos[key].length > 0;
@@ -337,7 +322,7 @@
               {showNotesList ? (
                 Object.entries(notes)
                   .sort((a,b)=>b[0].localeCompare(a[0]))
-                  .map(([d,text])=>(
+                  .map(([d, text])=>(
                     <div key={d} style={{
                       background:'#fff', borderRadius:'0.5rem',
                       padding:'0.75rem', marginBottom:'0.5rem',
@@ -353,8 +338,13 @@
                       </div>
                       <div style={{
                         fontWeight:'bold',
-                        color: dateColors[d] || accentColor
+                        color: dateColors[d] || accentColor,
+                        whiteSpace:'pre-wrap'
                       }}>{text}</div>
+                      <button className="edit-delete-btn"
+                        onClick={()=>database.ref('notes/'+d).remove()}>
+                        Delete
+                      </button>
                     </div>
                   ))
               ) : (
@@ -390,7 +380,7 @@
                           width:'1.8rem', height:'1.8rem', margin:'0 auto',
                           display:'flex', alignItems:'center',
                           justifyContent:'center',
-                          border: isToday&& !isSel?'1px solid #ccc':'none',
+                          border:'none',
                           backgroundColor: isSel?circleColor:'transparent',
                           color: isSel?'#fff':'#000',
                           borderRadius:'9999px',
@@ -432,32 +422,45 @@
                 })}
               </h2>
 
-              {(!notesEditMode && noteText.trim()) ? (
-                <div style={{
-                  fontWeight:'bold',
-                  color: dateColors[dateKey]||accentColor,
-                  marginBottom:'1rem', whiteSpace:'pre-wrap'
-                }}
-                onDoubleClick={()=>setNotesEditMode(true)}
-                onContextMenu={e=>{e.preventDefault();setNotesEditMode(true);}}>
-                  {noteText}
-                </div>
-              ) : (
-                <textarea
-                  value={noteText}
-                  onChange={e=>setNoteText(e.target.value)}
-                  onKeyDown={handleKeyDownNote}
-                  placeholder="Notes (Enter 저장, Shift+Enter 줄바꿈)"
-                  rows={2}
-                  style={{
-                    width:'100%', border:'1px solid #ccc',
-                    padding:'0.5rem', borderRadius:'0.25rem',
-                    resize:'vertical', fontWeight:'bold',
+              <div style={{
+                display:'flex', alignItems:'center', gap:'0.5rem',
+                marginBottom:'1rem'
+              }}>
+                {(!notesEditMode && noteText.trim()) ? (
+                  <div style={{
+                    fontWeight:'bold',
                     color: dateColors[dateKey]||accentColor,
-                    marginBottom:'1rem'
+                    whiteSpace:'pre-wrap'
+                  }}
+                  onDoubleClick={()=>setNotesEditMode(true)}
+                  onContextMenu={e=>{e.preventDefault();setNotesEditMode(true);}}>
+                    {noteText}
+                  </div>
+                ) : (
+                  <textarea
+                    value={noteText}
+                    onChange={e=>setNoteText(e.target.value)}
+                    onKeyDown={handleKeyDownNote}
+                    placeholder="Notes (Enter 저장, Shift+Enter 줄바꿈)"
+                    rows={2}
+                    style={{
+                      width:'100%', border:'1px solid #ccc',
+                      padding:'0.5rem', borderRadius:'0.25rem',
+                      resize:'vertical', fontWeight:'bold',
+                      color: dateColors[dateKey]||accentColor
+                    }}
+                  />
+                )}
+                <input
+                  type="color"
+                  value={dateColors[dateKey]||accentColor}
+                  onChange={handleCurrentDateColorChange}
+                  style={{
+                    width:'1.5rem', height:'1.5rem',
+                    borderRadius:'9999px', cursor:'pointer'
                   }}
                 />
-              )}
+              </div>
 
               <div style={{
                 display:'grid', gridTemplateColumns:'auto 1fr',
