@@ -12,35 +12,29 @@
       font-style: normal;
     }
     body {
-      margin: 0; padding: 0;
+      margin: 0;
+      padding: 0;
       font-family: 'HJSS', sans-serif;
       background: #f5f5f5;
       box-sizing: border-box;
     }
-    *, *::before, *::after { box-sizing: inherit; }
+    *, *::before, *::after {
+      box-sizing: inherit;
+    }
     .edit-delete-btn {
-      font-size: 0.75rem; color: #888;
-      background: none; border: none;
-      cursor: pointer; margin-left: 0.5rem;
-    }
-    /* color picker 텍스트 숨기기 */
-    input[type=color] {
-      -webkit-appearance: none; appearance: none;
-      border: none; padding: 0;
-      width: 1.5rem; height: 1.5rem;
+      font-size: 0.75rem;
+      color: #888;
+      background: none;
+      border: none;
       cursor: pointer;
+      margin-left: 0.5rem;
     }
-    input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
-    input[type=color]::-webkit-color-swatch { border: none; }
-    input[type=color]::-webkit-color-swatch-text { display: none; }
-    input[type=color]::-moz-color-swatch,
-    input[type=color]::-moz-color-swatch-wrapper { border: none; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
-  <!-- React / Babel -->
+  <!-- React, ReactDOM, Babel -->
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -53,242 +47,318 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
   <script type="text/babel">
+    // Firebase 초기화
     const firebaseConfig = {
-      apiKey: "...", authDomain: "...",
-      databaseURL: "...", projectId: "...",
-      storageBucket: "...", messagingSenderId: "...",
-      appId: "..."
+      apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
+      authDomain: "nagi-todo.firebaseapp.com",
+      databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com/",
+      projectId: "nagi-todo",
+      storageBucket: "nagi-todo.firebasestorage.app",
+      messagingSenderId: "923414063910",
+      appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
     };
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // KST 자정 반환
+    // KST 정확하게 계산 (sv-SE 포맷)
     function getSeoulDate() {
-      const now = Date.now();
-      const utc = now + new Date().getTimezoneOffset() * 60000;
-      const kst = new Date(utc + 9 * 60 * 60000);
-      kst.setHours(0,0,0,0);
-      return kst;
+      const seoulStr = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' });
+      return new Date(seoulStr);
     }
 
     function App() {
+      // 기본 상태
       const [selectedDate, setSelectedDate] = React.useState(getSeoulDate());
-      const [allTodos, setAllTodos]             = React.useState({});
-      const [dateColors, setDateColors]         = React.useState({});
-      const [notes, setNotes]                   = React.useState({});
-      const [noteText, setNoteText]             = React.useState('');
-      const [showNotesList, setShowNotesList]   = React.useState(false);
-      const [notesEditMode, setNotesEditMode]   = React.useState(false);
-      const [accentColor, setAccentColor]       = React.useState('#888888');
-      const [editMode, setEditMode]             = React.useState(false);
-      const [draggedItem, setDraggedItem]       = React.useState(null);
+      const [showSidebar, setShowSidebar] = React.useState(true);
+      const [allTodos, setAllTodos] = React.useState({});
+      const [accentColor, setAccentColor] = React.useState('#888888');
+      const [dateColors, setDateColors] = React.useState({});
+      const [noteText, setNoteText] = React.useState('');
+      const [notes, setNotes] = React.useState({});
+      const [showNotesList, setShowNotesList] = React.useState(false);
+      const [notesEditMode, setNotesEditMode] = React.useState(false);
+      const [editMode, setEditMode] = React.useState(false);
+      const [draggedItem, setDraggedItem] = React.useState(null);
       const [draggedOverItem, setDraggedOverItem] = React.useState(null);
 
-      const [textNec, setTextNec]   = React.useState('');
-      const [textGro, setTextGro]   = React.useState('');
+      // 세 구획 입력 상태
+      const [textNec, setTextNec] = React.useState('');
+      const [textGro, setTextGro] = React.useState('');
       const [textFree, setTextFree] = React.useState('');
 
       const bulletStates = ['☐','☑','☒'];
-      const categories   = ['필연의 시간','성장의 시간','자유의 시간'];
-      const dateKey      = selectedDate.toISOString().split('T')[0];
-      const items        = allTodos[dateKey] || [];
+      const categories = ['필연의 시간','성장의 시간','자유의 시간'];
+      const dateKey = selectedDate.toISOString().split('T')[0];
+      const items = allTodos[dateKey] || [];
 
-      // 그룹화된 배열
+      // tasksByCategory 계산
       const tasksByCategory = categories.map(cat =>
-        items.map((it,i)=> it.type==='todo'&&it.category===cat?{...it,index:i}:null)
-             .filter(x=>x)
+        items.map((it, i) =>
+          it.type === 'todo' && it.category === cat
+            ? { ...it, index: i }
+            : null
+        ).filter(x => x)
       );
 
-      // 구독: todos
-      React.useEffect(()=>{
-        const ref = database.ref('todos/'+dateKey);
-        const h   = ref.on('value',s=>setAllTodos(prev=>({
-          ...prev, [dateKey]: s.val()||[]
-        })));
-        return ()=>ref.off('value',h);
-      },[dateKey]);
+      // Firebase 구독: todos
+      React.useEffect(() => {
+        const ref = database.ref('todos/' + dateKey);
+        const handler = ref.on('value', snap => {
+          setAllTodos(prev => ({ ...prev, [dateKey]: snap.val() || [] }));
+        });
+        return () => ref.off('value', handler);
+      }, [dateKey]);
 
-      // 구독: 컬러
-      React.useEffect(()=>{
+      // Firebase 구독: dateColors
+      React.useEffect(() => {
         const ref = database.ref('dateColors');
-        const h   = ref.on('value',s=>setDateColors(s.val()||{}));
-        return ()=>ref.off('value',h);
-      },[]);
+        const handler = ref.on('value', snap => {
+          setDateColors(snap.val() || {});
+        });
+        return () => ref.off('value', handler);
+      }, []);
 
-      // 구독: 노트(오늘)
-      React.useEffect(()=>{
+      // Firebase 구독: notes (오늘)
+      React.useEffect(() => {
         setNotesEditMode(false);
-        const ref = database.ref('notes/'+dateKey);
-        const h   = ref.on('value',s=>setNoteText(s.val()||''));
-        return ()=>ref.off('value',h);
-      },[dateKey]);
+        const ref = database.ref('notes/' + dateKey);
+        const handler = ref.on('value', snap => {
+          setNoteText(snap.val() || '');
+        });
+        return () => ref.off('value', handler);
+      }, [dateKey]);
 
-      // 구독: 전체 노트
-      React.useEffect(()=>{
+      // Firebase 구독: all notes
+      React.useEffect(() => {
         const ref = database.ref('notes');
-        const h   = ref.on('value',s=>setNotes(s.val()||{}));
-        return ()=>ref.off('value',h);
-      },[]);
+        const handler = ref.on('value', snap => {
+          setNotes(snap.val() || {});
+        });
+        return () => ref.off('value', handler);
+      }, []);
 
       // accentColor 로컬 저장
-      React.useEffect(()=>{
-        const v = localStorage.getItem('accentColor');
-        if(v) setAccentColor(v);
-      },[]);
-      React.useEffect(()=>{
-        localStorage.setItem('accentColor',accentColor);
-      },[accentColor]);
+      React.useEffect(() => {
+        const saved = localStorage.getItem('accentColor');
+        if (saved) setAccentColor(saved);
+      }, []);
+      React.useEffect(() => {
+        localStorage.setItem('accentColor', accentColor);
+      }, [accentColor]);
 
-      // 내비게이션
-      function prevMonth(){setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1));}
-      function nextMonth(){setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1));}
-      function goToday(){
+      // 월 이동 & Today (Notes 닫기 포함)
+      function handlePrevMonth() {
+        setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+      }
+      function handleNextMonth() {
+        setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+      }
+      function handleToday() {
         setSelectedDate(getSeoulDate());
         setShowNotesList(false);
       }
 
-      // 할 일 추가
-      function addTodo(cat,text,setter){
-        if(!text.trim()) return;
-        database.ref('todos/'+dateKey).set([
-          ...items, {type:'todo',category:cat,text:text.trim(),state:0}
-        ]);
+      // 세 구획별 할 일 추가
+      function addTodo(cat, text, setter) {
+        if (!text.trim()) return;
+        database.ref('todos/' + dateKey)
+          .set([...items, { type: 'todo', category: cat, text: text.trim(), state: 0 }]);
         setter('');
       }
-      function onKeyDownNec(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo('필연의 시간',textNec,setTextNec);} }
-      function onKeyDownGro(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo('성장의 시간',textGro,setTextGro);} }
-      function onKeyDownFree(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo('자유의 시간',textFree,setTextFree);} }
+      function handleKeyDownNec(e)    { if (e.key==='Enter'&& !e.shiftKey){ e.preventDefault(); addTodo('필연의 시간', textNec, setTextNec); }} 
+      function handleKeyDownGro(e)    { if (e.key==='Enter'&& !e.shiftKey){ e.preventDefault(); addTodo('성장의 시간', textGro, setTextGro); }} 
+      function handleKeyDownFree(e)   { if (e.key==='Enter'&& !e.shiftKey){ e.preventDefault(); addTodo('자유의 시간', textFree, setTextFree); }}
 
-      // 토글/삭제/편집
-      function toggleState(i){
-        if(editMode) return;
-        const upd = items.map((it,idx)=>
-          idx===i&&it.type==='todo'
-            ?{...it, state:(it.state+1)%bulletStates.length}
+      // 상태 토글
+      function toggleState(i) {
+        if (editMode) return;
+        const upd = items.map((it, idx) =>
+          idx === i && it.type === 'todo'
+            ? { ...it, state: (it.state + 1) % bulletStates.length }
             : it
         );
-        database.ref('todos/'+dateKey).set(upd);
+        database.ref('todos/' + dateKey).set(upd);
       }
-      function deleteItem(i){
-        const f = items.filter((_,idx)=>idx!==i);
-        database.ref('todos/'+dateKey).set(f);
+      // 삭제
+      function deleteItem(i) {
+        const filt = items.filter((_, idx) => idx !== i);
+        database.ref('todos/' + dateKey).set(filt);
       }
-      function editItem(i){
+      // 편집
+      function editItem(i) {
         const it = items[i];
-        if(!it) return;
-        const nt = prompt('Edit text:',it.text);
-        if(nt!=null&&nt.trim()){
-          const c=[...items];
-          c[i].text=nt.trim();
-          database.ref('todos/'+dateKey).set(c);
+        if (!it) return;
+        const nt = prompt('Edit text:', it.text);
+        if (nt != null && nt.trim()) {
+          const copy = [...items];
+          copy[i].text = nt.trim();
+          database.ref('todos/' + dateKey).set(copy);
         }
       }
 
-      // 노트 저장/색
-      function onKeyDownNote(e){
-        if(e.key==='Enter'&&!e.shiftKey){
+      // Notes 저장
+      function handleKeyDownNote(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
-          database.ref('notes/'+dateKey).set(noteText.trim());
+          database.ref('notes/' + dateKey).set(noteText.trim());
           setNotesEditMode(false);
         }
       }
-      function onColorChange(e){
-        database.ref('dateColors/'+dateKey).set(e.target.value);
+      function handleCurrentDateColorChange(e) {
+        database.ref('dateColors/' + dateKey).set(e.target.value);
       }
 
-      // DnD
-      function onDragStart(e,i){ if(!editMode)return; setDraggedItem(i); e.currentTarget.style.opacity='0.4'; }
-      function onDragEnd(e){ if(!editMode)return; e.currentTarget.style.opacity='1'; setDraggedItem(null); setDraggedOverItem(null); }
-      function onDragOver(e,i){ if(!editMode)return; e.preventDefault(); setDraggedOverItem(i); }
-      function onDrop(e,i){
+      // DnD (이전과 동일)
+      function handleDragStart(e,i){ if(!editMode)return; setDraggedItem(i); e.currentTarget.style.opacity='0.4'; }
+      function handleDragEnd(e)   { if(!editMode)return; e.currentTarget.style.opacity='1'; setDraggedItem(null); setDraggedOverItem(null); }
+      function handleDragOver(e,i){ if(!editMode)return; e.preventDefault(); setDraggedOverItem(i); }
+      function handleDrop(e,i){
         if(!editMode)return;
         e.preventDefault();
-        const c=[...items];
-        const mv=c.splice(draggedItem,1)[0];
-        c.splice(i,0,mv);
-        database.ref('todos/'+dateKey).set(c);
+        const copy = [...items];
+        const mv = copy.splice(draggedItem,1)[0];
+        copy.splice(i,0,mv);
+        database.ref('todos/' + dateKey).set(copy);
         setDraggedItem(null); setDraggedOverItem(null);
       }
 
-      // Export
+      // Export as Image (이전과 동일)
       async function exportAsImage(){
-        const container=document.querySelector('.todo-container');
-        const canvas=await html2canvas(container,{backgroundColor:'#fff'});
+        const container = document.querySelector('.todo-container');
+        const canvas = await html2canvas(container, { backgroundColor:'#fff' });
         canvas.toBlob(async blob=>{
-          try{
-            await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+          try {
+            await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
             alert('클립보드에 이미지를 복사했어.');
-          }catch{
-            const url=URL.createObjectURL(blob);
-            const a=document.createElement('a');
-            a.href=url; a.download=`todo-${dateKey}.png`; a.click();
+          } catch {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `todo-${dateKey}.png`; a.click();
             URL.revokeObjectURL(url);
             alert('이미지를 다운로드했어.');
           }
         });
       }
 
-      // 달력
-      const daysInMonth=new Date(selectedDate.getFullYear(),selectedDate.getMonth()+1,0).getDate();
-      const firstDay  =new Date(selectedDate.getFullYear(),selectedDate.getMonth(),1).getDay();
-      const hasTodosFn=d=>{
-        const k=d.toISOString().split('T')[0];
-        return allTodos[k]&&allTodos[k].length>0;
+      // 달력 계산
+      const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth()+1, 0).getDate();
+      const firstDay   = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).getDay();
+      const hasTodos   = d => {
+        const k = d.toISOString().split('T')[0];
+        return allTodos[k] && allTodos[k].length > 0;
       };
 
       return (
-        <div style={{display:'flex',minHeight:'100vh'}}>
-          <button onClick={()=>setShowNotesList(v=>!v)} style={{position:'fixed',left:10,top:10,zIndex:10,background:'#fff',padding:8,borderRadius:999,cursor:'pointer'}} className="md:hidden">
-            {showNotesList?'←':'→'}
-          </button>
+        <div style={{ display:'flex', minHeight:'100vh' }}>
+          {/* 모바일 토글 */}
+          <button onClick={()=>setShowSidebar(v=>!v)}
+            style={{
+              position:'fixed',left:'1rem',top:'1rem',zIndex:10,
+              background:'#fff',padding:'0.5rem',borderRadius:'9999px',
+              boxShadow:'0 2px 5px rgba(0,0,0,0.1)',cursor:'pointer'
+            }}
+            className="md:hidden"
+          >{showSidebar?'←':'→'}</button>
 
-          <div style={{position:'fixed',left:0,top:0,bottom:0,width:256,background:'#fff',overflow:'auto',transform:showNotesList?'translateX(0)':'translateX(-100%)',transition:'transform .3s',boxShadow:'0 0 10px rgba(0,0,0,.1)',zIndex:20}}>
-            <div style={{padding:16}}>
-              <h2 style={{textAlign:'center',fontWeight:'bold',whiteSpace:'pre-line',marginBottom:16}}>
-                {selectedDate.toLocaleString('en-US',{year:'numeric'})}{'\n'}
-                {selectedDate.toLocaleString('en-US',{month:'long'})}
+          {/* 사이드바 */}
+          <div style={{
+            position:'fixed',left:0,top:0,bottom:0,width:'16rem',
+            background:'#fff',boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
+            overflow:'auto',
+            transform: showSidebar ? 'translateX(0)' : 'translateX(-100%)',
+            transition:'transform 0.3s ease-in-out', zIndex:20
+          }}>
+            <div style={{ padding:'1rem' }}>
+              <h2 style={{
+                fontWeight:'bold',whiteSpace:'pre-line',textAlign:'center',
+                marginBottom:'1rem'
+              }}>
+                {selectedDate.toLocaleString('en-US',{ year:'numeric'})}{'\n'}
+                {selectedDate.toLocaleString('en-US',{ month:'long'})}
               </h2>
-              <div style={{display:'flex',justifyContent:'center',gap:8,margin:'8px 0'}}>
-                <button onClick={prevMonth} style={{background:'#fff',border:'none',cursor:'pointer'}}>←</button>
-                <button onClick={goToday}   style={{background:'#fff',border:'none',cursor:'pointer'}}>Today</button>
-                <button onClick={nextMonth} style={{background:'#fff',border:'none',cursor:'pointer'}}>→</button>
+
+              {/* ← Today → */}
+              <div style={{
+                display:'flex',justifyContent:'center',gap:'0.5rem',margin:'0.5rem 0'
+              }}>
+                <button onClick={handlePrevMonth}
+                  style={{ background:'#fff',border:'none',padding:'0.25rem 0.5rem',cursor:'pointer' }}>←</button>
+                <button onClick={handleToday}
+                  style={{ background:'#fff',border:'none',padding:'0.25rem 0.5rem',cursor:'pointer' }}>Today</button>
+                <button onClick={handleNextMonth}
+                  style={{ background:'#fff',border:'none',padding:'0.25rem 0.5rem',cursor:'pointer' }}>→</button>
               </div>
-              <button onClick={()=>setShowNotesList(v=>!v)} style={{width:'100%',padding:8,marginBottom:16,background:'#f0f0f0',border:'none',cursor:'pointer'}}>
-                {showNotesList?'Back':'Notes'}
-              </button>
+
+              {/* Notes 토글 */}
+              <button onClick={()=>setShowNotesList(v=>!v)}
+                style={{
+                  width:'100%',padding:'0.5rem',marginBottom:'1rem',
+                  background:'#f0f0f0',border:'none',cursor:'pointer'
+                }}
+              >{showNotesList?'Back':'Notes'}</button>
 
               {showNotesList
-                ? Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,txt])=>(
-                    <div key={d} style={{background:'#fff',borderRadius:8,padding:12,marginBottom:8,boxShadow:'0 1px 3px rgba(0,0,0,.1)'}}>
-                      <div style={{fontWeight:'600',marginBottom:4}}>
-                        {new Date(d).toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+                ? Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d, txt])=>(
+                    <div key={d} style={{
+                      background:'#fff',borderRadius:'0.5rem',
+                      padding:'0.75rem',marginBottom:'0.5rem',
+                      boxShadow:'0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>
+                        {new Date(d).toLocaleString('en-US',{ weekday:'long', year:'numeric', month:'long', day:'numeric' })}
                       </div>
-                      <div style={{fontWeight:'bold',whiteSpace:'pre-wrap',color:dateColors[d]||accentColor}}>{txt}</div>
-                      <button className="edit-delete-btn" onClick={()=>database.ref('notes/'+d).remove()}>Delete</button>
+                      <div style={{
+                        fontWeight:'bold',whiteSpace:'pre-wrap',
+                        color: dateColors[d] || accentColor
+                      }}>{txt}</div>
+                      <button className="edit-delete-btn"
+                        onClick={()=>database.ref('notes/'+d).remove()}
+                      >Delete</button>
                     </div>
                   ))
-                : <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:4,fontSize:14}}>
-                    {['S','M','T','W','T','F','S'].map(d=><div key={d} style={{textAlign:'center',color:'#666'}}>{d}</div>)}
-                    {Array(firstDay).fill().map((_,i)=><div key={i}/>)} 
-                    {Array.from({length:daysInMonth},(_,i)=>{
-                      const dt=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),i+1);
-                      const k=dt.toISOString().split('T')[0];
-                      const sel=k===dateKey;
-                      const col=dateColors[k]||accentColor;
+                : <div style={{
+                    display:'grid',gridTemplateColumns:'repeat(7,1fr)',
+                    gap:'0.25rem',fontSize:'0.875rem'
+                  }}>
+                    {['S','M','T','W','T','F','S'].map(d=>(
+                      <div key={d} style={{
+                        textAlign:'center',fontWeight:'500',color:'#666'
+                      }}>{d}</div>
+                    ))}
+                    {Array(firstDay).fill(null).map((_,i)=><div key={i}/>)}
+                    {Array.from({ length: daysInMonth }, (_, i) => {
+                      const dateObj = new Date(
+                        selectedDate.getFullYear(),
+                        selectedDate.getMonth(),
+                        i + 1
+                      );
+                      const dKey = dateObj.toISOString().split('T')[0];
+                      const isSel = dKey === dateKey;
+                      const circleColor = dateColors[dKey] || accentColor;
                       return (
-                        <button key={i} onClick={()=>{
-                          setSelectedDate(dt);
-                          setShowNotesList(false);
-                        }} style={{
-                          width:28,height:28,margin:'0 auto',
-                          display:'flex',alignItems:'center',justifyContent:'center',
-                          background:sel?col:'transparent',
-                          color:sel?'#fff':'#000',
-                          border:'none',cursor:'pointer',position:'relative',
-                          borderRadius:999
-                        }}>
-                          {i+1}
-                          {hasTodosFn(dt) && <span style={{position:'absolute',bottom:-4,fontSize:10,color:sel?'#fff':col}}>•</span>}
+                        <button key={i}
+                          onClick={()=>{
+                            setSelectedDate(dateObj);
+                            if(window.innerWidth<768) setShowSidebar(false);
+                          }}
+                          style={{
+                            width:'1.8rem',height:'1.8rem',margin:'0 auto',
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            border:'none',
+                            backgroundColor: isSel?circleColor:'transparent',
+                            color: isSel?'#fff':'#000',
+                            borderRadius:'9999px',cursor:'pointer',
+                            position:'relative'
+                          }}
+                        >
+                          <span>{i+1}</span>
+                          {hasTodos(dateObj) && (
+                            <span style={{
+                              fontSize:'0.75rem',
+                              color: isSel?'#fff':circleColor,
+                              position:'absolute',bottom:'-0.3rem'
+                            }}>•</span>
+                          )}
                         </button>
                       );
                     })}
@@ -297,99 +367,158 @@
             </div>
           </div>
 
-          <div style={{flex:1,padding:16,marginLeft:showNotesList?256:0,transition:'margin-left .3s'}}>
-            <div className="todo-container" style={{maxWidth:672,margin:'0 auto',background:'#fff',borderRadius:8,boxShadow:'0 2px 5px rgba(0,0,0,.1)',padding:24}}>
-              <h2 style={{fontSize:20,fontWeight:'bold',marginBottom:16}}>
-                {selectedDate.toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+          {/* 메인 영역 */}
+          <div style={{
+            flex:1,padding:'1rem',
+            marginLeft: showSidebar?'16rem':'0',
+            transition:'margin-left 0.3s'
+          }}>
+            <div className="todo-container" style={{
+              maxWidth:'42rem',margin:'0 auto',background:'#fff',
+              borderRadius:'0.5rem',boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
+              padding:'1.5rem'
+            }}>
+              <h2 style={{
+                fontSize:'1.25rem',fontWeight:'bold',marginBottom:'1rem'
+              }}>
+                {selectedDate.toLocaleString('en-US',{ weekday:'long', year:'numeric', month:'long', day:'numeric' })}
               </h2>
 
-              {/* Notes */}
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
-                {(!notesEditMode && noteText.trim()) 
-                  ? <div onDoubleClick={()=>setNotesEditMode(true)} style={{fontWeight:'bold',whiteSpace:'pre-wrap',color:accentColor,cursor:'pointer'}}>{noteText}</div>
-                  : <textarea
-                      value={noteText}
-                      onFocus={()=>setNotesEditMode(true)}
-                      onChange={e=>setNoteText(e.target.value)}
-                      onKeyDown={onKeyDownNote}
-                      placeholder="Notes (Enter 저장, Shift+Enter 줄바꿈)"
-                      rows={2}
-                      style={{flex:1,border:'1px solid #ccc',padding:8,borderRadius:4,resize:'vertical',fontWeight:'bold',color:accentColor}}
-                    />
-                }
-                <input type="color" value={dateColors[dateKey]||accentColor} onChange={onColorChange}/>
+              {/* Notes 입력부 */}
+              <div style={{
+                display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'1rem'
+              }}>
+                {(!notesEditMode && noteText.trim()) ? (
+                  <div style={{
+                    fontWeight:'bold',whiteSpace:'pre-wrap',
+                    color: dateColors[dateKey] || accentColor
+                  }}
+                  onDoubleClick={()=>setNotesEditMode(true)}
+                  onContextMenu={e=>{e.preventDefault();setNotesEditMode(true);}}>
+                    {noteText}
+                  </div>
+                ) : (
+                  <textarea
+                    value={noteText}
+                    onFocus={()=>setNotesEditMode(true)}
+                    onChange={e=>setNoteText(e.target.value)}
+                    onKeyDown={handleKeyDownNote}
+                    placeholder="Notes (Enter 저장, Shift+Enter 줄바꿈)"
+                    rows={2}
+                    style={{
+                      width:'100%',border:'1px solid #ccc',
+                      padding:'0.5rem',borderRadius:'0.25rem',
+                      resize:'vertical',fontWeight:'bold',
+                      color: dateColors[dateKey] || accentColor
+                    }}
+                  />
+                )}
+                <input
+                  type="color"
+                  value={dateColors[dateKey] || accentColor}
+                  onChange={handleCurrentDateColorChange}
+                  style={{
+                    width:'1.5rem',height:'1.5rem',
+                    borderRadius:'9999px',cursor:'pointer'
+                  }}
+                />
               </div>
 
               {/* 세 구획 입력 */}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:16}}>
-                {[{label:'필연의 시간', state:textNec, onChange:setTextNec, onKey: onKeyDownNec},
-                  {label:'성장의 시간', state:textGro, onChange:setTextGro, onKey: onKeyDownGro},
-                  {label:'자유의 시간', state:textFree, onChange:setTextFree, onKey: onKeyDownFree}]
-                .map((cfg,i)=>(
-                  <div key={i}>
-                    <div style={{fontWeight:'600',marginBottom:4}}>{cfg.label}</div>
-                    <textarea
-                      value={cfg.state}
-                      onChange={e=>cfg.onChange(e.target.value)}
-                      onKeyDown={cfg.onKey}
-                      placeholder={`${cfg.label} (Enter 저장)`}
-                      rows={3}
-                      style={{width:'100%',border:'1px solid #ccc',padding:8,borderRadius:4,resize:'vertical'}}
-                    />
-                  </div>
-                ))}
+              <div style={{
+                display:'grid',
+                gridTemplateColumns:'repeat(3,1fr)',
+                gap:'0.5rem',marginBottom:'1rem'
+              }}>
+                <div>
+                  <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>필연의 시간</div>
+                  <textarea
+                    value={textNec}
+                    onChange={e=>setTextNec(e.target.value)}
+                    onKeyDown={handleKeyDownNec}
+                    placeholder="필연의 시간 (Enter 저장)"
+                    rows={3}
+                    style={{
+                      border:'1px solid #ccc',padding:'0.5rem',
+                      borderRadius:'0.25rem',resize:'vertical'
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>성장의 시간</div>
+                  <textarea
+                    value={textGro}
+                    onChange={e=>setTextGro(e.target.value)}
+                    onKeyDown={handleKeyDownGro}
+                    placeholder="성장의 시간 (Enter 저장)"
+                    rows={3}
+                    style={{
+                      border:'1px solid #ccc',padding:'0.5rem',
+                      borderRadius:'0.25rem',resize:'vertical'
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{fontWeight:'600',marginBottom:'0.25rem'}}>자유의 시간</div>
+                  <textarea
+                    value={textFree}
+                    onChange={e=>setTextFree(e.target.value)}
+                    onKeyDown={handleKeyDownFree}
+                    placeholder="자유의 시간 (Enter 저장)"
+                    rows={3}
+                    style={{
+                      border:'1px solid #ccc',padding:'0.5rem',
+                      borderRadius:'0.25rem',resize:'vertical'
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* 그룹화된 목록 */}
-              <div style={{marginTop:16}}>
-                {categories.map((cat,idx)=>(
-                  <div key={cat} style={{marginBottom:24}}>
-                    <div style={{fontWeight:'600',marginBottom:8}}>{cat}</div>
-                    {tasksByCategory[idx].map(item=>{
-                      const dndProps = editMode?{
-                        draggable:true,
-                        onDragStart:e=>onDragStart(e,item.index),
-                        onDragEnd: onDragEnd,
-                        onDragOver:e=>onDragOver(e,item.index),
-                        onDrop:e=>onDrop(e,item.index)
-                      }:{};
-                      return (
-                        <div key={item.index} {...dndProps} style={{
-                          display:'flex',alignItems:'center',gap:8,padding:8,
-                          borderRadius:4,background:'#fafafa',marginBottom:4,
-                          cursor: editMode?'move':'pointer'
-                        }}>
-                          <span onClick={()=>toggleState(item.index)}
-                            style={{fontFamily:'monospace',fontSize:18,color:accentColor}}>
-                            {bulletStates[item.state]}
-                          </span>
-                          <span style={{flex:1,whiteSpace:'pre-wrap'}}>{item.text}</span>
-                          {editMode && (
-                            <>
-                              <button className="edit-delete-btn" onClick={()=>editItem(item.index)}>Edit</button>
-                              <button className="edit-delete-btn" onClick={()=>deleteItem(item.index)}>Delete</button>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
+              {/* 범주별 그룹 표시 */}
+              <div style={{ marginTop:'1rem' }}>
+                {categories.map((cat, idx) => (
+                  <div key={cat} style={{ marginBottom:'1rem' }}>
+                    <div style={{ fontWeight:'600', marginBottom:'0.5rem' }}>{cat}</div>
+                    {tasksByCategory[idx].map(item => (
+                      <div key={item.index} style={{
+                        display:'flex',alignItems:'center',gap:'0.5rem',marginBottom:'0.25rem'
+                      }}>
+                        <span onClick={()=>toggleState(item.index)}
+                          style={{ color:accentColor,cursor:'pointer',fontFamily:'monospace' }}>
+                          {bulletStates[item.state]}
+                        </span>
+                        <span style={{ flex:1,whiteSpace:'pre-wrap' }}>{item.text}</span>
+                      </div>
+                    ))}
+                    {idx < categories.length - 1 && (
+                      <hr style={{
+                        borderTop:`1px solid ${accentColor}`,
+                        margin:'0.75rem 0'
+                      }}/>
+                    )}
                   </div>
                 ))}
               </div>
 
               {/* Export / Edit */}
-              <div style={{display:'flex',gap:8}}>
-                {items.length>0 && (
+              <div style={{ display:'flex',gap:'0.5rem',marginTop:'1rem' }}>
+                {items.length > 0 && (
                   <button onClick={exportAsImage} style={{
-                    flex:1,padding:12,background:accentColor,color:'#fff',
-                    border:'none',borderRadius:4,cursor:'pointer'
+                    flex:1,padding:'0.5rem',
+                    background:accentColor,color:'#fff',
+                    border:'none',borderRadius:'0.25rem',
+                    cursor:'pointer'
                   }}>Export as Image</button>
                 )}
                 <button onClick={()=>setEditMode(v=>!v)} style={{
-                  padding:12,background:editMode?'#ddd':'#f0f0f0',
-                  border:'none',borderRadius:4,cursor:'pointer'
+                  flex: items.length>0 ? 'unset' : 1,
+                  padding:'0.5rem',fontSize:'0.875rem',
+                  background: editMode?'#dddddd':'#f0f0f0',
+                  border:'none',borderRadius:'0.25rem',
+                  cursor:'pointer'
                 }}>{editMode?'Done':'Edit'}</button>
               </div>
+
             </div>
           </div>
         </div>
