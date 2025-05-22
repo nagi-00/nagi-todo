@@ -105,65 +105,70 @@
         if (saved) setAccentColor(saved);
       }, []);
       React.useEffect(() => localStorage.setItem('accentColor', accentColor), [accentColor]);
-      function handleToday() { setSelectedDate(new Date()); setShowNotesList(false); }
-      function handlePrevMonth() { setSelectedDate(p => new Date(p.getFullYear(), p.getMonth()-1, 1)); }
-      function handleNextMonth() { setSelectedDate(p => new Date(p.getFullYear(), p.getMonth()+1, 1)); }
-      function handleCurrentDateColorChange(e) {
-        database.ref('dateColors/'+dateKey).set(e.target.value);
-      }
+{!showNotesList ? (
+  <div style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: '0.25rem',
+    fontSize: '0.875rem'
+  }}>
+    {['S','M','T','W','T','F','S'].map((d,i) => (
+      <div key={`hdr-${i}`} style={{
+        textAlign: 'center',
+        fontWeight: '500',
+        color: '#666'
+      }}>{d}</div>
+    ))}
 
-      return (
-        <div style={{ display:'flex', minHeight:'100vh' }}>
-          {/* 사이드바 토글 */}
-          <button onClick={()=>setShowSidebar(v=>!v)}
+    {/* 1일 전 빈 칸 채우기 */}
+    {Array(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).getDay())
+      .fill(null)
+      .map((_, i) => <div key={`pad-${i}`} />)
+    }
+
+    {/* 실제 날짜 버튼들 */}
+    {Array.from(
+      { length: new Date(selectedDate.getFullYear(), selectedDate.getMonth()+1, 0).getDate() },
+      (_, i) => {
+        const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), i+1);
+        const dKey = d.toLocaleDateString('sv-SE');
+        const isSel = dKey === dateKey;
+        const color = dateColors[dKey] || accentColor;
+        return (
+          <button
+            key={`day-${i}`}
+            onClick={() => {
+              setSelectedDate(d);
+              if (window.innerWidth < 768) setShowSidebar(false);
+            }}
             style={{
-              position:'fixed', left:'1rem', top:'1rem', zIndex:10,
-              background:'#fff', border:'none', color:'#000',
-              padding:'.5rem', borderRadius:'9999px',
-              boxShadow:'0 2px 5px rgba(0,0,0,0.1)', cursor:'pointer'
-            }}>{showSidebar?'←':'→'}</button>
-
-          {/* 사이드바 */}
-          <div style={{
-            position:'fixed', left:0, top:0, bottom:0, width:'16rem',
-            background:'#fff', overflow:'auto',
-            boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
-            transform: showSidebar?'translateX(0)':'translateX(-100%)',
-            transition:'transform 0.3s ease-in-out', zIndex:20
-          }}>
-            <div style={{ padding:'1rem' }}>
-              <h2 style={{
-                fontWeight:'bold', whiteSpace:'pre-line', textAlign:'center',
-                marginBottom:'1rem'
-              }}>
-                {selectedDate.toLocaleString('en-US',{year:'numeric'})}{'\n'}
-                {selectedDate.toLocaleString('en-US',{month:'long'})}
-              </h2>
-
-              {/* 달력 이동 버튼 */}
-              <div style={{
-                display:'flex', justifyContent:'center', gap:'.5rem', margin:'.5rem 0'
-              }}>
-                <button onClick={handlePrevMonth} style={{background:'#fff',border:'none',color:'#000',cursor:'pointer'}}>←</button>
-                <button onClick={handleToday}         style={{background:'#fff',border:'none',color:'#000',cursor:'pointer'}}>Today</button>
-                <button onClick={handleNextMonth}     style={{background:'#fff',border:'none',color:'#000',cursor:'pointer'}}>→</button>
-              </div>
-
-              {/* Notes 토글 */}
-              <button onClick={()=>setShowNotesList(v=>!v)} style={{
-                width:'100%',padding:'.5rem',marginBottom:'1rem',
-                background:'#f0f0f0',border:'none',cursor:'pointer'
-              }}>{showNotesList?'Back':'Notes'}</button>
-
-              {!showNotesList ? (
-                /* 달력 그리드 (이전과 동일) */
-                <div style={{/* ... */}}>{/* ... */}</div>
-              ) : (
-                /* Notes 리스트 (이전과 동일) */
-                <div style={{/* ... */}}>{/* ... */}</div>
-              )}
-            </div>
-          </div>
+              width: '1.8rem',
+              height: '1.8rem',
+              border: 'none',
+              borderRadius: '9999px',
+              backgroundColor: isSel ? color : 'transparent',
+              color: isSel ? '#fff' : '#000',
+              position: 'relative',
+              cursor: 'pointer'
+            }}
+          >
+            <span>{i+1}</span>
+            {(allTodos[dKey]?.length > 0) && (
+              <span style={{
+                fontSize: '0.75rem',
+                position: 'absolute',
+                bottom: '-0.3rem',
+                color: isSel ? '#fff' : color
+              }}>•</span>
+            )}
+          </button>
+        );
+      }
+    )}
+  </div>
+) : (
+  /* Notes 리스트… 그대로 유지 */
+)}
           {/* 메인 콘텐츠 */}
           <div style={{
             flex:1,padding:'1rem',
