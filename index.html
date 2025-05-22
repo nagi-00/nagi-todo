@@ -40,12 +40,15 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script type="text/babel">
-    const firebaseConfig = {
-      apiKey: "...", authDomain: "...",
-      databaseURL: "...", projectId: "...",
-      storageBucket: "...", messagingSenderId: "...",
-      appId: "..."
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
+  authDomain: "nagi-todo.firebaseapp.com",
+  databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com", // ← 반드시 .firebaseio.com 도메인
+  projectId: "nagi-todo",
+  storageBucket: "nagi-todo.appspot.com",
+  messagingSenderId: "923414063910",
+  appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
+};
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
