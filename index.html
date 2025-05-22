@@ -15,7 +15,7 @@
       margin: 0;
       padding: 0;
       font-family: 'HJSS', sans-serif;
-      background: #ffffff;
+      background: #f5f5f5;
       box-sizing: border-box;
     }
     *, *::before, *::after {
@@ -196,7 +196,7 @@
 
       async function exportAsImage(){
         const container = document.querySelector('.todo-container');
-        const canvas = await html2canvas(container,{ backgroundColor:'#fff' });
+        const canvas = await html2canvas(container,{ backgroundColor:'#ffffff' });
         canvas.toBlob(async blob=>{
           try {
             await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
