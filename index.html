@@ -29,6 +29,10 @@
       cursor: pointer;
       margin-left: 0.5rem;
     }
+    .completed {
+      color: #bbb;
+      text-decoration: line-through;
+    }
   </style>
 </head>
 <body>
@@ -43,8 +47,9 @@
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
 
-  <!-- html2canvas -->
+  <!-- html2canvas & SortableJS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
   <script type="text/babel">
     // Firebase 초기화
@@ -53,14 +58,14 @@
       authDomain: "nagi-todo.firebaseapp.com",
       databaseURL: "https://nagi-todo-default-rtdb.firebaseio.com/",
       projectId: "nagi-todo",
-      storageBucket: "nagi-todo.firebasestorage.app",
+      storageBucket: "nagi-todo.appspot.com",
       messagingSenderId: "923414063910",
       appId: "1:923414063910:web:e09c59bc3cc72a19686fe7"
     };
     const app = firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // KST 오프셋 직접 적용
+    // KST 시간 가져오기
     function getSeoulDate() {
       const now = new Date();
       const utc = now.getTime() + now.getTimezoneOffset() * 60000;
@@ -79,7 +84,6 @@
       const [showNotesList, setShowNotesList] = React.useState(false);
       const [notesEditMode, setNotesEditMode] = React.useState(false);
       const [editMode, setEditMode] = React.useState(false);
-
       const [textNec, setTextNec] = React.useState('');
       const [textGro, setTextGro] = React.useState('');
       const [textFree, setTextFree] = React.useState('');
@@ -137,7 +141,6 @@
       React.useEffect(() => {
         localStorage.setItem('accentColor', accentColor);
       }, [accentColor]);
-
       function handlePrevMonth() {
         setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
       }
@@ -155,6 +158,7 @@
           .set([...items, { type: 'todo', category: cat, text: text.trim(), state: 0 }]);
         setter('');
       }
+
       function handleKeyDownNec(e)  { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo('필연의 시간',textNec,setTextNec);} }
       function handleKeyDownGro(e)  { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo('성장의 시간',textGro,setTextGro);} }
       function handleKeyDownFree(e){ if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo('자유의 시간',textFree,setTextFree);} }
@@ -168,10 +172,12 @@
         );
         database.ref('todos/' + dateKey).set(upd);
       }
+
       function deleteItem(i) {
         const filt = items.filter((_, idx) => idx !== i);
         database.ref('todos/' + dateKey).set(filt);
       }
+
       function editItem(i) {
         const it = items[i];
         if (!it) return;
@@ -190,13 +196,21 @@
           setNotesEditMode(false);
         }
       }
+
       function handleCurrentDateColorChange(e) {
         database.ref('dateColors/' + dateKey).set(e.target.value);
       }
 
       async function exportAsImage(){
         const container = document.querySelector('.todo-container');
-        const canvas = await html2canvas(container,{ backgroundColor:'#fff' });
+        const clone = container.cloneNode(true);
+        clone.style.backgroundColor = '#fff';
+        clone.querySelectorAll('input[type=\"color\"]').forEach(e => e.remove());
+        clone.querySelectorAll('button').forEach(e => e.remove());
+        clone.querySelectorAll('.edit-delete-btn').forEach(e => e.remove());
+        document.body.appendChild(clone);
+        const canvas = await html2canvas(clone, { backgroundColor:'#fff' });
+        document.body.removeChild(clone);
         canvas.toBlob(async blob=>{
           try {
             await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
@@ -211,6 +225,27 @@
         });
       }
 
+      React.useEffect(() => {
+        const containers = document.querySelectorAll('.task-list');
+        containers.forEach(container => {
+          Sortable.create(container, {
+            animation: 150,
+            onEnd: evt => {
+              const newIndex = evt.newIndex;
+              const oldIndex = evt.oldIndex;
+              const list = items.filter(it => it.category === container.dataset.category);
+              const globalIndices = list.map(it => it.index);
+              const moved = globalIndices.splice(oldIndex, 1)[0];
+              globalIndices.splice(newIndex, 0, moved);
+              const newOrder = [...items];
+              const categoryItems = items.filter(it => it.category === container.dataset.category);
+              const rest = items.filter(it => it.category !== container.dataset.category);
+              globalIndices.forEach((i, idx) => newOrder[i] = categoryItems[idx]);
+              const final = [...rest, ...globalIndices.map(i => newOrder[i])];
+              database.ref('todos/' + dateKey).set(final);
+            }
+          });
+        });
       const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth()+1, 0).getDate();
       const firstDay   = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).getDay();
       const hasTodos   = d => {
@@ -220,122 +255,7 @@
 
       return (
         <div style={{ display:'flex', minHeight:'100vh' }}>
-          <button onClick={()=>setShowSidebar(v=>!v)}
-            style={{
-              position:'fixed', left:'1rem', top:'1rem', zIndex:10,
-              background:'#fff', padding:'0.5rem', borderRadius:'9999px',
-              boxShadow:'0 2px 5px rgba(0,0,0,0.1)', cursor:'pointer'
-            }}
-            className="md:hidden"
-          >{showSidebar?'←':'→'}</button>
-
-          <div style={{
-            position:'fixed', left:0, top:0, bottom:0, width:'16rem',
-            background:'#fff', boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
-            overflow:'auto',
-            transform: showSidebar?'translateX(0)':'translateX(-100%)',
-            transition:'transform 0.3s ease-in-out', zIndex:20
-          }}>
-            <div style={{ padding:'1rem' }}>
-              <h2 style={{
-                fontWeight:'bold', whiteSpace:'pre-line', textAlign:'center',
-                marginBottom:'1rem'
-              }}>
-                {selectedDate.toLocaleString('en-US',{ year:'numeric'})}{'\n'}
-                {selectedDate.toLocaleString('en-US',{ month:'long'})}
-              </h2>
-
-              <div style={{
-                display:'flex', justifyContent:'center', gap:'0.5rem',
-                margin:'0.5rem 0'
-              }}>
-                <button onClick={handlePrevMonth}
-                  style={{ background:'#fff', border:'none', padding:'0.25rem 0.5rem', cursor:'pointer' }}>←</button>
-                <button onClick={handleToday}
-                  style={{ background:'#fff', border:'none', padding:'0.25rem 0.5rem', cursor:'pointer' }}>Today</button>
-                <button onClick={handleNextMonth}
-                  style={{ background:'#fff', border:'none', padding:'0.25rem 0.5rem', cursor:'pointer' }}>→</button>
-              </div>
-
-              <button onClick={()=>setShowNotesList(v=>!v)}
-                style={{
-                  width:'100%', padding:'0.5rem', marginBottom:'1rem',
-                  background:'#f0f0f0', border:'none', cursor:'pointer'
-                }}
-              >{showNotesList?'Back':'Notes'}</button>
-
-              {showNotesList
-                ? Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d, txt])=>(
-                    <div key={d} style={{
-                      background:'#fff', borderRadius:'0.5rem',
-                      padding:'0.75rem', marginBottom:'0.5rem',
-                      boxShadow:'0 1px 3px rgba(0,0,0,0.1)'
-                    }}>
-                      <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>
-                        {new Date(d).toLocaleString('en-US',{ weekday:'long', year:'numeric', month:'long', day:'numeric' })}
-                      </div>
-                      <div style={{
-                        fontWeight:'bold', whiteSpace:'pre-wrap',
-                        color: dateColors[d] || accentColor
-                      }}>{txt}</div>
-                      <button className="edit-delete-btn"
-                        onClick={()=>database.ref('notes/'+d).remove()}
-                      >Delete</button>
-                    </div>
-                  ))
-                : <div style={{
-                    display:'grid', gridTemplateColumns:'repeat(7,1fr)',
-                    gap:'0.25rem', fontSize:'0.875rem'
-                  }}>
-                    {['S','M','T','W','T','F','S'].map(d=>(
-                      <div key={d} style={{
-                        textAlign:'center', fontWeight:'500', color:'#666'
-                      }}>{d}</div>
-                    ))}
-                    {Array(firstDay).fill(null).map((_,i)=><div key={i}/>)}
-                    {Array.from({ length: daysInMonth }, (_, i) => {
-                      const dateObj = new Date(
-                        selectedDate.getFullYear(),
-                        selectedDate.getMonth(),
-                        i + 1
-                      );
-                      const dKey = dateObj.toISOString().split('T')[0];
-                      const isSel = dKey === dateKey;
-                      const circleColor = dateColors[dKey] || accentColor;
-                      return (
-                        <button key={i}
-                          onClick={()=>{ setSelectedDate(dateObj); if(window.innerWidth<768) setShowSidebar(false); }}
-                          style={{
-                            width:'1.8rem', height:'1.8rem', margin:'0 auto',
-                            display:'flex', alignItems:'center', justifyContent:'center',
-                            border:'none',
-                            backgroundColor: isSel?circleColor:'transparent',
-                            color: isSel?'#fff':'#000',
-                            borderRadius:'9999px', cursor:'pointer',
-                            position:'relative'
-                          }}
-                        >
-                          <span>{i+1}</span>
-                          {hasTodos(dateObj) && (
-                            <span style={{
-                              fontSize:'0.75rem',
-                              color: isSel?'#fff':circleColor,
-                              position:'absolute', bottom:'-0.3rem'
-                            }}>•</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-              }
-            </div>
-          </div>
-
-          <div style={{
-            flex:1, padding:'1rem',
-            marginLeft: showSidebar?'16rem':'0',
-            transition:'margin-left 0.3s'
-          }}>
+          <div style={{ flex:1, padding:'1rem', marginLeft: showSidebar?'16rem':'0', transition:'margin-left 0.3s' }}>
             <div className="todo-container" style={{
               maxWidth:'42rem', margin:'0 auto', background:'#fff',
               borderRadius:'0.5rem', boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
@@ -388,59 +308,10 @@
                 />
               </div>
 
-              <div style={{
-                display:'grid',
-                gridTemplateColumns:'repeat(3,1fr)',
-                gap:'0.5rem', marginBottom:'1rem'
-              }}>
-                <div>
-                  <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>필연의 시간</div>
-                  <textarea
-                    value={textNec}
-                    onChange={e=>setTextNec(e.target.value)}
-                    onKeyDown={handleKeyDownNec}
-                    placeholder="필연의 시간 (Enter 저장)"
-                    rows={3}
-                    style={{
-                      border:'1px solid #ccc', padding:'0.5rem',
-                      borderRadius:'0.25rem', resize:'vertical'
-                    }}
-                  />
-                </div>
-                <div>
-                  <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>성장의 시간</div>
-                  <textarea
-                    value={textGro}
-                    onChange={e=>setTextGro(e.target.value)}
-                    onKeyDown={handleKeyDownGro}
-                    placeholder="성장의 시간 (Enter 저장)"
-                    rows={3}
-                    style={{
-                      border:'1px solid #ccc', padding:'0.5rem',
-                      borderRadius:'0.25rem', resize:'vertical'
-                    }}
-                  />
-                </div>
-                <div>
-                  <div style={{ fontWeight:'600', marginBottom:'0.25rem' }}>자유의 시간</div>
-                  <textarea
-                    value={textFree}
-                    onChange={e=>setTextFree(e.target.value)}
-                    onKeyDown={handleKeyDownFree}
-                    placeholder="자유의 시간 (Enter 저장)"
-                    rows={3}
-                    style={{
-                      border:'1px solid #ccc', padding:'0.5rem',
-                      borderRadius:'0.25rem', resize:'vertical'
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ marginTop:'1rem' }}>
-                {categories.map((cat, idx) => (
-                  <div key={cat} style={{ marginBottom:'1rem' }}>
-                    <div style={{ fontWeight:'600', marginBottom:'0.5rem' }}>{cat}</div>
+              {categories.map((cat, idx) => (
+                <div key={cat} style={{ marginBottom:'1rem' }}>
+                  <div style={{ fontWeight:'600', marginBottom:'0.5rem' }}>{cat}</div>
+                  <div className="task-list" data-category={cat}>
                     {tasksByCategory[idx].map(item => (
                       <div key={item.index} style={{
                         display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'0.25rem'
@@ -452,7 +323,10 @@
                           }}>
                           {bulletStates[item.state]}
                         </span>
-                        <span style={{ flex:1, whiteSpace:'pre-wrap' }}>{item.text}</span>
+                        <span style={{ flex:1, whiteSpace:'pre-wrap' }}
+                          className={item.state === 1 ? 'completed' : ''}>
+                          {item.text}
+                        </span>
                         {editMode && (
                           <>
                             <button className="edit-delete-btn" onClick={()=>editItem(item.index)}>Edit</button>
@@ -461,15 +335,15 @@
                         )}
                       </div>
                     ))}
-                    {idx < categories.length - 1 && (
-                      <hr style={{
-                        borderTop:`1px solid ${dateColors[dateKey] || accentColor}`,
-                        margin:'0.75rem 0'
-                      }}/>
-                    )}
                   </div>
-                ))}
-              </div>
+                  {idx < categories.length - 1 && (
+                    <hr style={{
+                      borderTop:`1px solid ${dateColors[dateKey] || accentColor}`,
+                      margin:'0.75rem 0'
+                    }}/>
+                  )}
+                </div>
+              ))}
 
               <div style={{ display:'flex', gap:'0.5rem', marginTop:'1rem' }}>
                 {items.length > 0 && (
@@ -488,7 +362,6 @@
                   cursor:'pointer'
                 }}>{editMode?'Done':'Edit'}</button>
               </div>
-
             </div>
           </div>
         </div>
