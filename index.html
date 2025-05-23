@@ -414,6 +414,11 @@
       // 집중시간 체크 함수
 // 기존 함수 대신 이걸로 교체
 const isFocusTime = () => {
+  // …기존 변환 로직…
+  console.log('⏱️ KST:', kst.toISOString(), 'weekday:', weekday, 'hour:', hour);
+  return hour >= start && hour < end;
+};
+const isFocusTime = () => {
   const now = new Date();
   // 브라우저(컨테이너)의 로컬타임 → UTC
   const utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
