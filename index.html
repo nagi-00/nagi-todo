@@ -412,21 +412,29 @@
       const [isOnline, setIsOnline] = React.useState(false);
 
       // 집중시간 체크 함수
-      const isFocusTime = () => {
-        const now = new Date();
-        const weekday = now.getDay() === 0 ? 6 : now.getDay() - 1;
-        const hour = now.getHours();
-        const focusTimes = {
-          0: [9, 13],   // 월요일: 9AM-1PM
-          1: [9, 18],   // 화요일: 9AM-6PM
-          2: [9, 13],   // 수요일: 9AM-1PM
-          3: [9, 18],   // 목요일: 9AM-6PM
-          4: [9, 21],   // 금요일: 9AM-9PM
-        };
-        if (!(weekday in focusTimes)) return false;
-        const [start, end] = focusTimes[weekday];
-        return hour >= start && hour < end;
-      };
+// 기존 함수 대신 이걸로 교체
+const isFocusTime = () => {
+  const now = new Date();
+  // 브라우저(컨테이너)의 로컬타임 → UTC
+  const utc = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+  // UTC → KST(+9h)
+  const kst = new Date(utc.getTime() + 9 * 60 * 60000);
+
+  const weekday = kst.getDay() === 0 ? 6 : kst.getDay() - 1;  
+  const hour    = kst.getHours();
+
+  const focusTimes = {
+    0: [9, 13],
+    1: [9, 18],
+    2: [9, 13],
+    3: [9, 18],
+    4: [9, 21],
+  };
+  if (!(weekday in focusTimes)) return false;
+  const [start, end] = focusTimes[weekday];
+  return hour >= start && hour < end;
+};
+
 
       React.useEffect(() => {
         async function fetchLatest() {
