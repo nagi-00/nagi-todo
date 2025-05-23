@@ -405,7 +405,212 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Discord 봇 위젯 */}
+      <DiscordBotWidget />
     </div>
+  );
+}
+
+// Discord 봇 위젯 컴포넌트
+function DiscordBotWidget() {
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [lastMessage, setLastMessage] = React.useState('');
+  const [isOnline, setIsOnline] = React.useState(false);
+
+  // 집중시간 체크 함수
+  const isFocusTime = () => {
+    const now = new Date();
+    const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // KST로 변환
+    const weekday = kst.getDay() === 0 ? 6 : kst.getDay() - 1; // 월=0, 일=6
+    const hour = kst.getHours();
+    
+    const focusTimes = {
+      0: [9, 13],   // 월요일: 9AM-1PM
+      1: [9, 18],   // 화요일: 9AM-6PM
+      2: [9, 13],   // 수요일: 9AM-1PM
+      3: [9, 18],   // 목요일: 9AM-6PM
+      4: [9, 21],   // 금요일: 9AM-9PM
+    };
+    
+    if (!(weekday in focusTimes)) return false;
+    const [start, end] = focusTimes[weekday];
+    return hour >= start && hour < end;
+  };
+
+  // 현재 집중시간인지 체크
+  React.useEffect(() => {
+    const checkStatus = () => {
+      setIsOnline(isFocusTime());
+    };
+    
+    checkStatus();
+    const interval = setInterval(checkStatus, 60000); // 1분마다 체크
+    return () => clearInterval(interval);
+  }, []);
+
+  // 랜덤 메시지 (실제 봇이 보내는 메시지와 동일)
+  const messages = [
+    "🖤 지금이야. 흐트러지지 마.",
+    "💪 집중해. 너는 할 수 있어.",
+    "⚡ 이 순간에 집중하자.",
+    "🎯 목표를 향해 나아가고 있어.",
+    "🔥 열정을 잃지 마.",
+    "💎 지금 이 시간이 가장 소중해.",
+    "🌟 포기하지 마. 거의 다 왔어.",
+    "⭐ 꾸준함이 네 무기야.",
+    "🚀 지금 이 순간을 잡아.",
+    "💫 집중력이 너의 힘이다."
+  ];
+
+  React.useEffect(() => {
+    if (isOnline) {
+      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+      setLastMessage(randomMessage);
+    }
+  }, [isOnline]);
+
+  return (
+    <>
+      {/* 봇 아이콘 (우하단 고정) */}
+      <div
+        onClick={() => setIsVisible(!isVisible)}
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          width: '60px',
+          height: '60px',
+          borderRadius: '50%',
+          background: isOnline ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#ccc',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 1000,
+          transition: 'all 0.3s ease',
+          border: '3px solid #fff'
+        }}
+      >
+        <span style={{ fontSize: '24px', color: '#fff' }}>🤖</span>
+        {/* 온라인 상태 표시 */}
+        <div style={{
+          position: 'absolute',
+          bottom: '2px',
+          right: '2px',
+          width: '16px',
+          height: '16px',
+          borderRadius: '50%',
+          background: isOnline ? '#00ff00' : '#ff4444',
+          border: '2px solid #fff'
+        }} />
+      </div>
+
+      {/* 말풍선 위젯 */}
+      {isVisible && (
+        <div style={{
+          position: 'fixed',
+          bottom: '100px',
+          right: '20px',
+          width: '320px',
+          background: '#fff',
+          borderRadius: '15px',
+          boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+          zIndex: 999,
+          overflow: 'hidden',
+          animation: 'slideUp 0.3s ease-out'
+        }}>
+          {/* 헤더 */}
+          <div style={{
+            background: isOnline ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#ccc',
+            color: '#fff',
+            padding: '15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              background: '#fff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '20px'
+            }}>
+              🤖
+            </div>
+            <div>
+              <div style={{ fontWeight: 'bold', fontSize: '16px' }}>ᴅᴇᴍɪᴀɴ</div>
+              <div style={{ fontSize: '12px', opacity: 0.9 }}>
+                {isOnline ? '🟢 ᴏɴ' : '🔴 ᴏғғ'}
+              </div>
+            </div>
+            <button
+              onClick={() => setIsVisible(false)}
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: '#fff',
+                fontSize: '18px',
+                cursor: 'pointer',
+                padding: '5px'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* 메시지 영역 */}
+          <div style={{ padding: '20px', minHeight: '100px' }}>
+            {isOnline ? (
+              <div style={{
+                background: '#f0f0f0',
+                borderRadius: '15px 15px 15px 5px',
+                padding: '12px 16px',
+                marginBottom: '10px',
+                position: 'relative'
+              }}>
+                <div style={{ fontSize: '14px', color: '#333' }}>
+                  {lastMessage}
+                </div>
+                <div style={{ fontSize: '11px', color: '#888', marginTop: '5px' }}>
+                  방금 전
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                color: '#888',
+                fontSize: '14px',
+                padding: '20px 0'
+              }}>
+                <div>😴 휴식의 시간. </div>
+                <div style={{ fontSize: '12px', marginTop: '8px' }}>
+                  집중시간: 월(9-13시), 화(9-18시), 수(9-13시), 목(9-18시), 금(9-21시)
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </>
   );
 }
 
