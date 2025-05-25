@@ -423,11 +423,11 @@ function DiscordBotWidget() {
     const day = now.getDay(); // 0: 일요일, 1: 월요일 ...
     const hour = now.getHours();
     const focusRanges = {
-      1: [9, 13],
-      2: [9, 18],
-      3: [9, 13],
-      4: [9, 18],
-      5: [9, 21],
+      1: [6, 13],
+      2: [6, 18],
+      3: [6, 13],
+      4: [6, 18],
+      5: [6, 21],
     };
     const range = focusRanges[day];
     return range && hour >= range[0] && hour < range[1];
@@ -480,11 +480,11 @@ function DiscordBotWidget() {
               </div>
               <div style={{ fontSize: '12px', marginTop: '8px', textAlign: 'center' }}>
                 𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲 <br/>
-                M (09-13)<br/>
-                T (09-18)<br/>
-                W (09-13)<br/>
-                T (09-18)<br/>
-                F (09-21)<br/>
+                M (06-13)<br/>
+                T (06-18)<br/>
+                W (06-13)<br/>
+                T (06-18)<br/>
+                F (06-21)<br/>
               </div>
             </>
           )}
