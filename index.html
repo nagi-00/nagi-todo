@@ -149,37 +149,40 @@ function App() {
     if(s) setAccentColor(s);
   },[]);
 
-React.useLayoutEffect(() => {
-  sortablesRef.current.forEach(s => s.destroy());
-  sortablesRef.current = [];
+  React.useLayoutEffect(() => {
   if (!editMode) return;
-  categories.forEach(cat => {
-    const el = document.getElementById(
-      `todo-list-${cat.replace(/\s+/g, '-')}`
-    );
-    if (!el) return;
-    const sortable = Sortable.create(el, {
-      handle: '.drag-handle',
-      animation: 150,
-      onEnd: evt => {
-        const current = items;
-        const indices = current
-          .map((it, idx) => (it.category === cat ? idx : -1))
-          .filter(idx => idx >= 0);
-        const oldGlob = indices[evt.oldIndex];
-        const target =
-          indices[evt.newIndex] != null
-            ? indices[evt.newIndex]
-            : indices[indices.length - 1];
-        const updated = [...current];
-        const [moved] = updated.splice(oldGlob, 1);
-        updated.splice(target, 0, moved);
-        database.ref('todos/' + dateKey).set(updated);
-      }
-    });
-    sortablesRef.current.push(sortable);
-  });
-  return () => sortablesRef.current.forEach(s => s.destroy());
+  const instances = categories
+    .map(cat => {
+      const el = document.getElementById(
+        `todo-list-${cat.replace(/\s+/g, '-')}`
+      );
+      if (!el) return null;
+      return Sortable.create(el, {
+        handle: '.drag-handle',
+        animation: 150,
+        onEnd: evt => {
+          const current = items;
+          const indices = current
+            .map((it, idx) => (it.category === cat ? idx : -1))
+            .filter(idx => idx >= 0);
+          const oldGlob = indices[evt.oldIndex];
+          const target =
+            indices[evt.newIndex] != null
+              ? indices[evt.newIndex]
+              : indices[indices.length - 1];
+          const updated = [...current];
+          const [moved] = updated.splice(oldGlob, 1);
+          updated.splice(target, 0, moved);
+          // database 호출도 필요한 경우 언급한 대로 안전하게 처리
+          database.ref('todos/' + dateKey).set(updated);
+        }
+      });
+    })
+    .filter(Boolean);
+  sortablesRef.current = instances;
+  return () => {
+    instances.forEach(s => s && s.el && s.destroy());
+  };
 }, [editMode, items]);
 
 
