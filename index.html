@@ -173,6 +173,7 @@ function App() {
           const updated = [...current];
           const [moved] = updated.splice(oldGlob, 1);
           updated.splice(target, 0, moved);
+          setItems(updated)
           // database 호출도 필요한 경우 언급한 대로 안전하게 처리
           database.ref('todos/' + dateKey).set(updated);
         }
