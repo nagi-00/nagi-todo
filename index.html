@@ -109,6 +109,7 @@ function App() {
   const [textFree,setTextFree]=React.useState('');
 
   const categories=['필연의 시간','성장의 시간','자유의 시간'];
+  const sortablesRef = React.useRef([]);
   const bulletStates=['☐','☑','☒'];
   const dateKey=selectedDate.toLocaleDateString('sv-SE');
   const items=allTodos[dateKey]||[];
@@ -148,30 +149,39 @@ function App() {
     if(s) setAccentColor(s);
   },[]);
 
-  React.useEffect(()=>{
-    localStorage.setItem('accentColor',accentColor);
-  },[accentColor]);
-  // ─── 드래그 앤 드롭 훅은 return 위에 ───
-  React.useLayoutEffect(()=>{
-    if(!editMode) return;
-    categories.forEach(cat=>{
-      const safeId=`todo-list-${cat.replace(/\s+/g,'-')}`;
-      const el=document.getElementById(safeId);
-      if(!el) return;
-      Sortable.create(el,{
-        handle:'.drag-handle',
-        animation:150,
-        onEnd:evt=>{
-          const list  = items.filter(it=>it.category===cat);
-          const others= items.filter(it=>it.category!==cat);
-          const moved =[...list];
-          const [rem] = moved.splice(evt.oldIndex,1);
-          moved.splice(evt.newIndex,0,rem);
-          database.ref('todos/'+dateKey).set([...others,...moved]);
-}
-      });
+React.useLayoutEffect(() => {
+  sortablesRef.current.forEach(s => s.destroy());
+  sortablesRef.current = [];
+  if (!editMode) return;
+  categories.forEach(cat => {
+    const el = document.getElementById(
+      `todo-list-${cat.replace(/\s+/g, '-')}`
+    );
+    if (!el) return;
+    const sortable = Sortable.create(el, {
+      handle: '.drag-handle',
+      animation: 150,
+      onEnd: evt => {
+        const current = items;
+        const indices = current
+          .map((it, idx) => (it.category === cat ? idx : -1))
+          .filter(idx => idx >= 0);
+        const oldGlob = indices[evt.oldIndex];
+        const target =
+          indices[evt.newIndex] != null
+            ? indices[evt.newIndex]
+            : indices[indices.length - 1];
+        const updated = [...current];
+        const [moved] = updated.splice(oldGlob, 1);
+        updated.splice(target, 0, moved);
+        database.ref('todos/' + dateKey).set(updated);
+      }
     });
-  },[editMode, items]);
+    sortablesRef.current.push(sortable);
+  });
+  return () => sortablesRef.current.forEach(s => s.destroy());
+}, [editMode, items]);
+
 
   // ─── 이제 UI 반환 ───
   return (
