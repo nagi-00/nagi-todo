@@ -130,8 +130,7 @@ function App() {
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
   const sortsRef  = React.useRef([]);
-  const itemsRef  = React.useRef(items);
-  React.useEffect(()=>{ itemsRef.current=items; },[items]);
+  const itemsRef  = React.useRef([]);
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -140,9 +139,15 @@ function App() {
   const dlabel  = sel.toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const todayDk = new Date().toLocaleDateString('sv-SE');
 
+  /* keep itemsRef in sync — must be before useLayoutEffect reads it */
+  React.useEffect(()=>{ itemsRef.current=items; },[items]);
+
   const appRoutines = React.useMemo(() => {
     const dow = sel.getDay();
-    return routines.filter(r => r.freq==='daily' || (r.freq==='weekly' && r.weekday===dow));
+    return routines.filter(r =>
+      r.freq==='daily' ||
+      (r.freq==='weekly' && (r.weekdays ? r.weekdays.includes(dow) : r.weekday===dow))
+    );
   }, [routines, sel]);
 
   /* handlers */
@@ -408,16 +413,15 @@ function App() {
                   ))}
                 </div>
 
-                {/* routine banner */}
                 {/* todo lists */}
                 {CATS.map((cat,idx)=>{
                   const list=items.map((it,gi)=>it.category===cat?{...it,gi}:null).filter(Boolean);
                   const appliedTexts=new Set(items.map(it=>it.text));
                   const pendingRtns=appRoutines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
-                  const isEmpty=list.length===0&&pendingRtns.length===0;
                   return (
                     <div key={cat} style={{marginBottom:'.7rem'}}>
                       <span style={sectionLabel()}>{cat}</span>
+                      {/* Sortable container — only real todo items go here so drag indices stay correct */}
                       <div id={`tl-${cat.replace(/\s+/g,'-')}`}>
                         {list.map(item=>(
                           <div key={item.gi} style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0'}}>
@@ -432,17 +436,17 @@ function App() {
                             )}
                           </div>
                         ))}
-                        {/* routine ghost items */}
-                        {pendingRtns.map((r,i)=>(
-                          <div key={`rtn-${i}`} style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0',opacity:.38}}>
-                            {editMode&&<span style={{width:'.95rem',flexShrink:0}}/>}
-                            <span style={{fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem'}}>○</span>
-                            <span style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,fontStyle:'italic'}}>{r.text}</span>
-                            <span style={{fontSize:'.6rem',color:'#bbb',flexShrink:0}}>루틴</span>
-                          </div>
-                        ))}
-                        {isEmpty&&<div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
+                        {list.length===0&&pendingRtns.length===0&&<div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
                       </div>
+                      {/* routine ghost items — OUTSIDE Sortable so drag indices aren't skewed */}
+                      {pendingRtns.map((r,i)=>(
+                        <div key={`rtn-${i}`} style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0'}}>
+                          {editMode&&<span style={{width:'.95rem',flexShrink:0}}/>}
+                          <span style={{fontFamily:'monospace',color:'#ccc',flexShrink:0,fontSize:'.9rem'}}>·</span>
+                          <span style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,color:'#bbb'}}>{r.text}</span>
+                          <span style={{fontSize:'.58rem',color:'#d5d5d5',flexShrink:0,letterSpacing:'.04em'}}>루틴</span>
+                        </div>
+                      ))}
                       {idx<CATS.length-1&&(
                         <div style={{borderTop:`1px solid ${color}22`,margin:'.6rem 0'}}/>
                       )}
@@ -470,7 +474,7 @@ function App() {
               </div>
 
               {/* off-screen export card */}
-              <XCard dlabel={dlabel} noteText={noteText} items={items} color={color}/>
+              <XCard dlabel={dlabel} noteText={noteText} items={items} color={color} routines={appRoutines}/>
             </>
           )}
 
@@ -489,7 +493,8 @@ function App() {
 
       {/* modals & widgets */}
       {showRtn&&<RoutineModal routines={routines} onClose={()=>setShowRtn(false)}/>}
-      <MusicWidget/>
+      <PomodoroWidget color={color}/>
+      <MusicWidget color={color}/>
       <DemianWidget/>
     </div>
   );
@@ -499,14 +504,21 @@ function App() {
 /* ══════════════════════════════════════════════════════════
    XCard  (export, off-screen)
 ══════════════════════════════════════════════════════════ */
-function XCard({dlabel,noteText,items,color}) {
+function XCard({dlabel,noteText,items,color,routines=[]}) {
   const done=items.filter(it=>it.state===1).length, total=items.length;
+  const appliedTexts=new Set(items.map(it=>it.text));
   const perfEdge=(flip)=>({
     height:'10px',
     background:'repeating-linear-gradient(90deg,#e8e8e8 0 6px,#fff 6px 12px)',
     borderTop:flip?'1px dashed #ddd':'none',
     borderBottom:flip?'none':'1px dashed #ddd',
   });
+  /* ☐ → · (미완료는 작은 점으로) */
+  function xBullet(state) {
+    if (state===0) return '·';
+    if (state===1) return '✓';
+    return '✗';
+  }
   return (
     <div id="xcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'320px'}}>
       {/* colored header band */}
@@ -523,14 +535,22 @@ function XCard({dlabel,noteText,items,color}) {
       <div style={{padding:'1.2rem 1.75rem 1.4rem'}}>
         {CATS.map((cat)=>{
           const list=items.filter(it=>it.category===cat);
-          if (!list.length) return null;
+          const pendingRtns=routines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
+          if (!list.length&&!pendingRtns.length) return null;
           return (
             <div key={cat} style={{marginBottom:'.85rem'}}>
               <div style={{fontSize:'.54rem',letterSpacing:'.18em',color,fontWeight:'bold',marginBottom:'.45rem',textTransform:'uppercase'}}>{cat}</div>
               {list.map((it,i)=>(
                 <div key={i} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start'}}>
-                  <span style={{color,fontFamily:'monospace',flexShrink:0,marginTop:'.05rem'}}>{BULLET[it.state]}</span>
+                  <span style={{color,fontFamily:'monospace',flexShrink:0,marginTop:'.05rem'}}>{xBullet(it.state)}</span>
                   <span style={{color:it.state===1?'#bbb':'#333',flex:1,whiteSpace:'pre-wrap',textDecoration:it.state===1?'line-through':'none'}}>{it.text}</span>
+                </div>
+              ))}
+              {pendingRtns.map((r,i)=>(
+                <div key={`xrtn-${i}`} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start'}}>
+                  <span style={{color:'#ccc',flexShrink:0,marginTop:'.05rem'}}>·</span>
+                  <span style={{color:'#bbb',flex:1,whiteSpace:'pre-wrap'}}>{r.text}</span>
+                  <span style={{fontSize:'.58rem',color:'#d5d5d5',flexShrink:0}}>루틴</span>
                 </div>
               ))}
             </div>
@@ -715,13 +735,22 @@ function RoutineModal({routines,onClose}) {
   const [text,setText]=React.useState('');
   const [cat,setCat]=React.useState(CATS[0]);
   const [freq,setFreq]=React.useState('daily');
-  const [wd,setWd]=React.useState(1);
+  const [wds,setWds]=React.useState([1]); /* multi-day: array of 0-6 */
 
+  function toggleWd(d) {
+    setWds(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d].sort((a,b)=>a-b));
+  }
   function add() {
     if (!text.trim()) return;
     const r={text:text.trim(),category:cat,freq};
-    if (freq==='weekly') r.weekday=wd;
+    if (freq==='weekly') r.weekdays=wds.length?wds:[1];
     db.ref('routines').push(r); setText('');
+  }
+  function rtnLabel(r) {
+    if (r.freq==='daily') return '매일';
+    /* support both old weekday and new weekdays */
+    const days=(r.weekdays||(r.weekday!=null?[r.weekday]:[])).map(d=>WEEK_KO[d]+'요일').join(', ');
+    return `매주 ${days}`;
   }
 
   const inp={border:'1px solid #eee',borderRadius:'.375rem',padding:'.38rem .55rem',fontFamily:'inherit',fontSize:'.82rem',background:'#fff',outline:'none'};
@@ -741,7 +770,7 @@ function RoutineModal({routines,onClose}) {
           <div key={r.id} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.45rem .55rem',background:'#f8f8f8',borderRadius:'.4rem',marginBottom:'.3rem'}}>
             <div style={{flex:1}}>
               <div style={{fontSize:'.84rem',color:'#333'}}>{r.text}</div>
-              <div style={{fontSize:'.68rem',color:'#bbb',marginTop:'.1rem'}}>{r.category} · {r.freq==='daily'?'매일':`매주 ${WEEK_KO[r.weekday]}요일`}</div>
+              <div style={{fontSize:'.68rem',color:'#bbb',marginTop:'.1rem'}}>{r.category} · {rtnLabel(r)}</div>
             </div>
             <button onClick={()=>db.ref('routines/'+r.id).remove()} className="icon-btn">✕</button>
           </div>
@@ -760,9 +789,17 @@ function RoutineModal({routines,onClose}) {
           </select>
         </div>
         {freq==='weekly'&&(
-          <select value={wd} onChange={e=>setWd(parseInt(e.target.value))} style={{...inp,width:'100%',marginBottom:'.4rem',display:'block'}}>
-            {WEEK_KO.map((l,i)=><option key={i} value={i}>{l}요일</option>)}
-          </select>
+          <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'.4rem'}}>
+            {WEEK_KO.map((l,i)=>(
+              <button key={i} onClick={()=>toggleWd(i)} style={{
+                padding:'.22rem .55rem',borderRadius:'9999px',border:'1px solid',
+                fontSize:'.72rem',cursor:'pointer',fontFamily:'inherit',
+                background:wds.includes(i)?'#222':'#fff',
+                color:wds.includes(i)?'#fff':'#bbb',
+                borderColor:wds.includes(i)?'#222':'#eee',
+              }}>{l}</button>
+            ))}
+          </div>
         )}
         <button onClick={add} style={{...pill('#222','#fff'),width:'100%',padding:'.48rem',borderRadius:'.4rem',display:'block'}}>추가</button>
       </div>
@@ -772,9 +809,152 @@ function RoutineModal({routines,onClose}) {
 
 
 /* ══════════════════════════════════════════════════════════
+   PomodoroWidget
+══════════════════════════════════════════════════════════ */
+function PomodoroWidget({color}) {
+  const ac = color || '#888';
+  const MODES = {focus:{label:'집중',mins:25},short:{label:'쉬기',mins:5},long:{label:'긴 쉬기',mins:15}};
+
+  const [open,    setOpen]    = React.useState(false);
+  const [mode,    setMode]    = React.useState('focus');
+  const [secs,    setSecs]    = React.useState(25*60);
+  const [running, setRunning] = React.useState(false);
+  const [session, setSession] = React.useState(0); /* 0-3 completed focus sessions */
+
+  /* refs so interval callback always sees latest values */
+  const secsRef    = React.useRef(25*60);
+  const modeRef    = React.useRef('focus');
+  const sessionRef = React.useRef(0);
+  const tickRef    = React.useRef(null);
+  React.useEffect(()=>{ secsRef.current=secs; },    [secs]);
+  React.useEffect(()=>{ modeRef.current=mode; },    [mode]);
+  React.useEffect(()=>{ sessionRef.current=session; },[session]);
+
+  React.useEffect(()=>{
+    if (running) {
+      tickRef.current=setInterval(()=>{
+        const next=secsRef.current-1;
+        if (next<=0) {
+          clearInterval(tickRef.current);
+          setRunning(false);
+          /* auto-advance */
+          if (modeRef.current==='focus') {
+            const ns=(sessionRef.current+1)%4;
+            setSession(ns);
+            if (ns===0) { setSecs(15*60); setMode('long'); }
+            else        { setSecs(5*60);  setMode('short'); }
+          } else {
+            setSecs(25*60); setMode('focus');
+          }
+        } else {
+          secsRef.current=next;
+          setSecs(next);
+        }
+      },1000);
+    } else {
+      clearInterval(tickRef.current);
+    }
+    return ()=>clearInterval(tickRef.current);
+  },[running]);
+
+  function switchMode(m) { setRunning(false); setMode(m); setSecs(MODES[m].mins*60); }
+  function reset()        { setRunning(false); setSecs(MODES[mode].mins*60); }
+
+  const mins=Math.floor(secs/60), ss=secs%60;
+  const timeStr=`${String(mins).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  const circum=2*Math.PI*42;
+  const progress=1-secs/(MODES[mode].mins*60);
+
+  return (
+    <div style={{position:'fixed',bottom:'68px',left:'20px',zIndex:1000}}>
+      {/* pill */}
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'11px'}}>🍅</span>
+        <span style={{fontSize:'10px',letterSpacing:'.04em',color:running?ac:'#ccc',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
+      </button>
+
+      {/* panel */}
+      {open&&(
+        <div style={{
+          position:'absolute',bottom:'42px',left:0,width:'210px',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',
+          border:'1px solid #f0f0f0',
+          padding:'14px 16px 12px',
+        }}>
+          {/* mode tabs */}
+          <div style={{display:'flex',gap:'3px',marginBottom:'14px'}}>
+            {Object.entries(MODES).map(([k,{label}])=>(
+              <button key={k} onClick={()=>switchMode(k)} style={{
+                flex:1,border:'none',borderRadius:'6px',
+                padding:'.28rem 0',fontSize:'9px',cursor:'pointer',fontFamily:'inherit',
+                background:mode===k?ac:'#f5f5f5',
+                color:mode===k?'#fff':'#bbb',
+              }}>{label}</button>
+            ))}
+          </div>
+
+          {/* circular timer */}
+          <div style={{display:'flex',justifyContent:'center',marginBottom:'12px'}}>
+            <div style={{position:'relative',width:'100px',height:'100px'}}>
+              <svg width="100" height="100" style={{transform:'rotate(-90deg)',position:'absolute',inset:0}}>
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#f0f0f0" strokeWidth="4"/>
+                <circle cx="50" cy="50" r="42" fill="none" stroke={ac} strokeWidth="4"
+                  strokeDasharray={`${circum}`}
+                  strokeDashoffset={`${circum*(1-progress)}`}
+                  strokeLinecap="round"
+                  style={{transition:'stroke-dashoffset 0.8s linear'}}
+                />
+              </svg>
+              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'2px'}}>
+                <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333',fontVariantNumeric:'tabular-nums',letterSpacing:'0.02em'}}>{timeStr}</div>
+                <div style={{fontSize:'.5rem',color:'#ccc',letterSpacing:'.16em'}}>{MODES[mode].label.toUpperCase()}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* controls */}
+          <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
+            <button onClick={reset} style={{
+              background:'#f5f5f5',border:'none',borderRadius:'50%',
+              width:'30px',height:'30px',cursor:'pointer',fontSize:'12px',color:'#ccc',
+              display:'flex',alignItems:'center',justifyContent:'center',
+            }}>↺</button>
+            <button onClick={()=>setRunning(r=>!r)} style={{
+              background:ac,border:'none',borderRadius:'50%',
+              width:'40px',height:'40px',cursor:'pointer',color:'#fff',fontSize:'13px',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              boxShadow:`0 3px 10px ${ac}44`,
+            }}>{running?'⏸':'▶'}</button>
+          </div>
+
+          {/* session dots — filled = completed focus sessions */}
+          <div style={{display:'flex',justifyContent:'center',gap:'5px'}}>
+            {[0,1,2,3].map(i=>(
+              <div key={i} style={{
+                width:'6px',height:'6px',borderRadius:'50%',
+                background:i<session?ac:'#ebebeb',
+                transition:'background .3s',
+              }}/>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
    MusicWidget
 ══════════════════════════════════════════════════════════ */
-function MusicWidget() {
+function MusicWidget({color}) {
+  const ac = color || '#888';
   const [open,    setOpen]    = React.useState(false);
   const [input,   setInput]   = React.useState('');
   const [urlBar,  setUrlBar]  = React.useState(false);
@@ -782,7 +962,6 @@ function MusicWidget() {
     try {
       const saved=JSON.parse(localStorage.getItem('ytplaylist'));
       if (saved?.length) return saved;
-      /* migrate from old single-embed format */
       const old=localStorage.getItem('ytembed');
       return old?[{embed:old}]:[];
     } catch { return []; }
@@ -807,72 +986,73 @@ function MusicWidget() {
 
   return (
     <div style={{position:'fixed',bottom:'20px',left:'20px',zIndex:1000}}>
-      {/* pill toggle */}
+      {/* pill toggle — white style */}
       <button onClick={()=>setOpen(v=>!v)} style={{
         display:'flex',alignItems:'center',gap:'.35rem',
-        background:'#1a1a1a',border:'none',borderRadius:'9999px',
+        background:'#fff',border:'none',borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 4px 18px rgba(0,0,0,0.22)',fontFamily:'inherit',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
       }}>
-        <span style={{fontSize:'12px',color:currentEmbed?'#fff':'#888'}}>♪</span>
-        <span style={{fontSize:'10px',color:'#999',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
+        <span style={{fontSize:'12px',color:currentEmbed?ac:'#ccc'}}>♪</span>
+        <span style={{fontSize:'10px',color:'#bbb',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
       </button>
 
       {/* panel — always in DOM; moves off-screen when closed so iframe keeps playing */}
       <div style={{
         position:'absolute',bottom:'42px',
         left:open?'0':'-9999px',
-        width:'290px',background:'#181818',borderRadius:'12px',overflow:'hidden',
-        boxShadow:open?'0 10px 36px rgba(0,0,0,0.4)':'none',
+        width:'290px',background:'#fff',borderRadius:'12px',overflow:'hidden',
+        boxShadow:open?'0 8px 28px rgba(0,0,0,0.11)':'none',
+        border:'1px solid #f0f0f0',
       }}>
-        {/* header (visible only when open) */}
+        {/* header */}
         {open&&(
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px'}}>
-            <span style={{fontSize:'9px',color:'#888',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
-            <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:'#888',cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit'}}>+ 추가</button>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px',borderBottom:'1px solid #f7f7f7'}}>
+            <span style={{fontSize:'9px',color:'#bbb',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
+            <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:ac,cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit',fontWeight:'bold'}}>+ 추가</button>
           </div>
         )}
 
-        {/* url input (visible only when open) */}
+        {/* url input */}
         {open&&urlBar&&(
-          <div style={{display:'flex',gap:'6px',padding:'0 10px 10px'}}>
+          <div style={{display:'flex',gap:'6px',padding:'8px 10px'}}>
             <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTrack()}
               placeholder="YouTube URL (영상·플레이리스트 모두 가능)"
-              style={{flex:1,background:'#252525',border:'1px solid #2e2e2e',borderRadius:'6px',padding:'.3rem .55rem',color:'#ccc',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
+              style={{flex:1,background:'#f8f8f8',border:'1px solid #eee',borderRadius:'6px',padding:'.3rem .55rem',color:'#555',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
             />
-            <button onClick={addTrack} style={{background:'#2a2a2a',border:'1px solid #333',borderRadius:'6px',color:'#999',cursor:'pointer',fontSize:'11px',padding:'0 .5rem'}}>→</button>
+            <button onClick={addTrack} style={{background:ac,border:'none',borderRadius:'6px',color:'#fff',cursor:'pointer',fontSize:'11px',padding:'0 .55rem'}}>→</button>
           </div>
         )}
 
-        {/* playlist (visible only when open) */}
+        {/* playlist */}
         {open&&playlist.length>0&&(
-          <div style={{maxHeight:'120px',overflowY:'auto',padding:'0 10px 8px'}}>
+          <div style={{maxHeight:'120px',overflowY:'auto',padding:'4px 10px 8px'}}>
             {playlist.map((track,i)=>(
               <div key={i} onClick={()=>setCurrent(i)} style={{
                 display:'flex',alignItems:'center',gap:'6px',
-                padding:'5px 8px',borderRadius:'6px',marginBottom:'3px',
-                background:i===current?'#252525':'transparent',cursor:'pointer',
+                padding:'5px 8px',borderRadius:'6px',marginBottom:'2px',
+                background:i===current?ac+'18':'transparent',cursor:'pointer',
               }}>
-                <span style={{fontSize:'8px',color:i===current?'#fff':'#555'}}>▶</span>
-                <span style={{fontSize:'9px',color:i===current?'#ccc':'#666',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
-                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
+                <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
+                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
               </div>
             ))}
           </div>
         )}
 
-        {/* empty state (visible only when open) */}
+        {/* empty state */}
         {open&&playlist.length===0&&(
           <div style={{height:'90px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'7px'}}>
-            <span style={{fontSize:'20px',opacity:.2,color:'#fff'}}>♪</span>
-            <span style={{fontSize:'10px',color:'#777',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
-            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#242424',border:'none',borderRadius:'6px',color:'#999',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
+            <span style={{fontSize:'20px',opacity:.15}}>♪</span>
+            <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
+            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
           </div>
         )}
 
         {/* iframe — always rendered for background playback */}
         {currentEmbed?(
-          <div style={{lineHeight:0,background:'#000'}}>
+          <div style={{lineHeight:0}}>
             <iframe src={currentEmbed} width="290" height="163" frameBorder="0"
               allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
               style={{display:'block'}}/>
