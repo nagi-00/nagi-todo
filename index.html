@@ -62,7 +62,7 @@ const BULLET     = ['☐', '☑', '☒'];
 const CAT_HUE    = { '필연의 시간': '#8A4545', '성장의 시간': '#434A8E', '자유의 시간': '#4a7c5a' };
 const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
 const DEF_SCHED  = {1:{s:6,e:13},2:{s:6,e:18},3:{s:6,e:13},4:{s:6,e:18},5:{s:6,e:21}};
-const DAY_KO     = {1:'월',2:'화',3:'수',4:'목',5:'금'};
+const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const WEEK_KO    = ['일','월','화','수','목','금','토'];
 
 /* ─── Helpers ───────────────────────────────────────────── */
@@ -129,7 +129,9 @@ function App() {
   const [journals,   setJournals]  = React.useState({});
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
-  const sortsRef = React.useRef([]);
+  const sortsRef  = React.useRef([]);
+  const itemsRef  = React.useRef(items);
+  React.useEffect(()=>{ itemsRef.current=items; },[items]);
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -229,12 +231,14 @@ function App() {
       return Sortable.create(el,{
         handle:'.drag-handle', animation:120,
         onEnd:evt=>{
-          const cur=[...items];
+          if (evt.oldIndex===evt.newIndex) return;
+          const cur=itemsRef.current;
           const idx=cur.map((it,i)=>it.category===cat?i:-1).filter(i=>i>=0);
           if (idx[evt.oldIndex]==null||idx[evt.newIndex]==null) return;
           const upd=[...cur];
           const [mv]=upd.splice(idx[evt.oldIndex],1);
           upd.splice(idx[evt.newIndex],0,mv);
+          itemsRef.current=upd;
           setAllTodos(p=>({...p,[dk]:upd}));
           db.ref('todos/'+dk).set(upd);
         }
@@ -242,7 +246,7 @@ function App() {
     }).filter(Boolean);
     sortsRef.current=inst;
     return()=>inst.forEach(s=>s?.el&&s.destroy());
-  },[editMode,items,dk]);
+  },[editMode,dk]);
 
   /* ── render ── */
   return (
@@ -317,7 +321,7 @@ function App() {
                     }}>
                     {i+1}
                     {allTodos[k]?.length>0&&(
-                      <span style={{position:'absolute',bottom:'0px',fontSize:'.38rem',color:isSel?'rgba(255,255,255,.7)':c}}>●</span>
+                      <span style={{position:'absolute',bottom:'2px',width:'4px',height:'4px',borderRadius:'50%',background:isSel?'rgba(255,255,255,.7)':c}}></span>
                     )}
                   </button>
                 );
@@ -405,16 +409,12 @@ function App() {
                 </div>
 
                 {/* routine banner */}
-                {items.length===0&&appRoutines.length>0&&(
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'#f7f7f7',borderRadius:'.4rem',padding:'.5rem .7rem',marginBottom:'.9rem'}}>
-                    <span style={{fontSize:'.78rem',color:'#bbb'}}>루틴 {appRoutines.length}개</span>
-                    <button onClick={applyRtn} style={pill(color,'#fff',true)}>적용</button>
-                  </div>
-                )}
-
                 {/* todo lists */}
                 {CATS.map((cat,idx)=>{
                   const list=items.map((it,gi)=>it.category===cat?{...it,gi}:null).filter(Boolean);
+                  const appliedTexts=new Set(items.map(it=>it.text));
+                  const pendingRtns=appRoutines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
+                  const isEmpty=list.length===0&&pendingRtns.length===0;
                   return (
                     <div key={cat} style={{marginBottom:'.7rem'}}>
                       <span style={sectionLabel()}>{cat}</span>
@@ -432,7 +432,16 @@ function App() {
                             )}
                           </div>
                         ))}
-                        {list.length===0&&<div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
+                        {/* routine ghost items */}
+                        {pendingRtns.map((r,i)=>(
+                          <div key={`rtn-${i}`} style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0',opacity:.38}}>
+                            {editMode&&<span style={{width:'.95rem',flexShrink:0}}/>}
+                            <span style={{fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem'}}>○</span>
+                            <span style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,fontStyle:'italic'}}>{r.text}</span>
+                            <span style={{fontSize:'.6rem',color:'#bbb',flexShrink:0}}>루틴</span>
+                          </div>
+                        ))}
+                        {isEmpty&&<div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
                       </div>
                       {idx<CATS.length-1&&(
                         <div style={{borderTop:`1px solid ${color}22`,margin:'.6rem 0'}}/>
@@ -440,6 +449,12 @@ function App() {
                     </div>
                   );
                 })}
+                {/* apply routines banner — only show when none have been applied yet */}
+                {items.length===0&&appRoutines.length>0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:'.3rem'}}>
+                    <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                  </div>
+                )}
 
                 {/* bottom actions */}
                 <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
@@ -486,46 +501,51 @@ function App() {
 ══════════════════════════════════════════════════════════ */
 function XCard({dlabel,noteText,items,color}) {
   const done=items.filter(it=>it.state===1).length, total=items.length;
-  const edge=(flip)=>({
-    height:'11px',
-    background:'repeating-linear-gradient(90deg,#efefef 0 7px,#fff 7px 14px)',
-    borderTop:flip?'1px dashed #e0e0e0':'none',
-    borderBottom:flip?'none':'1px dashed #e0e0e0',
+  const perfEdge=(flip)=>({
+    height:'10px',
+    background:'repeating-linear-gradient(90deg,#e8e8e8 0 6px,#fff 6px 12px)',
+    borderTop:flip?'1px dashed #ddd':'none',
+    borderBottom:flip?'none':'1px dashed #ddd',
   });
   return (
-    <div id="xcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'350px'}}>
-      <div style={edge(false)}/>
-      <div style={{padding:'1.75rem 2rem 1.5rem'}}>
-        <div style={{textAlign:'center',marginBottom:'1rem'}}>
-          <div style={{fontSize:'.58rem',letterSpacing:'.25em',color:'#d0d0d0',marginBottom:'.3rem'}}>𝐝 : ᴛᴏᴅᴏ</div>
-          <div style={{fontSize:'.85rem',fontWeight:'bold',color:'#333'}}>{dlabel}</div>
-          {noteText&&<div style={{fontSize:'.78rem',color,fontWeight:'bold',marginTop:'.45rem',whiteSpace:'pre-wrap',lineHeight:1.55}}>{noteText}</div>}
-        </div>
-        <div style={{borderTop:`1px dashed ${color}`,marginBottom:'.9rem'}}/>
-        {CATS.map((cat,idx)=>{
+    <div id="xcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'320px'}}>
+      {/* colored header band */}
+      <div style={{background:color,padding:'1.2rem 1.75rem 1rem'}}>
+        <div style={{fontSize:'.52rem',letterSpacing:'.28em',color:'rgba(255,255,255,.55)',marginBottom:'.25rem'}}>𝐝 : ᴛᴏᴅᴏ</div>
+        <div style={{fontSize:'.9rem',fontWeight:'bold',color:'#fff',lineHeight:1.4}}>{dlabel}</div>
+        {noteText&&<div style={{fontSize:'.75rem',color:'rgba(255,255,255,.82)',marginTop:'.4rem',whiteSpace:'pre-wrap',lineHeight:1.55}}>{noteText}</div>}
+      </div>
+
+      {/* perforated tear line */}
+      <div style={perfEdge(false)}/>
+
+      {/* item list */}
+      <div style={{padding:'1.2rem 1.75rem 1.4rem'}}>
+        {CATS.map((cat)=>{
           const list=items.filter(it=>it.category===cat);
           if (!list.length) return null;
           return (
-            <div key={cat} style={{marginBottom:'.75rem'}}>
-              <div style={{fontSize:'.58rem',letterSpacing:'.12em',color:'#ccc',marginBottom:'.3rem'}}>{cat}</div>
+            <div key={cat} style={{marginBottom:'.85rem'}}>
+              <div style={{fontSize:'.54rem',letterSpacing:'.18em',color,fontWeight:'bold',marginBottom:'.45rem',textTransform:'uppercase'}}>{cat}</div>
               {list.map((it,i)=>(
-                <div key={i} style={{display:'flex',gap:'.4rem',marginBottom:'.2rem',fontSize:'.82rem',lineHeight:1.55}}>
-                  <span style={{color,fontFamily:'monospace',flexShrink:0}}>{BULLET[it.state]}</span>
-                  <span style={{color:it.state===1?'#ccc':'#333',flex:1,whiteSpace:'pre-wrap',textDecoration:it.state===1?'line-through':'none'}}>{it.text}</span>
+                <div key={i} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start'}}>
+                  <span style={{color,fontFamily:'monospace',flexShrink:0,marginTop:'.05rem'}}>{BULLET[it.state]}</span>
+                  <span style={{color:it.state===1?'#bbb':'#333',flex:1,whiteSpace:'pre-wrap',textDecoration:it.state===1?'line-through':'none'}}>{it.text}</span>
                 </div>
               ))}
-              {idx<CATS.length-1&&<div style={{borderTop:'1px dashed #f0f0f0',marginTop:'.5rem'}}/>}
             </div>
           );
         })}
-        <div style={{borderTop:`1px dashed ${color}`,paddingTop:'.65rem',marginTop:'.3rem'}}>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:'.65rem',color:'#ccc'}}>
-            <span>{done} / {total} completed</span>
-            <span style={{letterSpacing:'.06em'}}>nagi-todo</span>
-          </div>
+
+        {/* footer */}
+        <div style={{borderTop:`1.5px solid ${color}33`,paddingTop:'.65rem',marginTop:'.2rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:'.64rem',color,fontWeight:'bold'}}>{done} / {total} done</span>
+          <span style={{fontSize:'.58rem',letterSpacing:'.1em',color:'#ccc'}}>nagi-todo</span>
         </div>
       </div>
-      <div style={edge(true)}/>
+
+      {/* bottom perforated tear line */}
+      <div style={perfEdge(true)}/>
     </div>
   );
 }
@@ -755,75 +775,110 @@ function RoutineModal({routines,onClose}) {
    MusicWidget
 ══════════════════════════════════════════════════════════ */
 function MusicWidget() {
-  const [open,   setOpen]   = React.useState(false);
-  const [input,  setInput]  = React.useState('');
-  const [embed,  setEmbed]  = React.useState(()=>localStorage.getItem('ytembed')||'');
-  const [urlBar, setUrlBar] = React.useState(false);
+  const [open,    setOpen]    = React.useState(false);
+  const [input,   setInput]   = React.useState('');
+  const [urlBar,  setUrlBar]  = React.useState(false);
+  const [playlist,setPlaylist]= React.useState(()=>{
+    try {
+      const saved=JSON.parse(localStorage.getItem('ytplaylist'));
+      if (saved?.length) return saved;
+      /* migrate from old single-embed format */
+      const old=localStorage.getItem('ytembed');
+      return old?[{embed:old}]:[];
+    } catch { return []; }
+  });
+  const [current, setCurrent] = React.useState(0);
 
-  function apply() {
+  const currentEmbed = playlist[current]?.embed || '';
+
+  function addTrack() {
     const u=ytEmbed(input);
-    if (u) { setEmbed(u); localStorage.setItem('ytembed',u); setUrlBar(false); setInput(''); }
-    else alert('유효한 YouTube URL을 넣어줘.');
+    if (!u) { alert('유효한 YouTube URL을 넣어줘.'); return; }
+    const next=[...playlist,{embed:u}];
+    setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
+    setCurrent(next.length-1); setUrlBar(false); setInput('');
   }
-  function clear() { setEmbed(''); localStorage.removeItem('ytembed'); }
+  function removeTrack(i,e) {
+    e.stopPropagation();
+    const next=playlist.filter((_,idx)=>idx!==i);
+    setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
+    setCurrent(c=>c>=next.length?Math.max(0,next.length-1):c);
+  }
 
   return (
     <div style={{position:'fixed',bottom:'20px',left:'20px',zIndex:1000}}>
       {/* pill toggle */}
-      <button onClick={()=>{setOpen(v=>!v);}} style={{
+      <button onClick={()=>setOpen(v=>!v)} style={{
         display:'flex',alignItems:'center',gap:'.35rem',
         background:'#1a1a1a',border:'none',borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 4px 18px rgba(0,0,0,0.22)',
-        fontFamily:'inherit',
+        boxShadow:'0 4px 18px rgba(0,0,0,0.22)',fontFamily:'inherit',
       }}>
-        <span style={{fontSize:'12px',color:embed?'#fff':'#4a4a4a'}}>♪</span>
-        <span style={{fontSize:'10px',color:'#4a4a4a',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
+        <span style={{fontSize:'12px',color:currentEmbed?'#fff':'#888'}}>♪</span>
+        <span style={{fontSize:'10px',color:'#999',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
       </button>
 
-      {/* player panel */}
-      {open&&(
-        <div style={{
-          position:'absolute',bottom:'42px',left:0,width:'290px',
-          background:'#181818',borderRadius:'12px',overflow:'hidden',
-          boxShadow:'0 10px 36px rgba(0,0,0,0.4)',
-        }}>
-          {/* panel header */}
+      {/* panel — always in DOM; moves off-screen when closed so iframe keeps playing */}
+      <div style={{
+        position:'absolute',bottom:'42px',
+        left:open?'0':'-9999px',
+        width:'290px',background:'#181818',borderRadius:'12px',overflow:'hidden',
+        boxShadow:open?'0 10px 36px rgba(0,0,0,0.4)':'none',
+      }}>
+        {/* header (visible only when open) */}
+        {open&&(
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px'}}>
-            <span style={{fontSize:'9px',color:'#444',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
-            <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
-              <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit'}}>URL</button>
-              {embed&&<button onClick={clear} style={{background:'none',border:'none',color:'#444',cursor:'pointer',fontSize:'10px',padding:0}}>✕</button>}
-            </div>
+            <span style={{fontSize:'9px',color:'#888',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
+            <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:'#888',cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit'}}>+ 추가</button>
           </div>
+        )}
 
-          {/* url bar */}
-          {urlBar&&(
-            <div style={{display:'flex',gap:'6px',padding:'0 10px 10px'}}>
-              <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&apply()}
-                placeholder="YouTube / YouTube Music URL"
-                style={{flex:1,background:'#252525',border:'1px solid #2e2e2e',borderRadius:'6px',padding:'.3rem .55rem',color:'#ccc',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
-              />
-              <button onClick={apply} style={{background:'#2a2a2a',border:'1px solid #333',borderRadius:'6px',color:'#666',cursor:'pointer',fontSize:'11px',padding:'0 .5rem'}}>→</button>
-            </div>
-          )}
+        {/* url input (visible only when open) */}
+        {open&&urlBar&&(
+          <div style={{display:'flex',gap:'6px',padding:'0 10px 10px'}}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTrack()}
+              placeholder="YouTube URL (영상·플레이리스트 모두 가능)"
+              style={{flex:1,background:'#252525',border:'1px solid #2e2e2e',borderRadius:'6px',padding:'.3rem .55rem',color:'#ccc',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
+            />
+            <button onClick={addTrack} style={{background:'#2a2a2a',border:'1px solid #333',borderRadius:'6px',color:'#999',cursor:'pointer',fontSize:'11px',padding:'0 .5rem'}}>→</button>
+          </div>
+        )}
 
-          {/* iframe or placeholder */}
-          {embed ? (
-            <div style={{lineHeight:0,background:'#000'}}>
-              <iframe src={embed} width="290" height="163" frameBorder="0"
-                allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
-                style={{display:'block'}}/>
-            </div>
-          ):(
-            <div style={{height:'108px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'7px'}}>
-              <span style={{fontSize:'20px',opacity:.25,color:'#fff'}}>♪</span>
-              <span style={{fontSize:'10px',color:'#3a3a3a',textAlign:'center',lineHeight:1.6}}>YouTube URL을 붙여넣어봐.<br/>음악도, 플레이리스트도 돼.</span>
-              <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#242424',border:'none',borderRadius:'6px',color:'#555',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>URL 입력</button>
-            </div>
-          )}
-        </div>
-      )}
+        {/* playlist (visible only when open) */}
+        {open&&playlist.length>0&&(
+          <div style={{maxHeight:'120px',overflowY:'auto',padding:'0 10px 8px'}}>
+            {playlist.map((track,i)=>(
+              <div key={i} onClick={()=>setCurrent(i)} style={{
+                display:'flex',alignItems:'center',gap:'6px',
+                padding:'5px 8px',borderRadius:'6px',marginBottom:'3px',
+                background:i===current?'#252525':'transparent',cursor:'pointer',
+              }}>
+                <span style={{fontSize:'8px',color:i===current?'#fff':'#555'}}>▶</span>
+                <span style={{fontSize:'9px',color:i===current?'#ccc':'#666',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* empty state (visible only when open) */}
+        {open&&playlist.length===0&&(
+          <div style={{height:'90px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'7px'}}>
+            <span style={{fontSize:'20px',opacity:.2,color:'#fff'}}>♪</span>
+            <span style={{fontSize:'10px',color:'#777',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
+            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#242424',border:'none',borderRadius:'6px',color:'#999',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
+          </div>
+        )}
+
+        {/* iframe — always rendered for background playback */}
+        {currentEmbed?(
+          <div style={{lineHeight:0,background:'#000'}}>
+            <iframe src={currentEmbed} width="290" height="163" frameBorder="0"
+              allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
+              style={{display:'block'}}/>
+          </div>
+        ):null}
+      </div>
     </div>
   );
 }
@@ -891,7 +946,7 @@ function DemianWidget() {
             <div>
               <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.7rem'}}>위젯 설정</div>
               <div style={{fontSize:'10px',color:'#ccc',marginBottom:'.5rem'}}>요일별 집중 시간 (24시)</div>
-              {[1,2,3,4,5].map(d=>(
+              {[1,2,3,4,5,6,0].map(d=>(
                 <div key={d} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.38rem'}}>
                   <button onClick={()=>tog(d)} style={{
                     width:'1.4rem',height:'.85rem',borderRadius:'9999px',border:'none',cursor:'pointer',padding:0,flexShrink:0,
