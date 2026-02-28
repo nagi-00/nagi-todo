@@ -6,11 +6,28 @@
 <link rel="icon" href="./favi.ico" type="image/x-icon" />
 <style>
 @font-face { font-family:'HJSS'; src:url('./HJSS.ttf') format('truetype'); }
-body { margin:0; padding:0; font-family:'HJSS',sans-serif; background:#f5f5f5; box-sizing:border-box; }
-*,*::before,*::after { box-sizing:inherit; }
-.edit-delete-btn { font-size:.75rem; color:#888; background:none; border:none; cursor:pointer; margin-left:.5rem; }
-.drag-handle { cursor:grab; font-size:1rem; margin-right:.5rem; color:#aaa; }
-.completed { color:#bbb; text-decoration:line-through; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'HJSS', sans-serif;
+  background: #ebebeb;
+  color: #333;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+
+/* Shared */
+.drag-handle  { cursor: grab; color: #ccc; user-select: none; font-size: .95rem; flex-shrink: 0; }
+.completed    { color: #ccc; text-decoration: line-through; }
+.icon-btn     { background: none; border: none; cursor: pointer; padding: 0; color: #ccc; font-size: .72rem; font-family: inherit; }
+
+textarea:focus, input:focus, select:focus { outline: none; }
+button { font-family: inherit; }
+select { font-family: inherit; }
 </style>
 </head>
 <body>
@@ -26,7 +43,7 @@ body { margin:0; padding:0; font-family:'HJSS',sans-serif; background:#f5f5f5; b
 
 <script type="text/babel">
 
-// ─── Firebase ───────────────────────────────────────────────
+/* ─── Firebase ─────────────────────────────────────────── */
 const firebaseConfig = {
   apiKey: "AIzaSyAa-8IWlzzPflkV6Iqzunha5TCnMXclTns",
   authDomain: "nagi-todo.firebaseapp.com",
@@ -39,701 +56,879 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ─── 상수 ────────────────────────────────────────────────────
-const CATEGORIES = ['필연의 시간', '성장의 시간', '자유의 시간'];
-const BULLET = ['☐', '☑', '☒'];
-const MOOD_OPTIONS = [
-  { emoji: '😻', label: '행복' },
-  { emoji: '😺', label: '보통' },
-  { emoji: '😿', label: '슬픔' },
-  { emoji: '😾', label: '화남' },
-  { emoji: '✨', label: '설렘' },
-];
-const DEFAULT_SCHEDULE = { 1:{start:6,end:13}, 2:{start:6,end:18}, 3:{start:6,end:13}, 4:{start:6,end:18}, 5:{start:6,end:21} };
-const DAY_LABELS = { 1:'월', 2:'화', 3:'수', 4:'목', 5:'금' };
+/* ─── Constants ────────────────────────────────────────── */
+const CATS       = ['필연의 시간', '성장의 시간', '자유의 시간'];
+const BULLET     = ['☐', '☑', '☒'];
+const CAT_HUE    = { '필연의 시간': '#8A4545', '성장의 시간': '#434A8E', '자유의 시간': '#4a7c5a' };
+const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
+const DEF_SCHED  = {1:{s:6,e:13},2:{s:6,e:18},3:{s:6,e:13},4:{s:6,e:18},5:{s:6,e:21}};
+const DAY_KO     = {1:'월',2:'화',3:'수',4:'목',5:'금'};
+const WEEK_KO    = ['일','월','화','수','목','금','토'];
 
-function loadSchedule() {
-  try { return JSON.parse(localStorage.getItem('focusSchedule')) || DEFAULT_SCHEDULE; }
-  catch { return DEFAULT_SCHEDULE; }
+/* ─── Helpers ───────────────────────────────────────────── */
+function loadSched() {
+  try { return JSON.parse(localStorage.getItem('focusSched')) || DEF_SCHED; }
+  catch { return DEF_SCHED; }
+}
+
+function ytEmbed(raw) {
+  if (!raw?.trim()) return null;
+  try {
+    const u    = new URL(raw.trim());
+    const v    = u.searchParams.get('v');
+    const list = u.searchParams.get('list');
+    const sid  = u.hostname === 'youtu.be' ? u.pathname.slice(1).split('?')[0] : null;
+    const vid  = v || sid;
+    const p    = 'autoplay=1&rel=0&modestbranding=1';
+    if (vid && list) return `https://www.youtube.com/embed/${vid}?list=${list}&${p}`;
+    if (vid)         return `https://www.youtube.com/embed/${vid}?${p}`;
+    if (list)        return `https://www.youtube.com/embed/videoseries?list=${list}&${p}`;
+    return null;
+  } catch { return null; }
+}
+
+/* ─── Micro Style Helpers ───────────────────────────────── */
+const CARD = {
+  background: '#fff',
+  borderRadius: '10px',
+  boxShadow: '0 1px 5px rgba(0,0,0,0.07)',
+  padding: '1.5rem',
+};
+function pill(bg='#f0f0f0', fg='#666', sm=false) {
+  return {
+    background: bg, color: fg,
+    border: 'none', borderRadius: '9999px',
+    padding: sm ? '.28rem .7rem' : '.4rem .95rem',
+    fontSize: sm ? '.72rem' : '.78rem',
+    cursor: 'pointer', fontFamily: 'inherit',
+    letterSpacing: '.03em',
+  };
+}
+function sectionLabel(extra) {
+  return { fontSize: '.6rem', letterSpacing: '.2em', color: '#bbb', marginBottom: '.5rem', display: 'block', ...extra };
 }
 
 
-// ═══════════════════════════════════════════════════════════════
-// App
-// ═══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════
+   App
+══════════════════════════════════════════════════════════ */
 function App() {
-  // ── 상태 ──
-  const [selectedDate, setSelectedDate] = React.useState(new Date());
-  const [showSidebar,  setShowSidebar]  = React.useState(true);
-  const [allTodos,     setAllTodos]     = React.useState({});
-  const [accentColor,  setAccentColor]  = React.useState('#888888');
-  const [dateColors,   setDateColors]   = React.useState({});
-  const [noteText,     setNoteText]     = React.useState('');
-  const [notes,        setNotes]        = React.useState({});
-  const [editMode,     setEditMode]     = React.useState(false);
-  const [showNotesList,setShowNotesList]= React.useState(false);
-  const [notesEditMode,setNotesEditMode]= React.useState(false);
-  const [textNec,      setTextNec]      = React.useState('');
-  const [textGro,      setTextGro]      = React.useState('');
-  const [textFree,     setTextFree]     = React.useState('');
-  const [activeTab,    setActiveTab]    = React.useState('todo');
-  const [journalData,  setJournalData]  = React.useState({});
+  /* state */
+  const [sel,        setSel]       = React.useState(new Date());
+  const [sidebar,    setSidebar]   = React.useState(true);
+  const [allTodos,   setAllTodos]  = React.useState({});
+  const [accent,     setAccent]    = React.useState('#888');
+  const [dColors,    setDColors]   = React.useState({});
+  const [noteText,   setNoteText]  = React.useState('');
+  const [notes,      setNotes]     = React.useState({});
+  const [editMode,   setEditMode]  = React.useState(false);
+  const [notesList,  setNotesList] = React.useState(false);
+  const [noteEdit,   setNoteEdit]  = React.useState(false);
+  const [inputs,     setInputs]    = React.useState({'필연의 시간':'','성장의 시간':'','자유의 시간':''});
+  const [tab,        setTab]       = React.useState('todo');
+  const [journals,   setJournals]  = React.useState({});
+  const [routines,   setRoutines]  = React.useState([]);
+  const [showRtn,    setShowRtn]   = React.useState(false);
+  const sortsRef = React.useRef([]);
 
-  const sortablesRef = React.useRef([]);
-  const dateKey  = selectedDate.toLocaleDateString('sv-SE');
-  const items    = allTodos[dateKey] || [];
-  const journal  = journalData[dateKey] || { morning:'', evening:'', mood:null };
-  const color    = dateColors[dateKey] || accentColor;
-  const dateLabel = selectedDate.toLocaleString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const dk      = sel.toLocaleDateString('sv-SE');
+  const items   = allTodos[dk] || [];
+  const journal = journals[dk] || { morning:'', evening:'', mood:null };
+  const color   = dColors[dk] || accent;
+  const dlabel  = sel.toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const todayDk = new Date().toLocaleDateString('sv-SE');
 
-  // ── 핸들러 ──
-  const handleToday     = () => { setSelectedDate(new Date()); setShowNotesList(false); };
-  const handlePrevMonth = () => setSelectedDate(p => new Date(p.getFullYear(), p.getMonth()-1, 1));
-  const handleNextMonth = () => setSelectedDate(p => new Date(p.getFullYear(), p.getMonth()+1, 1));
+  const appRoutines = React.useMemo(() => {
+    const dow = sel.getDay();
+    return routines.filter(r => r.freq==='daily' || (r.freq==='weekly' && r.weekday===dow));
+  }, [routines, sel]);
 
-  function handleDateColorChange(e) { db.ref('dateColors/'+dateKey).set(e.target.value); }
+  /* handlers */
+  function gotoToday()    { setSel(new Date()); setNotesList(false); }
+  function prevMonth()    { setSel(p => new Date(p.getFullYear(), p.getMonth()-1, 1)); }
+  function nextMonth()    { setSel(p => new Date(p.getFullYear(), p.getMonth()+1, 1)); }
+  function setIn(c,v)     { setInputs(p=>({...p,[c]:v})); }
 
-  function addTodo(cat, text, setter) {
-    if (!text.trim()) return;
-    db.ref('todos/'+dateKey).set([...items, { type:'todo', category:cat, text:text.trim(), state:0 }]);
-    setter('');
+  function addTodo(cat) {
+    const t = inputs[cat]; if (!t.trim()) return;
+    db.ref('todos/'+dk).set([...items, {type:'todo',category:cat,text:t.trim(),state:0}]);
+    setIn(cat,'');
   }
-  function handleTodoKeyDown(e, cat, text, setter) {
-    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); addTodo(cat, text, setter); }
-  }
-  function toggleState(i, e) {
-    e.stopPropagation();
-    if (editMode) return;
-    const updated = items.map((it, idx) => idx===i ? {...it, state:(it.state+1)%BULLET.length} : it);
-    db.ref('todos/'+dateKey).set(updated);
+  function toggleState(i,e) {
+    e.stopPropagation(); if (editMode) return;
+    db.ref('todos/'+dk).set(items.map((it,idx)=>idx===i?{...it,state:(it.state+1)%BULLET.length}:it));
   }
   function editItem(i) {
-    const nt = prompt('Edit:', items[i].text);
-    if (nt != null && nt.trim()) {
-      const copy = [...items];
-      copy[i] = { ...copy[i], text: nt.trim() };
-      db.ref('todos/'+dateKey).set(copy);
-    }
+    const nt=prompt('Edit:', items[i].text);
+    if (nt!=null&&nt.trim()) { const c=[...items]; c[i]={...c[i],text:nt.trim()}; db.ref('todos/'+dk).set(c); }
   }
-  function deleteItem(i) { db.ref('todos/'+dateKey).set(items.filter((_,idx)=>idx!==i)); }
-  function saveJournal(field, value) { db.ref('journal/'+dateKey+'/'+field).set(value); }
+  function delItem(i) { db.ref('todos/'+dk).set(items.filter((_,idx)=>idx!==i)); }
+  function applyRtn() {
+    const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0}));
+    db.ref('todos/'+dk).set([...items,...add]);
+  }
+  function saveJournal(f,v) { db.ref('journal/'+dk+'/'+f).set(v); }
 
-  async function exportAsImage() {
-    const cardEl = document.getElementById('export-card');
-    if (!cardEl) return;
-    const canvas = await html2canvas(cardEl, { backgroundColor:'#fff', scale:2, useCORS:true });
-    canvas.toBlob(async blob => {
+  async function exportImg() {
+    const el=document.getElementById('xcard'); if (!el) return;
+    const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
+    cv.toBlob(async blob=>{
       if (!blob) return;
-      try {
-        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
-        alert('클립보드에 복사했어.');
-      } catch {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href=url; a.download=`todo-${dateKey}.png`; a.click();
-        URL.revokeObjectURL(url);
-        alert('이미지를 저장했어.');
-      }
+      try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      catch { const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`todo-${dk}.png`;a.click();URL.revokeObjectURL(u); }
     });
   }
 
-  // ── Firebase Effects ──
-  React.useEffect(() => {
-    const ref = db.ref('todos/'+dateKey);
-    const h = ref.on('value', snap => setAllTodos(prev => ({...prev, [dateKey]: snap.val()||[]})));
-    return () => ref.off('value', h);
-  }, [dateKey]);
+  /* effects */
+  React.useEffect(()=>{
+    const r=db.ref('todos/'+dk);
+    const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
+    return()=>r.off('value',h);
+  },[dk]);
 
-  React.useEffect(() => {
-    const ref = db.ref('dateColors');
-    const h = ref.on('value', snap => setDateColors(snap.val()||{}));
-    return () => ref.off('value', h);
-  }, []);
+  React.useEffect(()=>{
+    const r=db.ref('dateColors');
+    const h=r.on('value',s=>setDColors(s.val()||{}));
+    return()=>r.off('value',h);
+  },[]);
 
-  React.useEffect(() => {
-    const ref = db.ref('notes/'+dateKey);
-    const h = ref.on('value', snap => setNoteText(snap.val()||''));
-    return () => ref.off('value', h);
-  }, [dateKey]);
+  React.useEffect(()=>{
+    const r=db.ref('notes/'+dk);
+    const h=r.on('value',s=>setNoteText(s.val()||''));
+    return()=>r.off('value',h);
+  },[dk]);
 
-  React.useEffect(() => {
-    const ref = db.ref('notes');
-    const h = ref.on('value', snap => setNotes(snap.val()||{}));
-    return () => ref.off('value', h);
-  }, []);
+  React.useEffect(()=>{
+    const r=db.ref('notes');
+    const h=r.on('value',s=>setNotes(s.val()||{}));
+    return()=>r.off('value',h);
+  },[]);
 
-  React.useEffect(() => {
-    const ref = db.ref('journal/'+dateKey);
-    const h = ref.on('value', snap => setJournalData(prev => ({...prev, [dateKey]: snap.val()||{morning:'',evening:'',mood:null}})));
-    return () => ref.off('value', h);
-  }, [dateKey]);
+  React.useEffect(()=>{
+    const r=db.ref('journal/'+dk);
+    const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',evening:'',mood:null}})));
+    return()=>r.off('value',h);
+  },[dk]);
 
-  React.useEffect(() => {
-    const s = localStorage.getItem('accentColor');
-    if (s) setAccentColor(s);
-  }, []);
+  React.useEffect(()=>{
+    const r=db.ref('routines');
+    const h=r.on('value',s=>{
+      const v=s.val()||{};
+      setRoutines(Object.entries(v).map(([id,x])=>({id,...x})));
+    });
+    return()=>r.off('value',h);
+  },[]);
 
-  // ── Sortable (Bug fix: setAllTodos 대신 setItems 호출 오류 수정) ──
-  React.useLayoutEffect(() => {
+  React.useEffect(()=>{ const s=localStorage.getItem('accentColor'); if(s) setAccent(s); },[]);
+
+  /* Sortable — bug-fixed */
+  React.useLayoutEffect(()=>{
     if (!editMode) return;
-    const instances = CATEGORIES.map(cat => {
-      const el = document.getElementById(`todo-list-${cat.replace(/\s+/g,'-')}`);
-      if (!el) return null;
-      return Sortable.create(el, {
-        handle: '.drag-handle',
-        animation: 150,
-        onEnd: evt => {
-          const current = [...items];
-          const indices = current.map((it,idx) => it.category===cat ? idx : -1).filter(i => i>=0);
-          if (indices[evt.oldIndex]==null || indices[evt.newIndex]==null) return;
-          const updated = [...current];
-          const [moved] = updated.splice(indices[evt.oldIndex], 1);
-          updated.splice(indices[evt.newIndex], 0, moved);
-          setAllTodos(prev => ({...prev, [dateKey]: updated}));
-          db.ref('todos/'+dateKey).set(updated);
+    const inst = CATS.map(cat=>{
+      const el=document.getElementById(`tl-${cat.replace(/\s+/g,'-')}`); if (!el) return null;
+      return Sortable.create(el,{
+        handle:'.drag-handle', animation:120,
+        onEnd:evt=>{
+          const cur=[...items];
+          const idx=cur.map((it,i)=>it.category===cat?i:-1).filter(i=>i>=0);
+          if (idx[evt.oldIndex]==null||idx[evt.newIndex]==null) return;
+          const upd=[...cur];
+          const [mv]=upd.splice(idx[evt.oldIndex],1);
+          upd.splice(idx[evt.newIndex],0,mv);
+          setAllTodos(p=>({...p,[dk]:upd}));
+          db.ref('todos/'+dk).set(upd);
         }
       });
     }).filter(Boolean);
-    sortablesRef.current = instances;
-    return () => instances.forEach(s => s?.el && s.destroy());
-  }, [editMode, items, dateKey]);
+    sortsRef.current=inst;
+    return()=>inst.forEach(s=>s?.el&&s.destroy());
+  },[editMode,items,dk]);
 
-  // ── UI ──
+  /* ── render ── */
   return (
-    <div style={{display:'flex', minHeight:'100vh'}}>
+    <div style={{display:'flex',minHeight:'100vh'}}>
 
-      {/* 사이드바 토글 버튼 */}
-      <button onClick={()=>setShowSidebar(v=>!v)} style={{
-        position:'fixed', left:'1rem', top:'1rem', zIndex:100,
-        background:'#fff', border:'none', padding:'.5rem',
-        borderRadius:'9999px', boxShadow:'0 2px 5px rgba(0,0,0,0.1)', cursor:'pointer'
-      }}>{showSidebar?'←':'→'}</button>
+      {/* sidebar toggle */}
+      <button
+        onClick={()=>setSidebar(v=>!v)}
+        style={{
+          position:'fixed',left:'1rem',top:'1rem',zIndex:100,
+          background:'#fff',border:'none',borderRadius:'9999px',
+          width:'2rem',height:'2rem',cursor:'pointer',
+          boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
+          color:'#999',fontSize:'.85rem',display:'flex',alignItems:'center',justifyContent:'center'
+        }}
+      >{sidebar?'←':'→'}</button>
 
-      {/* ── 사이드바 ── */}
-      <div style={{
-        position:'fixed', left:0, top:0, bottom:0, width:'16rem',
-        background:'#fff', overflow:'auto',
-        boxShadow:'0 2px 5px rgba(0,0,0,0.1)',
-        transform: showSidebar?'translateX(0)':'translateX(-100%)',
-        transition:'transform 0.3s ease-in-out', zIndex:20
+      {/* ═══ Sidebar ═══ */}
+      <aside style={{
+        position:'fixed',left:0,top:0,bottom:0,width:'14.5rem',
+        background:'#fff',overflow:'auto',zIndex:20,
+        boxShadow:'2px 0 10px rgba(0,0,0,0.05)',
+        transform:sidebar?'translateX(0)':'translateX(-100%)',
+        transition:'transform .25s ease',
       }}>
-        <div style={{padding:'1rem'}}>
-          <h2 style={{fontWeight:'bold', whiteSpace:'pre-line', textAlign:'center', marginBottom:'1rem'}}>
-            {selectedDate.toLocaleString('en-US',{year:'numeric'})}{'\n'}
-            {selectedDate.toLocaleString('en-US',{month:'long'})}
-          </h2>
-          <div style={{display:'flex', justifyContent:'center', gap:'.5rem', margin:'.5rem 0'}}>
-            <button onClick={handlePrevMonth} style={{background:'#fff',border:'none',cursor:'pointer'}}>←</button>
-            <button onClick={handleToday}     style={{background:'#fff',border:'none',cursor:'pointer'}}>Today</button>
-            <button onClick={handleNextMonth} style={{background:'#fff',border:'none',cursor:'pointer'}}>→</button>
+        <div style={{padding:'1.25rem 1rem 2rem'}}>
+
+          {/* month header */}
+          <div style={{textAlign:'center',marginBottom:'1rem',paddingTop:'.6rem'}}>
+            <div style={{fontSize:'.75rem',color:'#bbb',letterSpacing:'.05em',marginBottom:'.15rem'}}>
+              {sel.toLocaleString('en-US',{year:'numeric'})}
+            </div>
+            <div style={{fontSize:'1.1rem',fontWeight:'bold',marginBottom:'.6rem'}}>
+              {sel.toLocaleString('en-US',{month:'long'})}
+            </div>
+            <div style={{display:'flex',justifyContent:'center',gap:'.25rem'}}>
+              <button onClick={prevMonth}  style={pill('#f5f5f5','#888',true)}>←</button>
+              <button onClick={gotoToday} style={pill('#f5f5f5','#888',true)}>Today</button>
+              <button onClick={nextMonth}  style={pill('#f5f5f5','#888',true)}>→</button>
+            </div>
           </div>
 
-          <button onClick={()=>setShowNotesList(v=>!v)} style={{
-            width:'100%', padding:'.5rem', marginBottom:'1rem',
-            background:'#f0f0f0', border:'none', cursor:'pointer'
-          }}>{showNotesList?'Back':'Notes'}</button>
+          <button onClick={()=>setNotesList(v=>!v)} style={{
+            ...pill('#f7f7f7','#aaa',true),
+            width:'100%',marginBottom:'.75rem',borderRadius:'.4rem',textAlign:'center',
+          }}>{notesList?'← back':'Notes'}</button>
 
-          {!showNotesList ? (
-            /* 캘린더 */
-            <div style={{display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:'.25rem', fontSize:'.875rem'}}>
+          {!notesList ? (
+            /* calendar */
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',fontSize:'.7rem'}}>
               {['S','M','T','W','T','F','S'].map((d,i)=>(
-                <div key={i} style={{textAlign:'center', fontWeight:'500',
-                  color: i===0?'#8A4545': i===6?'#434A8E':'#666'}}>{d}</div>
+                <div key={i} style={{textAlign:'center',padding:'.15rem 0',color:i===0?'#8A4545':i===6?'#434A8E':'#bbb',fontSize:'.6rem'}}>{d}</div>
               ))}
-              {Array(new Date(selectedDate.getFullYear(),selectedDate.getMonth(),1).getDay())
-                .fill(null).map((_,i)=><div key={i}/>)}
-              {Array.from({length:new Date(selectedDate.getFullYear(),selectedDate.getMonth()+1,0).getDate()},(_,i)=>{
-                const dateObj = new Date(selectedDate.getFullYear(),selectedDate.getMonth(),i+1);
-                const dKey = dateObj.toLocaleDateString('sv-SE');
-                const isSel = dKey===dateKey;
-                const c = dateColors[dKey]||accentColor;
+              {Array(new Date(sel.getFullYear(),sel.getMonth(),1).getDay()).fill(null).map((_,i)=><div key={i}/>)}
+              {Array.from({length:new Date(sel.getFullYear(),sel.getMonth()+1,0).getDate()},(_,i)=>{
+                const d=new Date(sel.getFullYear(),sel.getMonth(),i+1);
+                const k=d.toLocaleDateString('sv-SE');
+                const isSel=k===dk, isToday=k===todayDk;
+                const c=dColors[k]||accent;
                 return (
                   <button key={i}
-                    onClick={()=>{setSelectedDate(dateObj); if(window.innerWidth<768) setShowSidebar(false);}}
+                    onClick={()=>{setSel(d);if(window.innerWidth<768)setSidebar(false);}}
                     style={{
-                      width:'1.8rem',height:'1.8rem', margin:'0 auto',
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      border:'none', borderRadius:'9999px',
-                      backgroundColor: isSel?c:'transparent',
-                      color: isSel?'#fff':'#000',
-                      position:'relative', cursor:'pointer'
+                      width:'1.7rem',height:'1.7rem',margin:'0 auto',
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      border:`1.5px solid ${isToday&&!isSel?c:'transparent'}`,
+                      borderRadius:'9999px',
+                      background:isSel?c:'transparent',
+                      color:isSel?'#fff':isToday?c:'#444',
+                      fontWeight:isToday?'bold':'400',
+                      position:'relative',cursor:'pointer',fontSize:'.78rem',
                     }}>
-                    <span>{i+1}</span>
-                    {allTodos[dKey]?.length>0 && (
-                      <span style={{fontSize:'.75rem',position:'absolute',bottom:'-.3rem',color:isSel?'#fff':c}}>•</span>
+                    {i+1}
+                    {allTodos[k]?.length>0&&(
+                      <span style={{position:'absolute',bottom:'0px',fontSize:'.38rem',color:isSel?'rgba(255,255,255,.7)':c}}>●</span>
                     )}
                   </button>
                 );
               })}
             </div>
           ) : (
-            /* 노트 목록 */
+            /* notes list */
             <div>
               {Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,txt])=>(
-                <div key={d} style={{background:'#fff',borderRadius:'.5rem',padding:'.75rem',marginBottom:'.5rem',boxShadow:'0 1px 3px rgba(0,0,0,0.1)'}}>
-                  <div style={{fontWeight:'600',marginBottom:'.25rem'}}>
-                    {new Date(d).toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}
+                <div key={d} style={{background:'#f8f8f8',borderRadius:'.5rem',padding:'.65rem .75rem',marginBottom:'.4rem'}}>
+                  <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.2rem'}}>
+                    {new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})}
                   </div>
-                  <div style={{fontWeight:'bold',whiteSpace:'pre-wrap',color:dateColors[d]||accentColor}}>{txt}</div>
-                  <button className="edit-delete-btn" onClick={()=>db.ref('notes/'+d).remove()}>Delete</button>
+                  <div style={{fontSize:'.82rem',fontWeight:'bold',whiteSpace:'pre-wrap',color:dColors[d]||accent,lineHeight:1.5}}>{txt}</div>
+                  <button className="icon-btn" onClick={()=>db.ref('notes/'+d).remove()} style={{marginTop:'.3rem'}}>Delete</button>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
-      {/* ── 메인 영역 ── */}
-      <div style={{flex:1, padding:'1rem', marginLeft:showSidebar?'16rem':'0', transition:'margin-left 0.3s'}}>
-        <div style={{maxWidth:'42rem', margin:'0 auto'}}>
+      {/* ═══ Main ═══ */}
+      <main style={{
+        flex:1,
+        padding:'1rem',
+        marginLeft:sidebar?'14.5rem':'0',
+        transition:'margin-left .25s',
+      }}>
+        <div style={{maxWidth:'40rem',margin:'0 auto'}}>
 
-          {/* 탭 */}
-          <div style={{display:'flex', gap:'.5rem', marginBottom:'1rem', paddingTop:'2.5rem'}}>
-            {['todo','journal'].map(tab=>(
-              <button key={tab} onClick={()=>setActiveTab(tab)} style={{
-                padding:'.4rem 1.1rem', border:'none', borderRadius:'9999px', cursor:'pointer',
-                background: activeTab===tab ? color : '#f0f0f0',
-                color: activeTab===tab ? '#fff' : '#555',
-                fontSize:'.8rem', letterSpacing:'.05em'
-              }}>
-                {tab==='todo' ? 'ᴛᴏᴅᴏ' : 'ᴊᴏᴜʀɴᴀʟ'}
-              </button>
+          {/* tabs */}
+          <div style={{display:'flex',gap:'.35rem',paddingTop:'2.75rem',marginBottom:'.75rem'}}>
+            {[{k:'todo',l:'ᴛᴏᴅᴏ'},{k:'journal',l:'ᴊᴏᴜʀɴᴀʟ'},{k:'week',l:'ᴡᴇᴇᴋ'}].map(({k,l})=>(
+              <button key={k} onClick={()=>setTab(k)} style={{
+                ...pill(tab===k?color:'#fff',tab===k?'#fff':'#bbb'),
+                boxShadow:tab===k?`0 2px 8px ${color}44`:'0 1px 3px rgba(0,0,0,0.08)',
+                transition:'all .2s',
+              }}>{l}</button>
             ))}
           </div>
 
-          {/* ── TODO 탭 ── */}
-          {activeTab==='todo' && (
+          {/* ── TODO ── */}
+          {tab==='todo'&&(
             <>
-              <div style={{background:'#fff', borderRadius:'.5rem', boxShadow:'0 2px 5px rgba(0,0,0,0.1)', padding:'1.5rem'}}>
-
-                <h2 style={{fontSize:'1.25rem', fontWeight:'bold', marginBottom:'1rem'}}>{dateLabel}</h2>
-
-                {/* 오늘의 한마디 */}
-                <div style={{display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'1rem'}}>
-                  {(!notesEditMode && noteText.trim()) ? (
-                    <div style={{fontWeight:'bold', whiteSpace:'pre-wrap', color, flex:1}}
-                      onDoubleClick={()=>setNotesEditMode(true)}
-                      onContextMenu={e=>{e.preventDefault();setNotesEditMode(true);}}
-                    >{noteText}</div>
-                  ) : (
-                    <textarea
-                      value={noteText}
-                      onChange={e=>setNoteText(e.target.value)}
-                      onKeyDown={e=>{
-                        if(e.key==='Enter'&&!e.shiftKey){
-                          e.preventDefault();
-                          db.ref('notes/'+dateKey).set(noteText.trim());
-                          setNotesEditMode(false);
-                        }
-                      }}
-                      onFocus={()=>setNotesEditMode(true)}
-                      placeholder="오늘의 한마디 (Enter 저장, Shift+Enter 줄바꿈)" rows={2}
-                      style={{flex:1, border:'1px solid #ccc', padding:'.5rem', borderRadius:'.25rem', resize:'vertical', fontWeight:'bold', color, fontFamily:'inherit'}}
-                    />
-                  )}
-                  <input type="color" value={color} onChange={handleDateColorChange}
-                    style={{width:'1.5rem',height:'1.5rem',borderRadius:'9999px',cursor:'pointer',border:'none',padding:0}}
+              <div style={CARD}>
+                {/* header row */}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem',gap:'.5rem'}}>
+                  <h2 style={{fontSize:'1rem',fontWeight:'bold',lineHeight:1.5,flex:1,color:'#222'}}>{dlabel}</h2>
+                  <input type="color" value={color}
+                    onChange={e=>db.ref('dateColors/'+dk).set(e.target.value)}
+                    style={{width:'1.25rem',height:'1.25rem',border:'none',padding:0,borderRadius:'9999px',cursor:'pointer',flexShrink:0,marginTop:'.25rem'}}
                   />
                 </div>
 
-                {/* 입력창 */}
-                <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'.5rem', marginBottom:'1rem'}}>
-                  {[[textNec,setTextNec,'필연의 시간'],[textGro,setTextGro,'성장의 시간'],[textFree,setTextFree,'자유의 시간']].map(([val,setter,cat])=>(
-                    <textarea key={cat} value={val} onChange={e=>setter(e.target.value)}
-                      onKeyDown={e=>handleTodoKeyDown(e,cat,val,setter)}
-                      placeholder={`${cat}`} rows={3}
-                      style={{border:'1px solid #ccc', padding:'.5rem', borderRadius:'.25rem', resize:'vertical', fontFamily:'inherit', fontSize:'.85rem'}}
+                {/* 오늘의 한마디 */}
+                {(!noteEdit&&noteText.trim()) ? (
+                  <div
+                    style={{fontWeight:'bold',whiteSpace:'pre-wrap',color,lineHeight:1.65,cursor:'text',fontSize:'.9rem',marginBottom:'1rem'}}
+                    onDoubleClick={()=>setNoteEdit(true)}
+                    onContextMenu={e=>{e.preventDefault();setNoteEdit(true);}}
+                  >{noteText}</div>
+                ) : (
+                  <textarea
+                    value={noteText}
+                    onChange={e=>setNoteText(e.target.value)}
+                    onFocus={()=>setNoteEdit(true)}
+                    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();db.ref('notes/'+dk).set(noteText.trim());setNoteEdit(false);}}}
+                    placeholder="오늘의 한마디 (Enter 저장, Shift+Enter 줄바꿈)" rows={2}
+                    style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontWeight:'bold',color,fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.65,marginBottom:'1rem'}}
+                  />
+                )}
+
+                {/* input row */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'.5rem',marginBottom:'1.1rem'}}>
+                  {CATS.map(cat=>(
+                    <textarea key={cat}
+                      value={inputs[cat]}
+                      onChange={e=>setIn(cat,e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo(cat);}}}
+                      placeholder={cat} rows={3}
+                      style={{border:'1px solid #eee',padding:'.4rem .5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.78rem',lineHeight:1.55,color:'#555',background:'#fafafa'}}
                     />
                   ))}
                 </div>
 
-                {/* 할 일 리스트 */}
-                {CATEGORIES.map((cat,idx)=>{
-                  const list = items.map((it,gi)=>it.category===cat?{...it,index:gi}:null).filter(Boolean);
+                {/* routine banner */}
+                {items.length===0&&appRoutines.length>0&&(
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'#f7f7f7',borderRadius:'.4rem',padding:'.5rem .7rem',marginBottom:'.9rem'}}>
+                    <span style={{fontSize:'.78rem',color:'#bbb'}}>루틴 {appRoutines.length}개</span>
+                    <button onClick={applyRtn} style={pill(color,'#fff',true)}>적용</button>
+                  </div>
+                )}
+
+                {/* todo lists */}
+                {CATS.map((cat,idx)=>{
+                  const list=items.map((it,gi)=>it.category===cat?{...it,gi}:null).filter(Boolean);
                   return (
-                    <div key={cat} style={{marginBottom:'1rem'}}>
-                      <div style={{fontWeight:'600', marginBottom:'.5rem', fontSize:'.8rem', color:'#999', letterSpacing:'.05em'}}>{cat}</div>
-                      <div id={`todo-list-${cat.replace(/\s+/g,'-')}`}>
+                    <div key={cat} style={{marginBottom:'.7rem'}}>
+                      <span style={sectionLabel()}>{cat}</span>
+                      <div id={`tl-${cat.replace(/\s+/g,'-')}`}>
                         {list.map(item=>(
-                          <div key={item.index} style={{display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'.25rem'}}>
-                            {editMode && <span className="drag-handle">≡</span>}
-                            <span onClick={e=>toggleState(item.index,e)} style={{cursor:'pointer', fontFamily:'monospace', color}}>
-                              {BULLET[item.state]}
-                            </span>
-                            <span className={item.state===1?'completed':''} style={{flex:1, whiteSpace:'pre-wrap'}}>{item.text}</span>
-                            {editMode && (
+                          <div key={item.gi} style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0'}}>
+                            {editMode&&<span className="drag-handle">≡</span>}
+                            <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem'}}>{BULLET[item.state]}</span>
+                            <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6}}>{item.text}</span>
+                            {editMode&&(
                               <>
-                                <button className="edit-delete-btn" onClick={()=>editItem(item.index)}>Edit</button>
-                                <button className="edit-delete-btn" onClick={()=>deleteItem(item.index)}>Delete</button>
+                                <button className="icon-btn" onClick={()=>editItem(item.gi)}>edit</button>
+                                <button className="icon-btn" onClick={()=>delItem(item.gi)}>✕</button>
                               </>
                             )}
                           </div>
                         ))}
+                        {list.length===0&&<div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
                       </div>
-                      {idx<CATEGORIES.length-1 && <hr style={{borderTop:`1px solid ${color}`, margin:'.75rem 0', borderBottom:'none'}}/>}
+                      {idx<CATS.length-1&&(
+                        <div style={{borderTop:`1px solid ${color}22`,margin:'.6rem 0'}}/>
+                      )}
                     </div>
                   );
                 })}
 
-                {/* 하단 버튼 */}
-                <div style={{display:'flex', gap:'.5rem', marginTop:'1rem'}}>
-                  {items.length>0 && (
-                    <button onClick={exportAsImage} style={{
-                      flex:1, padding:'.5rem', background:color,
-                      color:'#fff', border:'none', borderRadius:'.25rem', cursor:'pointer'
-                    }}>Export as Image</button>
+                {/* bottom actions */}
+                <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
+                  {items.length>0&&(
+                    <button onClick={exportImg} style={pill(color,'#fff')}>Export</button>
                   )}
-                  <button onClick={()=>setEditMode(v=>!v)} style={{
-                    flex: items.length>0?'unset':1, padding:'.5rem', fontSize:'.875rem',
-                    background: editMode?'#ddd':'#f0f0f0', border:'none', borderRadius:'.25rem', cursor:'pointer'
-                  }}>{editMode?'Done':'Edit'}</button>
+                  <button onClick={()=>setShowRtn(true)} style={pill('#f5f5f5','#aaa')}>루틴</button>
+                  <div style={{flex:1}}/>
+                  <button onClick={()=>setEditMode(v=>!v)} style={pill(editMode?'#e8e8e8':'#f5f5f5',editMode?'#555':'#bbb')}>
+                    {editMode?'Done':'Edit'}
+                  </button>
                 </div>
               </div>
 
-              {/* 영수증 카드 - 화면 밖에 렌더링, Export 전용 */}
-              <ExportCard dateLabel={dateLabel} noteText={noteText} items={items} color={color} />
+              {/* off-screen export card */}
+              <XCard dlabel={dlabel} noteText={noteText} items={items} color={color}/>
             </>
           )}
 
-          {/* ── JOURNAL 탭 ── */}
-          {activeTab==='journal' && (
-            <JournalTab dateLabel={dateLabel} journal={journal} color={color} onSave={saveJournal} />
+          {/* ── JOURNAL ── */}
+          {tab==='journal'&&(
+            <JournalTab dlabel={dlabel} journal={journal} color={color} onSave={saveJournal}/>
+          )}
+
+          {/* ── WEEK ── */}
+          {tab==='week'&&(
+            <WeekTab dColors={dColors} accent={accent}/>
           )}
 
         </div>
-      </div>
+      </main>
 
-      {/* 데미안 위젯 */}
-      <DiscordBotWidget />
+      {/* modals & widgets */}
+      {showRtn&&<RoutineModal routines={routines} onClose={()=>setShowRtn(false)}/>}
+      <MusicWidget/>
+      <DemianWidget/>
     </div>
   );
 }
 
 
-// ═══════════════════════════════════════════════════════════════
-// ExportCard  (영수증/카드 스타일, 화면 밖 렌더링)
-// ═══════════════════════════════════════════════════════════════
-function ExportCard({ dateLabel, noteText, items, color }) {
-  const done  = items.filter(it=>it.state===1).length;
-  const total = items.length;
-
-  const tickEdge = (flip=false) => ({
-    height: '14px',
-    background: 'repeating-linear-gradient(90deg, #f0f0f0 0 8px, #fff 8px 16px)',
-    borderTop:    flip ? '1px dashed #ddd' : 'none',
-    borderBottom: flip ? 'none' : '1px dashed #ddd',
+/* ══════════════════════════════════════════════════════════
+   XCard  (export, off-screen)
+══════════════════════════════════════════════════════════ */
+function XCard({dlabel,noteText,items,color}) {
+  const done=items.filter(it=>it.state===1).length, total=items.length;
+  const edge=(flip)=>({
+    height:'11px',
+    background:'repeating-linear-gradient(90deg,#efefef 0 7px,#fff 7px 14px)',
+    borderTop:flip?'1px dashed #e0e0e0':'none',
+    borderBottom:flip?'none':'1px dashed #e0e0e0',
   });
-
   return (
-    <div id="export-card" style={{
-      position:'fixed', left:'-9999px', top:0,
-      fontFamily:'HJSS, sans-serif',
-      background:'#fff',
-      width:'380px',
-    }}>
-      {/* 상단 톱니 */}
-      <div style={tickEdge()} />
-
-      <div style={{padding:'1.75rem 2rem'}}>
-        {/* 헤더 */}
-        <div style={{textAlign:'center', marginBottom:'1.25rem'}}>
-          <div style={{fontSize:'.65rem', letterSpacing:'.25em', color:'#ccc', marginBottom:'.35rem'}}>𝐝 : ᴛᴏᴅᴏ</div>
-          <div style={{fontSize:'.9rem', fontWeight:'bold', color:'#333'}}>{dateLabel}</div>
-          {noteText && (
-            <div style={{fontSize:'.8rem', color, fontWeight:'bold', marginTop:'.5rem', whiteSpace:'pre-wrap', lineHeight:1.5}}>{noteText}</div>
-          )}
+    <div id="xcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'350px'}}>
+      <div style={edge(false)}/>
+      <div style={{padding:'1.75rem 2rem 1.5rem'}}>
+        <div style={{textAlign:'center',marginBottom:'1rem'}}>
+          <div style={{fontSize:'.58rem',letterSpacing:'.25em',color:'#d0d0d0',marginBottom:'.3rem'}}>𝐝 : ᴛᴏᴅᴏ</div>
+          <div style={{fontSize:'.85rem',fontWeight:'bold',color:'#333'}}>{dlabel}</div>
+          {noteText&&<div style={{fontSize:'.78rem',color,fontWeight:'bold',marginTop:'.45rem',whiteSpace:'pre-wrap',lineHeight:1.55}}>{noteText}</div>}
         </div>
-
-        <div style={{borderTop:`1px dashed ${color}`, marginBottom:'1.1rem'}}/>
-
-        {/* 카테고리별 항목 */}
-        {CATEGORIES.map((cat, idx)=>{
-          const list = items.filter(it=>it.category===cat);
+        <div style={{borderTop:`1px dashed ${color}`,marginBottom:'.9rem'}}/>
+        {CATS.map((cat,idx)=>{
+          const list=items.filter(it=>it.category===cat);
           if (!list.length) return null;
           return (
-            <div key={cat} style={{marginBottom:'.9rem'}}>
-              <div style={{fontSize:'.65rem', letterSpacing:'.12em', color:'#bbb', marginBottom:'.35rem', textTransform:'uppercase'}}>{cat}</div>
-              {list.map((item,i)=>(
-                <div key={i} style={{display:'flex', gap:'.45rem', marginBottom:'.2rem', fontSize:'.85rem', lineHeight:1.5}}>
-                  <span style={{color, fontFamily:'monospace', flexShrink:0}}>{BULLET[item.state]}</span>
-                  <span style={{
-                    color: item.state===1?'#ccc':'#333', flex:1, whiteSpace:'pre-wrap',
-                    textDecoration: item.state===1?'line-through':'none'
-                  }}>{item.text}</span>
+            <div key={cat} style={{marginBottom:'.75rem'}}>
+              <div style={{fontSize:'.58rem',letterSpacing:'.12em',color:'#ccc',marginBottom:'.3rem'}}>{cat}</div>
+              {list.map((it,i)=>(
+                <div key={i} style={{display:'flex',gap:'.4rem',marginBottom:'.2rem',fontSize:'.82rem',lineHeight:1.55}}>
+                  <span style={{color,fontFamily:'monospace',flexShrink:0}}>{BULLET[it.state]}</span>
+                  <span style={{color:it.state===1?'#ccc':'#333',flex:1,whiteSpace:'pre-wrap',textDecoration:it.state===1?'line-through':'none'}}>{it.text}</span>
                 </div>
               ))}
-              {idx<CATEGORIES.length-1 && <div style={{borderTop:'1px dashed #eee', marginTop:'.5rem'}}/>}
+              {idx<CATS.length-1&&<div style={{borderTop:'1px dashed #f0f0f0',marginTop:'.5rem'}}/>}
             </div>
           );
         })}
-
-        {/* 푸터 */}
-        <div style={{borderTop:`1px dashed ${color}`, paddingTop:'.75rem', marginTop:'.5rem'}}>
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'.7rem', color:'#bbb'}}>
+        <div style={{borderTop:`1px dashed ${color}`,paddingTop:'.65rem',marginTop:'.3rem'}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:'.65rem',color:'#ccc'}}>
             <span>{done} / {total} completed</span>
-            <span style={{letterSpacing:'.08em'}}>nagi-todo</span>
+            <span style={{letterSpacing:'.06em'}}>nagi-todo</span>
           </div>
         </div>
       </div>
-
-      {/* 하단 톱니 */}
-      <div style={tickEdge(true)} />
+      <div style={edge(true)}/>
     </div>
   );
 }
 
 
-// ═══════════════════════════════════════════════════════════════
-// JournalTab
-// ═══════════════════════════════════════════════════════════════
-function JournalTab({ dateLabel, journal, color, onSave }) {
-  const [morningEdit, setMorningEdit] = React.useState(false);
-  const [eveningEdit, setEveningEdit] = React.useState(false);
-  const [morningText, setMorningText] = React.useState('');
-  const [eveningText, setEveningText] = React.useState('');
+/* ══════════════════════════════════════════════════════════
+   JournalTab
+══════════════════════════════════════════════════════════ */
+function JournalTab({dlabel,journal,color,onSave}) {
+  const [mEdit,setMEdit]=React.useState(false);
+  const [eEdit,setEEdit]=React.useState(false);
+  const [mText,setMText]=React.useState('');
+  const [eText,setEText]=React.useState('');
+  React.useEffect(()=>setMText(journal.morning||''),[journal.morning]);
+  React.useEffect(()=>setEText(journal.evening||''),[journal.evening]);
 
-  React.useEffect(()=>{ setMorningText(journal.morning||''); }, [journal.morning]);
-  React.useEffect(()=>{ setEveningText(journal.evening||''); }, [journal.evening]);
+  const VIEW={whiteSpace:'pre-wrap',fontSize:'.9rem',color:'#444',lineHeight:1.8,minHeight:'5rem',cursor:'text',paddingBottom:'.25rem'};
+  const TA  ={width:'100%',border:'1px solid #eee',padding:'.5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.8,background:'#fafafa'};
 
-  const sectionLabel = text => ({
-    fontSize:'.65rem', letterSpacing:'.2em', color:'#bbb', marginBottom:'.5rem', display:'block'
-  });
-  const noteStyle = {
-    whiteSpace:'pre-wrap', fontSize:'.9rem', color:'#333', cursor:'text',
-    minHeight:'4rem', lineHeight:1.7, padding:'.25rem 0'
-  };
-  const taStyle = {
-    width:'100%', border:'1px solid #e0e0e0', padding:'.5rem',
-    borderRadius:'.25rem', resize:'vertical', fontFamily:'inherit', fontSize:'.9rem', lineHeight:1.7
-  };
-
-  function saveAndClose(field, value, setEdit) {
-    onSave(field, value.trim());
-    setEdit(false);
-  }
+  function save(f,t,se){ onSave(f,t.trim()); se(false); }
 
   return (
-    <div style={{background:'#fff', borderRadius:'.5rem', boxShadow:'0 2px 5px rgba(0,0,0,0.1)', padding:'1.5rem'}}>
-      <h2 style={{fontSize:'1.25rem', fontWeight:'bold', marginBottom:'1.5rem'}}>{dateLabel}</h2>
+    <div style={CARD}>
+      <h2 style={{fontSize:'1rem',fontWeight:'bold',marginBottom:'1.5rem',color:'#222'}}>{dlabel}</h2>
 
-      {/* 모닝 페이지 */}
-      <div style={{marginBottom:'1.5rem'}}>
-        <span style={sectionLabel()}>ᴍᴏʀɴɪɴɢ</span>
-        {(!morningEdit && morningText.trim()) ? (
-          <div style={noteStyle}
-            onDoubleClick={()=>setMorningEdit(true)}
-            onContextMenu={e=>{e.preventDefault();setMorningEdit(true);}}
-          >{morningText}</div>
-        ) : (
-          <textarea autoFocus={morningEdit} value={morningText}
-            onChange={e=>setMorningText(e.target.value)}
-            onFocus={()=>setMorningEdit(true)}
-            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); saveAndClose('morning',morningText,setMorningEdit); }}}
-            placeholder="오늘 아침의 생각을 자유롭게 써봐. (Enter 저장, Shift+Enter 줄바꿈)"
-            rows={5} style={taStyle}
-          />
-        )}
-      </div>
+      <span style={sectionLabel()}>ᴍᴏʀɴɪɴɢ</span>
+      {(!mEdit&&mText.trim()) ? (
+        <div style={VIEW} onDoubleClick={()=>setMEdit(true)} onContextMenu={e=>{e.preventDefault();setMEdit(true);}}>{mText}</div>
+      ):(
+        <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
+          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장, Shift+Enter 줄바꿈)" rows={5} style={TA}/>
+      )}
 
-      <hr style={{borderTop:`1px solid ${color}`, borderBottom:'none', margin:'1rem 0'}}/>
+      <div style={{borderTop:`1px solid ${color}20`,margin:'1.25rem 0'}}/>
 
-      {/* 감사 일기 */}
-      <div style={{marginBottom:'1.5rem'}}>
-        <span style={sectionLabel()}>ᴇᴠᴇɴɪɴɢ · ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
-        {(!eveningEdit && eveningText.trim()) ? (
-          <div style={noteStyle}
-            onDoubleClick={()=>setEveningEdit(true)}
-            onContextMenu={e=>{e.preventDefault();setEveningEdit(true);}}
-          >{eveningText}</div>
-        ) : (
-          <textarea autoFocus={eveningEdit} value={eveningText}
-            onChange={e=>setEveningText(e.target.value)}
-            onFocus={()=>setEveningEdit(true)}
-            onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); saveAndClose('evening',eveningText,setEveningEdit); }}}
-            placeholder="오늘 감사했던 것들을 적어봐. (Enter 저장, Shift+Enter 줄바꿈)"
-            rows={5} style={taStyle}
-          />
-        )}
-      </div>
+      <span style={sectionLabel()}>ᴇᴠᴇɴɪɴɢ · ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
+      {(!eEdit&&eText.trim()) ? (
+        <div style={VIEW} onDoubleClick={()=>setEEdit(true)} onContextMenu={e=>{e.preventDefault();setEEdit(true);}}>{eText}</div>
+      ):(
+        <textarea autoFocus={eEdit} value={eText} onChange={e=>setEText(e.target.value)} onFocus={()=>setEEdit(true)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('evening',eText,setEEdit);}}}
+          placeholder="오늘 감사했던 것들을 적어봐. (Enter 저장, Shift+Enter 줄바꿈)" rows={5} style={TA}/>
+      )}
 
-      <hr style={{borderTop:`1px solid ${color}`, borderBottom:'none', margin:'1rem 0'}}/>
+      <div style={{borderTop:`1px solid ${color}20`,margin:'1.25rem 0'}}/>
 
-      {/* 무드 트래커 */}
-      <div>
-        <span style={sectionLabel()}>ᴍᴏᴏᴅ</span>
-        <div style={{display:'flex', gap:'1rem'}}>
-          {MOOD_OPTIONS.map(({emoji, label})=>(
-            <button key={label}
-              onClick={()=>onSave('mood', journal.mood===label ? null : label)}
-              title={label}
-              style={{
-                fontSize:'1.6rem', background:'none', border:'none', cursor:'pointer', padding:0,
-                opacity: (!journal.mood || journal.mood===label) ? 1 : 0.25,
-                transform: journal.mood===label ? 'scale(1.35)' : 'scale(1)',
-                transition:'all 0.15s ease'
-              }}
-            >{emoji}</button>
-          ))}
-        </div>
+      <span style={sectionLabel()}>ᴍᴏᴏᴅ</span>
+      <div style={{display:'flex',gap:'.65rem'}}>
+        {MOODS.map(({e,l})=>(
+          <button key={l} onClick={()=>onSave('mood',journal.mood===l?null:l)} title={l} style={{
+            fontSize:'1.4rem',background:'none',border:'none',cursor:'pointer',padding:0,
+            opacity:(!journal.mood||journal.mood===l)?1:0.18,
+            transform:journal.mood===l?'scale(1.3)':'scale(1)',
+            transition:'all .15s ease',
+          }}>{e}</button>
+        ))}
       </div>
     </div>
   );
 }
 
 
-// ═══════════════════════════════════════════════════════════════
-// DiscordBotWidget  (집중 메시지 위젯 + 설정)
-// ═══════════════════════════════════════════════════════════════
-function DiscordBotWidget() {
-  const [isVisible,    setIsVisible]    = React.useState(false);
-  const [lastMessage,  setLastMessage]  = React.useState('');
-  const [isOnline,     setIsOnline]     = React.useState(false);
-  const [showSettings, setShowSettings] = React.useState(false);
-  const [schedule,     setSchedule]     = React.useState(loadSchedule);
-  const [editSched,    setEditSched]    = React.useState(loadSchedule);
+/* ══════════════════════════════════════════════════════════
+   WeekTab
+══════════════════════════════════════════════════════════ */
+function WeekTab({dColors,accent}) {
+  const [data,setData]=React.useState(null);
 
-  const isFocusTime = React.useCallback(() => {
-    const now = new Date();
-    const range = schedule[now.getDay()];
-    return range && now.getHours() >= range.start && now.getHours() < range.end;
-  }, [schedule]);
+  React.useEffect(()=>{
+    const today=new Date(), dow=today.getDay();
+    const mon=new Date(today); mon.setDate(today.getDate()+(dow===0?-6:1-dow));
+    const days=Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+    Promise.all(days.map(async d=>{
+      const k=d.toLocaleDateString('sv-SE');
+      const [t,j,n]=await Promise.all([
+        db.ref('todos/'+k).once('value'),
+        db.ref('journal/'+k).once('value'),
+        db.ref('notes/'+k).once('value'),
+      ]);
+      const todos=t.val()||[];
+      return {date:d,key:k,todos,journal:j.val()||{},note:n.val()||'',total:todos.length,done:todos.filter(it=>it.state===1).length};
+    })).then(setData);
+  },[]);
 
-  React.useEffect(() => {
-    const update = async () => {
-      const online = isFocusTime();
-      setIsOnline(online);
-      if (online) {
+  if (!data) return <div style={{...CARD,textAlign:'center',padding:'3rem',color:'#ccc',fontSize:'.85rem'}}>Loading...</div>;
+
+  const todayKey=new Date().toLocaleDateString('sv-SE');
+  const tDone=data.reduce((s,d)=>s+d.done,0);
+  const tItems=data.reduce((s,d)=>s+d.total,0);
+  const pct=tItems?Math.round(tDone/tItems*100):0;
+  const catStats=CATS.map(cat=>{ const ci=data.flatMap(d=>d.todos.filter(t=>t.category===cat)); return {cat,total:ci.length,done:ci.filter(t=>t.state===1).length}; });
+
+  return (
+    <div style={CARD}>
+      {/* summary */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:'1.25rem'}}>
+        <div>
+          <span style={sectionLabel({marginBottom:'.2rem'})}>ᴡᴇᴇᴋʟʏ ʀᴇᴠɪᴇᴡ</span>
+          <div style={{fontSize:'.78rem',color:'#bbb'}}>{tDone} / {tItems} completed</div>
+        </div>
+        <div style={{fontSize:'2.4rem',fontWeight:'bold',color:accent,lineHeight:1}}>
+          {pct}<span style={{fontSize:'1rem',color:'#ccc'}}>%</span>
+        </div>
+      </div>
+
+      {/* category bars */}
+      <div style={{display:'flex',gap:'.4rem',marginBottom:'1.35rem'}}>
+        {catStats.map(({cat,total,done})=>{
+          const c=CAT_HUE[cat]||accent, p=total?Math.round(done/total*100):0;
+          return (
+            <div key={cat} style={{flex:1,background:'#f8f8f8',borderRadius:'.5rem',padding:'.7rem .5rem',textAlign:'center'}}>
+              <div style={{fontSize:'.58rem',color:'#bbb',marginBottom:'.25rem',lineHeight:1.4}}>{cat}</div>
+              <div style={{fontSize:'1.05rem',fontWeight:'bold',color:c,marginBottom:'.3rem'}}>{p}%</div>
+              <div style={{height:'2px',background:'#ebebeb',borderRadius:'9999px',overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${p}%`,background:c,borderRadius:'9999px'}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{borderTop:'1px solid #f0f0f0',marginBottom:'1rem'}}/>
+
+      {/* day rows */}
+      {data.map(({date,key,total,done,journal,note})=>{
+        const c=dColors[key]||accent, ratio=total?done/total:0;
+        const isToday=key===todayKey, isFut=key>todayKey;
+        const mood=MOODS.find(m=>m.l===journal.mood);
+        return (
+          <div key={key} style={{
+            padding:'.5rem .65rem',borderRadius:'.4rem',marginBottom:'.3rem',
+            border:`1.5px solid ${isToday?c:'transparent'}`,
+            background:isToday?`${c}07`:'transparent',
+            opacity:isFut?0.32:1,
+          }}>
+            <div style={{display:'flex',alignItems:'center',gap:'.55rem'}}>
+              <div style={{minWidth:'4.2rem',display:'flex',gap:'.3rem',alignItems:'baseline'}}>
+                <span style={{fontSize:'.67rem',color:'#bbb'}}>{date.toLocaleString('en-US',{weekday:'short'})}</span>
+                <span style={{fontSize:'.88rem',fontWeight:isToday?'bold':'500',color:isToday?c:'#333'}}>{date.getDate()}</span>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{height:'2.5px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${ratio*100}%`,background:c,borderRadius:'9999px',transition:'width .5s'}}/>
+                </div>
+              </div>
+              <span style={{fontSize:'.7rem',color:'#bbb',minWidth:'2rem',textAlign:'right'}}>{total?`${done}/${total}`:'—'}</span>
+              <span style={{fontSize:'.95rem',opacity:mood?1:0.12}}>{mood?mood.e:'·'}</span>
+            </div>
+            {note&&!isFut&&(
+              <div style={{fontSize:'.7rem',color:'#bbb',marginTop:'.22rem',paddingLeft:'4.9rem',fontStyle:'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                "{note}"
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   RoutineModal
+══════════════════════════════════════════════════════════ */
+function RoutineModal({routines,onClose}) {
+  const [text,setText]=React.useState('');
+  const [cat,setCat]=React.useState(CATS[0]);
+  const [freq,setFreq]=React.useState('daily');
+  const [wd,setWd]=React.useState(1);
+
+  function add() {
+    if (!text.trim()) return;
+    const r={text:text.trim(),category:cat,freq};
+    if (freq==='weekly') r.weekday=wd;
+    db.ref('routines').push(r); setText('');
+  }
+
+  const inp={border:'1px solid #eee',borderRadius:'.375rem',padding:'.38rem .55rem',fontFamily:'inherit',fontSize:'.82rem',background:'#fff',outline:'none'};
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.22)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={onClose}>
+      <div style={{...CARD,width:'100%',maxWidth:'350px',maxHeight:'78vh',overflow:'auto'}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <span style={sectionLabel({marginBottom:0})}>ʀᴏᴜᴛɪɴᴇ</span>
+          <button onClick={onClose} className="icon-btn" style={{fontSize:'1rem'}}>✕</button>
+        </div>
+
+        {routines.length===0&&(
+          <div style={{textAlign:'center',color:'#e0e0e0',fontSize:'.85rem',padding:'1rem 0 .5rem'}}>등록된 루틴이 없어.</div>
+        )}
+        {routines.map(r=>(
+          <div key={r.id} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.45rem .55rem',background:'#f8f8f8',borderRadius:'.4rem',marginBottom:'.3rem'}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:'.84rem',color:'#333'}}>{r.text}</div>
+              <div style={{fontSize:'.68rem',color:'#bbb',marginTop:'.1rem'}}>{r.category} · {r.freq==='daily'?'매일':`매주 ${WEEK_KO[r.weekday]}요일`}</div>
+            </div>
+            <button onClick={()=>db.ref('routines/'+r.id).remove()} className="icon-btn">✕</button>
+          </div>
+        ))}
+
+        {routines.length>0&&<div style={{borderTop:'1px solid #f0f0f0',margin:'.75rem 0'}}/>}
+
+        <span style={sectionLabel()}>새 루틴 추가</span>
+        <input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="할 일 내용"
+          style={{...inp,width:'100%',marginBottom:'.4rem',display:'block'}}/>
+        <div style={{display:'flex',gap:'.4rem',marginBottom:'.4rem'}}>
+          <select value={cat} onChange={e=>setCat(e.target.value)} style={{...inp,flex:2}}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+          <select value={freq} onChange={e=>setFreq(e.target.value)} style={{...inp,flex:1}}>
+            <option value="daily">매일</option>
+            <option value="weekly">매주</option>
+          </select>
+        </div>
+        {freq==='weekly'&&(
+          <select value={wd} onChange={e=>setWd(parseInt(e.target.value))} style={{...inp,width:'100%',marginBottom:'.4rem',display:'block'}}>
+            {WEEK_KO.map((l,i)=><option key={i} value={i}>{l}요일</option>)}
+          </select>
+        )}
+        <button onClick={add} style={{...pill('#222','#fff'),width:'100%',padding:'.48rem',borderRadius:'.4rem',display:'block'}}>추가</button>
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   MusicWidget
+══════════════════════════════════════════════════════════ */
+function MusicWidget() {
+  const [open,   setOpen]   = React.useState(false);
+  const [input,  setInput]  = React.useState('');
+  const [embed,  setEmbed]  = React.useState(()=>localStorage.getItem('ytembed')||'');
+  const [urlBar, setUrlBar] = React.useState(false);
+
+  function apply() {
+    const u=ytEmbed(input);
+    if (u) { setEmbed(u); localStorage.setItem('ytembed',u); setUrlBar(false); setInput(''); }
+    else alert('유효한 YouTube URL을 넣어줘.');
+  }
+  function clear() { setEmbed(''); localStorage.removeItem('ytembed'); }
+
+  return (
+    <div style={{position:'fixed',bottom:'20px',left:'20px',zIndex:1000}}>
+      {/* pill toggle */}
+      <button onClick={()=>{setOpen(v=>!v);}} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#1a1a1a',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 4px 18px rgba(0,0,0,0.22)',
+        fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'12px',color:embed?'#fff':'#4a4a4a'}}>♪</span>
+        <span style={{fontSize:'10px',color:'#4a4a4a',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
+      </button>
+
+      {/* player panel */}
+      {open&&(
+        <div style={{
+          position:'absolute',bottom:'42px',left:0,width:'290px',
+          background:'#181818',borderRadius:'12px',overflow:'hidden',
+          boxShadow:'0 10px 36px rgba(0,0,0,0.4)',
+        }}>
+          {/* panel header */}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px'}}>
+            <span style={{fontSize:'9px',color:'#444',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
+            <div style={{display:'flex',gap:'10px',alignItems:'center'}}>
+              <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:'#555',cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit'}}>URL</button>
+              {embed&&<button onClick={clear} style={{background:'none',border:'none',color:'#444',cursor:'pointer',fontSize:'10px',padding:0}}>✕</button>}
+            </div>
+          </div>
+
+          {/* url bar */}
+          {urlBar&&(
+            <div style={{display:'flex',gap:'6px',padding:'0 10px 10px'}}>
+              <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&apply()}
+                placeholder="YouTube / YouTube Music URL"
+                style={{flex:1,background:'#252525',border:'1px solid #2e2e2e',borderRadius:'6px',padding:'.3rem .55rem',color:'#ccc',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
+              />
+              <button onClick={apply} style={{background:'#2a2a2a',border:'1px solid #333',borderRadius:'6px',color:'#666',cursor:'pointer',fontSize:'11px',padding:'0 .5rem'}}>→</button>
+            </div>
+          )}
+
+          {/* iframe or placeholder */}
+          {embed ? (
+            <div style={{lineHeight:0,background:'#000'}}>
+              <iframe src={embed} width="290" height="163" frameBorder="0"
+                allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
+                style={{display:'block'}}/>
+            </div>
+          ):(
+            <div style={{height:'108px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'7px'}}>
+              <span style={{fontSize:'20px',opacity:.25,color:'#fff'}}>♪</span>
+              <span style={{fontSize:'10px',color:'#3a3a3a',textAlign:'center',lineHeight:1.6}}>YouTube URL을 붙여넣어봐.<br/>음악도, 플레이리스트도 돼.</span>
+              <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#242424',border:'none',borderRadius:'6px',color:'#555',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>URL 입력</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   DemianWidget
+══════════════════════════════════════════════════════════ */
+function DemianWidget() {
+  const [vis,    setVis]    = React.useState(false);
+  const [msg,    setMsg]    = React.useState('');
+  const [online, setOnline] = React.useState(false);
+  const [cfg,    setCfg]    = React.useState(false);
+  const [sched,  setSched]  = React.useState(loadSched);
+  const [edit,   setEdit]   = React.useState(loadSched);
+
+  const isFocus=React.useCallback(()=>{ const n=new Date(),r=sched[n.getDay()]; return r&&n.getHours()>=r.s&&n.getHours()<r.e; },[sched]);
+
+  React.useEffect(()=>{
+    const run=async()=>{
+      const on=isFocus(); setOnline(on);
+      if (on) {
         try {
-          const res  = await fetch("https://raw.githubusercontent.com/nagi-00/nagi-todo/main/demian_focus_messages.json");
-          const data = await res.json();
-          setLastMessage(data.messages[Math.floor(Math.random()*data.messages.length)]);
-        } catch { setLastMessage("메시지를 불러오지 못했어."); }
+          const res=await fetch("https://raw.githubusercontent.com/nagi-00/nagi-todo/main/demian_focus_messages.json");
+          const d=await res.json();
+          setMsg(d.messages[Math.floor(Math.random()*d.messages.length)]);
+        } catch { setMsg("메시지를 불러오지 못했어."); }
       }
     };
-    update();
-    const t = setInterval(update, 60000);
-    return () => clearInterval(t);
-  }, [isFocusTime]);
+    run(); const t=setInterval(run,60000); return()=>clearInterval(t);
+  },[isFocus]);
 
-  function openSettings() { setEditSched({...schedule}); setShowSettings(true); }
+  function save() { setSched(edit); localStorage.setItem('focusSched',JSON.stringify(edit)); setCfg(false); }
+  function upd(d,f,v) { const n=parseInt(v,10); if(isNaN(n)||n<0||n>23) return; setEdit(p=>({...p,[d]:{...(p[d]||{s:0,e:0}),[f]:n}})); }
+  function tog(d) { setEdit(p=>{ const n={...p}; n[d]?delete n[d]:n[d]=DEF_SCHED[d]||{s:6,e:18}; return n; }); }
 
-  function saveSettings() {
-    setSchedule(editSched);
-    localStorage.setItem('focusSchedule', JSON.stringify(editSched));
-    setShowSettings(false);
-  }
-
-  function updateDay(day, field, raw) {
-    const v = parseInt(raw, 10);
-    if (isNaN(v) || v<0 || v>23) return;
-    setEditSched(prev => ({...prev, [day]: {...(prev[day]||{start:0,end:0}), [field]: v}}));
-  }
-
-  function toggleDay(day) {
-    setEditSched(prev => {
-      const next = {...prev};
-      if (next[day]) { delete next[day]; }
-      else { next[day] = DEFAULT_SCHEDULE[day] || {start:6, end:18}; }
-      return next;
-    });
-  }
-
-  const inputStyle = {
-    width:'3.2rem', padding:'.2rem .3rem', border:'1px solid #e0e0e0',
-    borderRadius:'4px', textAlign:'center', fontSize:'12px', fontFamily:'inherit'
-  };
+  const numInp={width:'2.9rem',padding:'.2rem',border:'1px solid #eee',borderRadius:'4px',textAlign:'center',fontSize:'10px',fontFamily:'inherit',outline:'none'};
 
   return (
     <>
-      {/* 플로팅 버튼 */}
-      <div onClick={()=>{ setIsVisible(v=>!v); if(isVisible) setShowSettings(false); }} style={{
-        position:'fixed', bottom:'20px', right:'20px',
-        width:'56px', height:'56px', borderRadius:'50%',
-        background: isOnline ? '#CECECE' : '#ddd',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        cursor:'pointer', zIndex:1000,
-        boxShadow:'0 4px 14px rgba(0,0,0,0.15)',
-        transition:'background 0.3s'
+      <div onClick={()=>{setVis(v=>!v);if(vis)setCfg(false);}} style={{
+        position:'fixed',bottom:'20px',right:'20px',
+        width:'50px',height:'50px',borderRadius:'50%',
+        background:online?'#b8b8b8':'#d8d8d8',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        cursor:'pointer',zIndex:1000,
+        boxShadow:'0 4px 16px rgba(0,0,0,0.14)',
+        transition:'background .3s',
       }}>
-        <span style={{fontSize:'22px'}}>🖤</span>
+        <span style={{fontSize:'19px'}}>🖤</span>
       </div>
 
-      {/* 팝업 */}
-      {isVisible && (
+      {vis&&(
         <div style={{
-          position:'fixed', bottom:'86px', right:'20px', width:'280px',
-          background:'#fff', borderRadius:'14px', padding:'18px 20px',
-          boxShadow:'0 8px 28px rgba(0,0,0,0.13)', zIndex:999
+          position:'fixed',bottom:'80px',right:'20px',width:'265px',
+          background:'#fff',borderRadius:'12px',padding:'15px 17px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',zIndex:999,
         }}>
-          {/* 설정 버튼 */}
-          <button onClick={e=>{e.stopPropagation(); showSettings ? setShowSettings(false) : openSettings();}} style={{
-            position:'absolute', top:'12px', right:'14px',
-            background:'none', border:'none', cursor:'pointer',
-            fontSize:'.7rem', color:'#ccc', padding:0
+          <button onClick={e=>{e.stopPropagation();cfg?setCfg(false):(setEdit({...sched}),setCfg(true));}} style={{
+            position:'absolute',top:'10px',right:'13px',
+            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#ccc',padding:0,fontFamily:'inherit'
           }}>⚙ 설정</button>
 
-          {showSettings ? (
-            /* ── 설정 패널 ── */
+          {cfg?(
             <div>
-              <div style={{fontWeight:'bold', fontSize:'14px', marginBottom:'.9rem'}}>위젯 설정</div>
-              <div style={{fontSize:'11px', color:'#bbb', marginBottom:'.6rem'}}>요일별 집중 시간 (24시 기준)</div>
-
-              {[1,2,3,4,5].map(day=>(
-                <div key={day} style={{display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.45rem'}}>
-                  {/* 토글 */}
-                  <button onClick={()=>toggleDay(day)} style={{
-                    width:'1.6rem', height:'1rem', borderRadius:'9999px', border:'none', cursor:'pointer', padding:0, flexShrink:0,
-                    background: editSched[day] ? '#555' : '#ddd',
-                    position:'relative', transition:'background .2s'
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.7rem'}}>위젯 설정</div>
+              <div style={{fontSize:'10px',color:'#ccc',marginBottom:'.5rem'}}>요일별 집중 시간 (24시)</div>
+              {[1,2,3,4,5].map(d=>(
+                <div key={d} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.38rem'}}>
+                  <button onClick={()=>tog(d)} style={{
+                    width:'1.4rem',height:'.85rem',borderRadius:'9999px',border:'none',cursor:'pointer',padding:0,flexShrink:0,
+                    background:edit[d]?'#444':'#e8e8e8',position:'relative',transition:'background .2s',
                   }}>
-                    <span style={{
-                      position:'absolute', top:'1px',
-                      left: editSched[day] ? '8px' : '1px',
-                      width:'calc(1rem - 4px)', height:'calc(1rem - 4px)',
-                      borderRadius:'50%', background:'#fff', transition:'left .2s'
-                    }}/>
+                    <span style={{position:'absolute',top:'1px',left:edit[d]?'6px':'1px',width:'calc(.85rem - 4px)',height:'calc(.85rem - 4px)',borderRadius:'50%',background:'#fff',transition:'left .2s'}}/>
                   </button>
-                  <span style={{width:'1.5rem', fontSize:'13px', fontWeight:'600', color: editSched[day]?'#333':'#bbb'}}>{DAY_LABELS[day]}</span>
-                  {editSched[day] ? (
+                  <span style={{width:'1.2rem',fontSize:'11px',fontWeight:'600',color:edit[d]?'#333':'#ccc'}}>{DAY_KO[d]}</span>
+                  {edit[d]?(
                     <>
-                      <input type="number" min="0" max="23" value={editSched[day].start}
-                        onChange={e=>updateDay(day,'start',e.target.value)} style={inputStyle}/>
-                      <span style={{color:'#ccc', fontSize:'11px'}}>–</span>
-                      <input type="number" min="0" max="23" value={editSched[day].end}
-                        onChange={e=>updateDay(day,'end',e.target.value)} style={inputStyle}/>
-                      <span style={{color:'#bbb', fontSize:'11px'}}>시</span>
+                      <input type="number" min="0" max="23" value={edit[d].s} onChange={e=>upd(d,'s',e.target.value)} style={numInp}/>
+                      <span style={{color:'#ddd',fontSize:'9px'}}>–</span>
+                      <input type="number" min="0" max="23" value={edit[d].e} onChange={e=>upd(d,'e',e.target.value)} style={numInp}/>
+                      <span style={{color:'#ccc',fontSize:'9px'}}>시</span>
                     </>
-                  ) : (
-                    <span style={{fontSize:'11px', color:'#ccc'}}>휴일</span>
+                  ):(
+                    <span style={{fontSize:'9px',color:'#ccc'}}>휴일</span>
                   )}
                 </div>
               ))}
-
-              <div style={{display:'flex', gap:'.5rem', marginTop:'.9rem'}}>
-                <button onClick={()=>setShowSettings(false)} style={{
-                  flex:1, padding:'.35rem', background:'#f0f0f0', border:'none',
-                  borderRadius:'6px', cursor:'pointer', fontSize:'12px'
-                }}>취소</button>
-                <button onClick={saveSettings} style={{
-                  flex:1, padding:'.35rem', background:'#333', color:'#fff',
-                  border:'none', borderRadius:'6px', cursor:'pointer', fontSize:'12px'
-                }}>저장</button>
+              <div style={{display:'flex',gap:'.4rem',marginTop:'.65rem'}}>
+                <button onClick={()=>setCfg(false)} style={{...pill('#f5f5f5','#aaa',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>취소</button>
+                <button onClick={save} style={{...pill('#222','#fff',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>저장</button>
               </div>
             </div>
-          ) : isOnline ? (
-            /* ── 집중 메시지 ── */
+          ):online?(
             <>
-              <div style={{fontWeight:'bold', fontSize:'14px', marginBottom:'.4rem', letterSpacing:'.05em'}}>ᴅᴇᴍɪᴀɴ</div>
-              <div style={{fontSize:'13px', color:'#444', lineHeight:1.65}}>{lastMessage}</div>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.35rem',letterSpacing:'.05em'}}>ᴅᴇᴍɪᴀɴ</div>
+              <div style={{fontSize:'12px',color:'#555',lineHeight:1.7}}>{msg}</div>
             </>
-          ) : (
-            /* ── 휴식 중 ── */
+          ):(
             <>
-              <div style={{textAlign:'center', color:'#999', fontSize:'13px', marginBottom:'.5rem'}}>😴 휴식의 시간이야.</div>
-              <div style={{fontSize:'11px', textAlign:'center', color:'#bbb', lineHeight:1.9}}>
-                <div style={{fontWeight:'bold', marginBottom:'.2rem', letterSpacing:'.05em'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
-                {Object.entries(schedule).map(([d,r])=>(
-                  <div key={d}>{DAY_LABELS[d]} &nbsp;{String(r.start).padStart(2,'0')}:00 – {String(r.end).padStart(2,'0')}:00</div>
+              <div style={{textAlign:'center',color:'#aaa',fontSize:'12px',marginBottom:'.45rem'}}>😴 휴식의 시간이야.</div>
+              <div style={{fontSize:'10px',textAlign:'center',color:'#ccc',lineHeight:1.95}}>
+                <div style={{fontWeight:'bold',marginBottom:'.1rem',letterSpacing:'.04em',color:'#bbb'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
+                {Object.entries(sched).map(([d,r])=>(
+                  <div key={d}>{DAY_KO[d]}&nbsp;&nbsp;{String(r.s).padStart(2,'0')}:00 – {String(r.e).padStart(2,'0')}:00</div>
                 ))}
               </div>
             </>
