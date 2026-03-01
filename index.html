@@ -272,7 +272,11 @@ function App() {
           color:timePanel?'#fff':'#bbb',fontSize:'.7rem',display:'flex',alignItems:'center',justifyContent:'center',
           transition:'background .2s,color .2s',
         }}
-      >⊞</button>
+      >
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px',width:'10px',height:'10px'}}>
+          {[0,1,2,3].map(i=><div key={i} style={{background:timePanel?'#fff':'#ccc',borderRadius:'1px'}}/>)}
+        </div>
+      </button>
 
       {/* ═══ Sidebar ═══ */}
       <aside style={{
