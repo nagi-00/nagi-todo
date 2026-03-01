@@ -132,6 +132,7 @@ function App() {
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
   const [timePanel,  setTimePanel] = React.useState(false);
+  const [stickyOpen, setStickyOpen]= React.useState(false);
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -265,7 +266,7 @@ function App() {
       <button
         onClick={()=>setTimePanel(v=>!v)}
         style={{
-          position:'fixed',right:'1rem',top:'3.5rem',zIndex:100,
+          position:'fixed',right:'1rem',top:'3.5rem',zIndex:1002,
           background:timePanel?color:'#fff',border:'none',borderRadius:'9999px',
           width:'2rem',height:'2rem',cursor:'pointer',
           boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
@@ -546,13 +547,19 @@ function App() {
         </div>
       </main>
 
+      {/* click-outside overlay — closes all slide panels */}
+      {(sidebar||timePanel||stickyOpen)&&(
+        <div onClick={()=>{setSidebar(false);setTimePanel(false);setStickyOpen(false);}}
+          style={{position:'fixed',inset:0,zIndex:15}}/>
+      )}
+
       {/* modals & widgets */}
       {showRtn&&<RoutineModal routines={routines} onClose={()=>setShowRtn(false)}/>}
       <TimeBlockPanel dk={dk} color={color} open={timePanel} onClose={()=>setTimePanel(false)}/>
       <WeatherWidget color={color}/>
       <PomodoroWidget color={color}/>
       <MusicWidget color={color}/>
-      <StickyWidget color={color}/>
+      <StickyWidget color={color} open={stickyOpen} onOpen={()=>setStickyOpen(true)} onClose={()=>setStickyOpen(false)}/>
       <DemianWidget/>
     </div>
   );
@@ -1348,22 +1355,12 @@ function MusicWidget({color}) {
 /* ══════════════════════════════════════════════════════════
    StickyWidget  (floating memo pad — text + image)
 ══════════════════════════════════════════════════════════ */
-function StickyWidget({color}) {
+function StickyWidget({color, open, onOpen, onClose}) {
   const ac = color || '#888';
-  const [open,   setOpen]  = React.useState(false);
   const [notes,  setNotes] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem('stickies'))||[];}catch{return [];} });
   const [input,  setInput] = React.useState('');
   const [pendImg,setPendImg]= React.useState(null);
-  const wrapRef  = React.useRef(null);
   const fileRef  = React.useRef(null);
-
-  /* click-outside */
-  React.useEffect(()=>{
-    if (!open) return;
-    function h(e){ if(!wrapRef.current?.contains(e.target)) setOpen(false); }
-    document.addEventListener('mousedown',h);
-    return()=>document.removeEventListener('mousedown',h);
-  },[open]);
 
   /* clipboard image paste */
   React.useEffect(()=>{
@@ -1400,9 +1397,9 @@ function StickyWidget({color}) {
   const addBg    = ac + '22';
 
   return (
-    <div ref={wrapRef} style={{position:'fixed',top:'1rem',right:'1rem',zIndex:900}}>
+    <div style={{position:'fixed',top:'1rem',right:'1rem',zIndex:900}}>
       {/* toggle pill */}
-      <button onClick={()=>setOpen(v=>!v)} style={{
+      <button onClick={()=>open?onClose():onOpen()} style={{
         display:'flex',alignItems:'center',gap:'.3rem',
         background:open ? ac+'22' : '#fff',
         border:`1px solid ${open ? ac+'44' : 'transparent'}`,
@@ -1599,21 +1596,21 @@ function DemianWidget() {
    TimeBlockPanel  (right-side slide panel)
 ══════════════════════════════════════════════════════════ */
 function TimeBlockPanel({dk, color, open, onClose}) {
-  const [blocks, setBlocks] = React.useState(() => {
+  const [blocks,     setBlocks]     = React.useState(() => {
     try { return JSON.parse(localStorage.getItem('timeBlocks')) || {}; }
     catch { return {}; }
   });
+  const [paintMode,  setPaintMode]  = React.useState(false);
+  const [paintLevel, setPaintLevel] = React.useState(2);
+  const isPaintingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    function up() { isPaintingRef.current = false; }
+    window.addEventListener('mouseup', up);
+    return () => window.removeEventListener('mouseup', up);
+  }, []);
 
   const dayBlocks = blocks[dk] || {};
-
-  function toggleSlot(hour, slot) {
-    const cur = (dayBlocks[hour] || [0,0,0,0,0,0])[slot];
-    const newSlots = [...(dayBlocks[hour] || [0,0,0,0,0,0])];
-    newSlots[slot] = (cur + 1) % 4;
-    const newBlocks = {...blocks, [dk]: {...dayBlocks, [hour]: newSlots}};
-    setBlocks(newBlocks);
-    localStorage.setItem('timeBlocks', JSON.stringify(newBlocks));
-  }
 
   function slotColor(level) {
     if (level === 0) return '#ebebeb';
@@ -1622,60 +1619,82 @@ function TimeBlockPanel({dk, color, open, onClose}) {
     return color;
   }
 
-  const HOURS = Array.from({length: 18}, (_, i) => i + 6); // 6 ~ 23
+  function toggleSlot(h, slot) {
+    const cur = (dayBlocks[h] || [0,0,0,0,0,0])[slot];
+    const newSlots = [...(dayBlocks[h] || [0,0,0,0,0,0])];
+    newSlots[slot] = (cur + 1) % 4;
+    const next = {...blocks, [dk]: {...dayBlocks, [h]: newSlots}};
+    setBlocks(next);
+    localStorage.setItem('timeBlocks', JSON.stringify(next));
+  }
+
+  function applyPaint(h, slot) {
+    setBlocks(prev => {
+      const prevDay   = prev[dk] || {};
+      const prevSlots = prevDay[h] || [0,0,0,0,0,0];
+      if (prevSlots[slot] === paintLevel) return prev;
+      const newSlots = [...prevSlots];
+      newSlots[slot]  = paintLevel;
+      const next = {...prev, [dk]: {...prevDay, [h]: newSlots}};
+      localStorage.setItem('timeBlocks', JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function handleSlotDown(e, h, slot) {
+    e.preventDefault();
+    if (paintMode) { isPaintingRef.current = true; applyPaint(h, slot); }
+    else           { toggleSlot(h, slot); }
+  }
+
+  function handleSlotEnter(h, slot) {
+    if (paintMode && isPaintingRef.current) applyPaint(h, slot);
+  }
+
+  const HOURS = Array.from({length: 18}, (_, i) => i + 6);
   const now = new Date();
   const nowH = now.getHours(), nowM = now.getMinutes();
 
-  const totalDeepMin = Object.values(dayBlocks).reduce(
-    (s, slots) => s + (slots||[]).filter(v => v===3).length * 10, 0
-  );
-  const totalFocusMin = Object.values(dayBlocks).reduce(
-    (s, slots) => s + (slots||[]).filter(v => v>0).length * 10, 0
-  );
+  const totalDeepMin  = Object.values(dayBlocks).reduce((s,sl)=>s+(sl||[]).filter(v=>v===3).length*10,0);
+  const totalFocusMin = Object.values(dayBlocks).reduce((s,sl)=>s+(sl||[]).filter(v=>v>0).length*10,0);
 
   async function exportImg() {
-    const el = document.getElementById('tbcard');
-    if (!el) return;
+    const el = document.getElementById('tbcard'); if (!el) return;
     const cv = await html2canvas(el, {backgroundColor:'#fff', scale:2, useCORS:true});
     cv.toBlob(async blob => {
       if (!blob) return;
-      try {
-        await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
-        alert('클립보드에 복사했어.');
-      } catch {
-        const u = URL.createObjectURL(blob), a = document.createElement('a');
-        a.href = u; a.download = `timeblock-${dk}.png`; a.click(); URL.revokeObjectURL(u);
-      }
+      try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      catch { const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`timeblock-${dk}.png`;a.click();URL.revokeObjectURL(u); }
     });
   }
 
   const grid = (interactive) => (
-    <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
+    <div style={{display:'flex',flexDirection:'column',gap:'3px',userSelect:'none'}}>
       {HOURS.map(h => {
         const slots = dayBlocks[h] || [0,0,0,0,0,0];
         const isCurHour = interactive && h === nowH;
         return (
           <div key={h} style={{display:'flex',alignItems:'center',gap:'7px'}}>
             <span style={{
-              fontSize:'.58rem',
+              fontSize:'.58rem', width:'1.4rem', textAlign:'right', flexShrink:0,
               color: isCurHour ? color : '#ccc',
               fontWeight: isCurHour ? 'bold' : 'normal',
-              width:'1.4rem', textAlign:'right', flexShrink:0,
             }}>{h}</span>
             <div style={{display:'flex',gap:'2px'}}>
               {slots.map((level, slot) => {
                 const isCurSlot = isCurHour && slot === Math.floor(nowM / 10);
                 return (
                   <div key={slot}
-                    onClick={interactive ? ()=>toggleSlot(h, slot) : undefined}
+                    onMouseDown={interactive ? e => handleSlotDown(e, h, slot) : undefined}
+                    onMouseEnter={interactive ? () => handleSlotEnter(h, slot) : undefined}
                     style={{
                       width:'14px', height:'14px',
                       background: slotColor(level),
                       borderRadius:'2px',
-                      cursor: interactive ? 'pointer' : 'default',
+                      cursor: interactive ? (paintMode ? 'crosshair' : 'pointer') : 'default',
                       outline: isCurSlot ? `2px solid ${color}` : 'none',
                       outlineOffset:'1px',
-                      transition: interactive ? 'background .12s' : 'none',
+                      transition: 'background .1s',
                     }}
                   />
                 );
@@ -1689,11 +1708,35 @@ function TimeBlockPanel({dk, color, open, onClose}) {
 
   const legend = (
     <div style={{display:'flex',flexDirection:'column',gap:'.35rem'}}>
-      {[1,2,3].map(l => (
+      {[1,2,3].map(l=>(
         <div key={l} style={{display:'flex',alignItems:'center',gap:'5px'}}>
           <div style={{width:'9px',height:'9px',borderRadius:'1px',background:slotColor(l)}}/>
           <span style={{fontSize:'.55rem',color:'#bbb'}}>{['낮음','보통','딥포커스'][l-1]}</span>
         </div>
+      ))}
+    </div>
+  );
+
+  /* paint-mode level picker */
+  const levelPicker = (
+    <div style={{display:'flex',gap:'5px',alignItems:'center'}}>
+      <span style={{fontSize:'.52rem',color:'#ccc',marginRight:'2px'}}>컬러</span>
+      {[1,2,3].map(l=>(
+        <div key={l} onClick={()=>setPaintLevel(l)} style={{
+          width:'16px', height:'16px', background:slotColor(l), borderRadius:'2px',
+          cursor:'pointer',
+          outline: paintLevel===l ? `2px solid ${color}` : '2px solid transparent',
+          outlineOffset:'1.5px', transition:'outline .1s',
+        }}/>
+      ))}
+    </div>
+  );
+
+  /* CSS paint-brush icon: 3 horizontal bars fading opacity */
+  const paintIcon = (
+    <div style={{display:'flex',flexDirection:'column',gap:'2px',width:'12px'}}>
+      {[1,.6,.3].map((op,i)=>(
+        <div key={i} style={{height:'3px',background:paintMode?color:'#ccc',borderRadius:'1px',opacity:op,transition:'background .15s'}}/>
       ))}
     </div>
   );
@@ -1703,7 +1746,8 @@ function TimeBlockPanel({dk, color, open, onClose}) {
       {/* ── slide panel ── */}
       <aside style={{
         position:'fixed', right:0, top:0, bottom:0, width:'13rem',
-        background:'#fff', overflow:'auto', zIndex:20,
+        background:'#fff', overflow:'auto',
+        zIndex: open ? 1001 : 20,
         boxShadow:'-2px 0 10px rgba(0,0,0,0.06)',
         transform: open ? 'translateX(0)' : 'translateX(100%)',
         transition:'transform .25s ease',
@@ -1721,7 +1765,6 @@ function TimeBlockPanel({dk, color, open, onClose}) {
             </div>
           </div>
 
-          {/* deep focus summary */}
           {totalDeepMin > 0 && (
             <div style={{fontSize:'.62rem',color,fontWeight:'bold',marginBottom:'.8rem'}}>
               {Math.floor(totalDeepMin/60)>0?`${Math.floor(totalDeepMin/60)}h `:''}
@@ -1732,8 +1775,18 @@ function TimeBlockPanel({dk, color, open, onClose}) {
           {grid(true)}
 
           <div style={{marginTop:'.9rem',borderTop:'1px solid #f5f5f5',paddingTop:'.75rem'}}>
-            {legend}
-            {totalFocusMin > 0 && (
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              {paintMode ? levelPicker : legend}
+              <button onClick={()=>setPaintMode(v=>!v)} style={{
+                background:'none',border:'none',cursor:'pointer',padding:'3px',
+                display:'flex',alignItems:'center',
+                background: paintMode ? color+'15' : 'none',
+                borderRadius:'4px', transition:'background .15s',
+              }}>
+                {paintIcon}
+              </button>
+            </div>
+            {!paintMode && totalFocusMin > 0 && (
               <div style={{fontSize:'.58rem',color:'#ccc',marginTop:'.5rem'}}>총 {totalFocusMin}m 기록</div>
             )}
           </div>
