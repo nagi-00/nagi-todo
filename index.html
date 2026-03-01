@@ -351,7 +351,7 @@ function App() {
 
           {/* tabs */}
           <div style={{display:'flex',gap:'.35rem',paddingTop:'2.75rem',marginBottom:'.75rem'}}>
-            {[{k:'todo',l:'ᴛᴏᴅᴏ'},{k:'journal',l:'ᴊᴏᴜʀɴᴀʟ'},{k:'week',l:'ᴡᴇᴇᴋ'}].map(({k,l})=>(
+            {[{k:'todo',l:'ᴛᴏᴅᴏ'},{k:'journal',l:'ᴊᴏᴜʀɴᴀʟ'},{k:'week',l:'ᴡᴇᴇᴋ'},{k:'time',l:'ᴛɪᴍᴇ'}].map(({k,l})=>(
               <button key={k} onClick={()=>setTab(k)} style={{
                 ...pill(tab===k?color:'#fff',tab===k?'#fff':'#bbb'),
                 boxShadow:tab===k?`0 2px 8px ${color}44`:'0 1px 3px rgba(0,0,0,0.08)',
@@ -523,6 +523,11 @@ function App() {
           {/* ── WEEK ── */}
           {tab==='week'&&(
             <WeekTab dColors={dColors} accent={accent}/>
+          )}
+
+          {/* ── TIME BLOCK ── */}
+          {tab==='time'&&(
+            <TimeBlockTab dk={dk} color={color}/>
           )}
 
         </div>
@@ -1572,6 +1577,106 @@ function DemianWidget() {
         </div>
       )}
     </>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   TimeBlockTab
+══════════════════════════════════════════════════════════ */
+function TimeBlockTab({dk, color}) {
+  const [blocks, setBlocks] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('timeBlocks')) || {}; }
+    catch { return {}; }
+  });
+
+  const dayBlocks = blocks[dk] || {};
+
+  function toggleSlot(hour, slot) {
+    const cur = (dayBlocks[hour] || [0,0,0,0,0,0])[slot];
+    const newSlots = [...(dayBlocks[hour] || [0,0,0,0,0,0])];
+    newSlots[slot] = (cur + 1) % 4;
+    const newBlocks = {...blocks, [dk]: {...dayBlocks, [hour]: newSlots}};
+    setBlocks(newBlocks);
+    localStorage.setItem('timeBlocks', JSON.stringify(newBlocks));
+  }
+
+  function slotColor(level) {
+    if (level === 0) return '#ebebeb';
+    if (level === 1) return color + '50';
+    if (level === 2) return color + '99';
+    return color;
+  }
+
+  const HOURS = Array.from({length: 18}, (_, i) => i + 6); // 6 ~ 23
+  const now = new Date();
+  const nowH = now.getHours(), nowM = now.getMinutes();
+
+  const totalDeepMin = Object.values(dayBlocks).reduce(
+    (s, slots) => s + (slots||[]).filter(v => v===3).length * 10, 0
+  );
+  const totalFocusMin = Object.values(dayBlocks).reduce(
+    (s, slots) => s + (slots||[]).filter(v => v>0).length * 10, 0
+  );
+
+  return (
+    <div style={CARD}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.25rem'}}>
+        <span style={sectionLabel({marginBottom:0})}>ᴛɪᴍᴇ ʙʟᴏᴄᴋ</span>
+        {totalDeepMin > 0 && (
+          <span style={{fontSize:'.68rem',color,fontWeight:'bold'}}>
+            {Math.floor(totalDeepMin/60)>0?`${Math.floor(totalDeepMin/60)}h `:''}
+            {totalDeepMin%60>0?`${totalDeepMin%60}m `:''}딥포커스
+          </span>
+        )}
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:'3px'}}>
+        {HOURS.map(h => {
+          const slots = dayBlocks[h] || [0,0,0,0,0,0];
+          const isCurHour = h === nowH;
+          return (
+            <div key={h} style={{display:'flex',alignItems:'center',gap:'7px'}}>
+              <span style={{
+                fontSize:'.58rem',
+                color: isCurHour ? color : '#ccc',
+                fontWeight: isCurHour ? 'bold' : 'normal',
+                width:'1.4rem', textAlign:'right', flexShrink:0,
+              }}>{h}</span>
+              <div style={{display:'flex',gap:'2px'}}>
+                {slots.map((level, slot) => {
+                  const isCurSlot = isCurHour && slot === Math.floor(nowM / 10);
+                  return (
+                    <div key={slot} onClick={()=>toggleSlot(h, slot)} style={{
+                      width:'14px', height:'14px',
+                      background: slotColor(level),
+                      borderRadius:'2px',
+                      cursor:'pointer',
+                      outline: isCurSlot ? `2px solid ${color}` : 'none',
+                      outlineOffset:'1px',
+                      transition:'background .12s',
+                    }}/>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{marginTop:'.9rem',borderTop:'1px solid #f5f5f5',paddingTop:'.75rem',display:'flex',alignItems:'center',gap:'.9rem',flexWrap:'wrap'}}>
+        <span style={{fontSize:'.55rem',color:'#ccc',letterSpacing:'.1em'}}>집중도</span>
+        {[1,2,3].map(l => (
+          <div key={l} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+            <div style={{width:'9px',height:'9px',borderRadius:'1px',background:slotColor(l)}}/>
+            <span style={{fontSize:'.55rem',color:'#bbb'}}>{['낮음','보통','딥포커스'][l-1]}</span>
+          </div>
+        ))}
+        {totalFocusMin > 0 && (
+          <span style={{fontSize:'.58rem',color:'#ccc',marginLeft:'auto'}}>총 {totalFocusMin}m 기록</span>
+        )}
+      </div>
+    </div>
   );
 }
 
