@@ -1602,6 +1602,7 @@ function TimeBlockPanel({dk, color, open, onClose}) {
   });
   const [paintMode,  setPaintMode]  = React.useState(false);
   const [paintLevel, setPaintLevel] = React.useState(2);
+  const [hov,        setHov]        = React.useState(null); // "h,slot" string key
   const isPaintingRef = React.useRef(false);
 
   React.useEffect(() => {
@@ -1648,6 +1649,7 @@ function TimeBlockPanel({dk, color, open, onClose}) {
   }
 
   function handleSlotEnter(h, slot) {
+    setHov(`${h},${slot}`);
     if (paintMode && isPaintingRef.current) applyPaint(h, slot);
   }
 
@@ -1683,18 +1685,26 @@ function TimeBlockPanel({dk, color, open, onClose}) {
             <div style={{display:'flex',gap:'2px'}}>
               {slots.map((level, slot) => {
                 const isCurSlot = isCurHour && slot === Math.floor(nowM / 10);
+                const isHov     = interactive && hov === `${h},${slot}`;
+                // paint-mode hover: preview the paint color; normal hover: subtle ring
+                const bg = (isHov && paintMode) ? slotColor(paintLevel) : slotColor(level);
+                const shadow = isCurSlot
+                  ? `inset 0 0 0 2px ${color}`
+                  : (isHov && !paintMode)
+                    ? 'inset 0 0 0 1.5px rgba(0,0,0,0.22)'
+                    : 'none';
                 return (
                   <div key={slot}
                     onMouseDown={interactive ? e => handleSlotDown(e, h, slot) : undefined}
                     onMouseEnter={interactive ? () => handleSlotEnter(h, slot) : undefined}
+                    onMouseLeave={interactive ? () => setHov(null) : undefined}
                     style={{
                       width:'14px', height:'14px',
-                      background: slotColor(level),
+                      background: bg,
                       borderRadius:'2px',
                       cursor: interactive ? (paintMode ? 'crosshair' : 'pointer') : 'default',
-                      outline: isCurSlot ? `2px solid ${color}` : 'none',
-                      outlineOffset:'1px',
-                      transition: 'background .1s',
+                      boxShadow: shadow,
+                      transition: 'background .12s, box-shadow .08s',
                     }}
                   />
                 );
@@ -1717,14 +1727,16 @@ function TimeBlockPanel({dk, color, open, onClose}) {
     </div>
   );
 
-  /* paint-mode level picker */
+  /* paint-mode level picker (level 0 = 없음/erase) */
+  const LEVEL_LABELS = ['없음','낮음','보통','딥포커스'];
   const levelPicker = (
-    <div style={{display:'flex',gap:'5px',alignItems:'center'}}>
-      <span style={{fontSize:'.52rem',color:'#ccc',marginRight:'2px'}}>컬러</span>
-      {[1,2,3].map(l=>(
-        <div key={l} onClick={()=>setPaintLevel(l)} style={{
-          width:'16px', height:'16px', background:slotColor(l), borderRadius:'2px',
+    <div style={{display:'flex',gap:'4px',alignItems:'center'}}>
+      <span style={{fontSize:'.52rem',color:'#ccc',marginRight:'1px'}}>컬러</span>
+      {[0,1,2,3].map(l=>(
+        <div key={l} title={LEVEL_LABELS[l]} onClick={()=>setPaintLevel(l)} style={{
+          width:'15px', height:'15px', background:slotColor(l), borderRadius:'2px',
           cursor:'pointer',
+          boxShadow: l===0 ? 'inset 0 0 0 1px #ccc' : 'none',
           outline: paintLevel===l ? `2px solid ${color}` : '2px solid transparent',
           outlineOffset:'1.5px', transition:'outline .1s',
         }}/>
