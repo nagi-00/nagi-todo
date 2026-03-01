@@ -1777,12 +1777,10 @@ function TimeBlockPanel({dk, color, open, onClose}) {
             </div>
           </div>
 
-          {totalDeepMin > 0 && (
-            <div style={{fontSize:'.62rem',color,fontWeight:'bold',marginBottom:'.8rem'}}>
-              {Math.floor(totalDeepMin/60)>0?`${Math.floor(totalDeepMin/60)}h `:''}
-              {totalDeepMin%60>0?`${totalDeepMin%60}m `:''}딥포커스
-            </div>
-          )}
+          <div style={{fontSize:'.62rem',color,fontWeight:'bold',marginBottom:'.8rem',visibility:totalDeepMin>0?'visible':'hidden'}}>
+            {Math.floor(totalDeepMin/60)>0?`${Math.floor(totalDeepMin/60)}h `:''}
+            {totalDeepMin%60>0?`${totalDeepMin%60}m `:''}딥포커스
+          </div>
 
           {grid(true)}
 
