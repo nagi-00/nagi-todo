@@ -25,17 +25,7 @@ body {
 .completed    { color: #ccc; text-decoration: line-through; }
 .icon-btn     { background: none; border: none; cursor: pointer; padding: 0; color: #ccc; font-size: .72rem; font-family: inherit; }
 
-/* Item reorder animation */
-@keyframes itemSlideUp {
-  0%   { transform:translateY(5px); opacity:.5; }
-  100% { transform:translateY(0);   opacity:1;  }
-}
-@keyframes itemSlideDown {
-  0%   { transform:translateY(-5px); opacity:.5; }
-  100% { transform:translateY(0);    opacity:1;  }
-}
-.item-slide-up   { animation: itemSlideUp   0.22s cubic-bezier(.22,.68,0,1.2) both; }
-.item-slide-down { animation: itemSlideDown 0.22s cubic-bezier(.22,.68,0,1.2) both; }
+
 
 textarea:focus, input:focus, select:focus { outline: none; }
 button { font-family: inherit; }
@@ -442,22 +432,22 @@ function App() {
                       <span style={sectionLabel({color: catColor + 'bb'})}>{cat}</span>
                       <div>
                         {list.map((item, catIdx)=>{
-                          const mk = movedKey;
-                          const isMoved = mk && mk.cat===cat && mk.catIdx===catIdx;
-                          const animClass = isMoved ? (mk.dir<0 ? 'item-slide-up' : 'item-slide-down') : '';
+                          const isMoved = movedKey?.cat===cat && movedKey?.catIdx===catIdx;
                           return (
-                          <div key={item.gi + (isMoved?mk.t:'')}
-                            className={animClass}
+                          <div key={item.gi}
                             style={{
-                              display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.22rem', padding:'.05rem 0',
+                              display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.22rem',
+                              padding:'.05rem .2rem .05rem .1rem', borderRadius:'3px',
+                              backgroundColor: isMoved ? color+'22' : 'transparent',
+                              transition: isMoved ? 'none' : 'background-color .65s ease-out',
                             }}>
                             {/* up / down order buttons */}
                             {editMode&&(
-                              <div style={{display:'flex',flexDirection:'column',gap:'0',flexShrink:0,width:'.7rem'}}>
+                              <div style={{display:'flex',flexDirection:'column',gap:'1px',flexShrink:0,width:'.6rem'}}>
                                 <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,-1)}
-                                  style={{fontSize:'.42rem',lineHeight:1.1,padding:'0 1px',color:catIdx===0?'#ddd':'#bbb'}}>▲</button>
+                                  style={{fontSize:'.34rem',lineHeight:1,padding:0,color:catIdx===0?'#e0e0e0':'#aaa'}}>↑</button>
                                 <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,1)}
-                                  style={{fontSize:'.42rem',lineHeight:1.1,padding:'0 1px',color:catIdx===list.length-1?'#ddd':'#bbb'}}>▼</button>
+                                  style={{fontSize:'.34rem',lineHeight:1,padding:0,color:catIdx===list.length-1?'#e0e0e0':'#aaa'}}>↓</button>
                               </div>
                             )}
                             <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
