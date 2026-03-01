@@ -443,11 +443,19 @@ function App() {
                             }}>
                             {/* up / down order buttons */}
                             {editMode&&(
-                              <div style={{display:'flex',flexDirection:'column',gap:'1px',flexShrink:0,width:'.6rem'}}>
+                              <div style={{display:'flex',flexDirection:'column',gap:'2px',flexShrink:0,alignItems:'center'}}>
                                 <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,-1)}
-                                  style={{fontSize:'.34rem',lineHeight:1,padding:0,color:catIdx===0?'#e0e0e0':'#aaa'}}>↑</button>
+                                  style={{padding:'1px 3px',display:'flex',color:catIdx===0?'#ddd':'#999'}}>
+                                  <span style={{display:'block',width:0,height:0,
+                                    borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
+                                    borderBottom:'4.5px solid currentColor'}}/>
+                                </button>
                                 <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,1)}
-                                  style={{fontSize:'.34rem',lineHeight:1,padding:0,color:catIdx===list.length-1?'#e0e0e0':'#aaa'}}>↓</button>
+                                  style={{padding:'1px 3px',display:'flex',color:catIdx===list.length-1?'#ddd':'#999'}}>
+                                  <span style={{display:'block',width:0,height:0,
+                                    borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
+                                    borderTop:'4.5px solid currentColor'}}/>
+                                </button>
                               </div>
                             )}
                             <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
