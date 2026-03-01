@@ -174,37 +174,15 @@ function App() {
   }
   function saveJournal(f,v) { db.ref('journal/'+dk+'/'+f).set(v); }
 
-  const [dragState,  setDragState]  = React.useState(null); // {cat, catIdx}
-  const [dropTarget, setDropTarget] = React.useState(null); // {cat, catIdx}
-  const dragStateRef = React.useRef(null);
-
-  function handleDragStart(cat, catIdx) {
-    dragStateRef.current = {cat, catIdx};
-    setDragState({cat, catIdx});
-  }
-  function handleDragEnter(cat, catIdx) {
-    if (dragStateRef.current?.cat === cat) setDropTarget({cat, catIdx});
-  }
-  function handleDragOver(e, cat) {
-    if (dragStateRef.current?.cat === cat) e.preventDefault();
-  }
-  function handleDrop(cat, dropIdx) {
-    if (!dragStateRef.current || dragStateRef.current.cat !== cat) {
-      dragStateRef.current = null; setDragState(null); setDropTarget(null); return;
-    }
-    const from = dragStateRef.current.catIdx;
-    dragStateRef.current = null; setDragState(null); setDropTarget(null);
-    if (from === dropIdx) return;
+  function moveItem(cat, catIdx, dir) {
     const catItems = [...items.filter(it => it.category === cat)];
-    const [mv] = catItems.splice(from, 1);
-    catItems.splice(dropIdx > from ? dropIdx - 1 : dropIdx, 0, mv);
+    const newIdx = catIdx + dir;
+    if (newIdx < 0 || newIdx >= catItems.length) return;
+    [catItems[catIdx], catItems[newIdx]] = [catItems[newIdx], catItems[catIdx]];
     let ci = 0;
     const upd = items.map(it => it.category === cat ? catItems[ci++] : it);
     setAllTodos(p => ({...p, [dk]: upd}));
     db.ref('todos/'+dk).set(upd);
-  }
-  function handleDragEnd() {
-    dragStateRef.current = null; setDragState(null); setDropTarget(null);
   }
 
   async function exportImg() {
@@ -449,22 +427,20 @@ function App() {
                       <div>
                         {list.map((item, catIdx)=>(
                           <div key={item.gi}
-                            draggable={editMode}
-                            onDragStart={editMode ? ()=>handleDragStart(cat, catIdx) : undefined}
-                            onDragEnter={editMode ? ()=>handleDragEnter(cat, catIdx) : undefined}
-                            onDragOver={editMode ? (e)=>handleDragOver(e, cat) : undefined}
-                            onDrop={editMode ? ()=>handleDrop(cat, catIdx) : undefined}
-                            onDragEnd={editMode ? handleDragEnd : undefined}
                             style={{
-                              display:'flex', alignItems:'baseline', gap:'.4rem', marginBottom:'.22rem', padding:'.05rem 0',
-                              opacity: dragState?.cat===cat && dragState?.catIdx===catIdx ? 0.3 : 1,
-                              borderTop: dropTarget?.cat===cat && dropTarget?.catIdx===catIdx && dragState?.catIdx!==catIdx ? `2px solid ${color}` : '2px solid transparent',
-                              transition: 'opacity 0.1s',
-                              cursor: editMode ? 'grab' : 'auto',
+                              display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.22rem', padding:'.05rem 0',
                             }}>
-                            {editMode&&<span className="drag-handle">≡</span>}
-                            <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem'}}>{BULLET[item.state]}</span>
-                            <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6}}>{item.text}</span>
+                            {/* up / down order buttons */}
+                            {editMode&&(
+                              <div style={{display:'flex',flexDirection:'column',gap:'1px',flexShrink:0}}>
+                                <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,-1)}
+                                  style={{fontSize:'.52rem',lineHeight:1,padding:'0 2px',color:catIdx===0?'#e8e8e8':'#bbb'}}>▲</button>
+                                <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,1)}
+                                  style={{fontSize:'.52rem',lineHeight:1,padding:'0 2px',color:catIdx===list.length-1?'#e8e8e8':'#bbb'}}>▼</button>
+                              </div>
+                            )}
+                            <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
+                            <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}>{item.text}</span>
                             {editMode&&(
                               <>
                                 <button className="icon-btn" onClick={()=>editItem(item.gi)}>edit</button>
@@ -473,15 +449,6 @@ function App() {
                             )}
                           </div>
                         ))}
-                        {/* end-of-list drop zone */}
-                        {editMode && (
-                          <div
-                            onDragEnter={()=>handleDragEnter(cat, list.length)}
-                            onDragOver={e=>handleDragOver(e, cat)}
-                            onDrop={()=>handleDrop(cat, list.length)}
-                            style={{height:'14px', borderTop: dropTarget?.cat===cat && dropTarget?.catIdx===list.length ? `2px solid ${color}` : '2px solid transparent'}}
-                          />
-                        )}
                         {list.length===0 && pendingRtns.length===0 && !editMode && <div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
                       </div>
                       {/* routine ghost items — OUTSIDE Sortable, clickable to apply */}
@@ -547,6 +514,7 @@ function App() {
       <WeatherWidget color={color}/>
       <PomodoroWidget color={color}/>
       <MusicWidget color={color}/>
+      <StickyWidget/>
       <DemianWidget/>
     </div>
   );
@@ -1334,6 +1302,134 @@ function MusicWidget({color}) {
           </div>
         ):null}
       </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   StickyWidget  (floating memo pad — text + image)
+══════════════════════════════════════════════════════════ */
+function StickyWidget() {
+  const [open,   setOpen]  = React.useState(false);
+  const [notes,  setNotes] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem('stickies'))||[];}catch{return [];} });
+  const [input,  setInput] = React.useState('');
+  const [pendImg,setPendImg]= React.useState(null);
+  const wrapRef  = React.useRef(null);
+  const fileRef  = React.useRef(null);
+  const taRef    = React.useRef(null);
+
+  /* click-outside */
+  React.useEffect(()=>{
+    if (!open) return;
+    function h(e){ if(!wrapRef.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown',h);
+    return()=>document.removeEventListener('mousedown',h);
+  },[open]);
+
+  /* clipboard image paste */
+  React.useEffect(()=>{
+    if (!open) return;
+    function hp(e){
+      const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+      if (!item) return;
+      const r=new FileReader(); r.onload=ev=>setPendImg(ev.target.result); r.readAsDataURL(item.getAsFile());
+    }
+    document.addEventListener('paste',hp);
+    return()=>document.removeEventListener('paste',hp);
+  },[open]);
+
+  function persist(next){ setNotes(next); localStorage.setItem('stickies',JSON.stringify(next)); }
+  function addNote(){
+    if (!input.trim()&&!pendImg) return;
+    persist([{id:Date.now(),text:input.trim(),img:pendImg},...notes]);
+    setInput(''); setPendImg(null);
+  }
+  function delNote(id){ persist(notes.filter(n=>n.id!==id)); }
+  function handleFile(e){
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=ev=>setPendImg(ev.target.result); r.readAsDataURL(f);
+    e.target.value='';
+  }
+
+  const panelY = '46px';
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'68px',right:'20px',zIndex:1000}}>
+      {/* toggle pill */}
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.3rem',
+        background:open?'#f5e820':'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'11px',color:'#c2a800'}}>✎</span>
+        <span style={{fontSize:'10px',color:'#bbb',letterSpacing:'.1em'}}>ᴍᴇᴍᴏ</span>
+      </button>
+
+      {/* panel */}
+      {open&&(
+        <div style={{
+          position:'absolute',bottom:panelY,right:0,
+          width:'264px',maxHeight:'440px',
+          background:'#FEFCE8',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.13)',
+          border:'1px solid #EDE98A',
+          display:'flex',flexDirection:'column',overflow:'hidden',
+        }}>
+          {/* header */}
+          <div style={{padding:'9px 13px 7px',borderBottom:'1px solid #EDE98A',flexShrink:0}}>
+            <span style={{fontSize:'9px',color:'#B8A600',letterSpacing:'.14em'}}>ᴍᴇᴍᴏ</span>
+          </div>
+
+          {/* input area */}
+          <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:'1px solid #EDE98A'}}>
+            <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addNote();}}}
+              placeholder="메모 입력. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
+              style={{width:'100%',background:'#FFFDE7',border:'1px solid #E6E07A',borderRadius:'6px',
+                padding:'.38rem .5rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
+                resize:'none',outline:'none',color:'#444',display:'block'}}
+            />
+            {/* pending image preview */}
+            {pendImg&&(
+              <div style={{position:'relative',display:'inline-block',marginTop:'5px'}}>
+                <img src={pendImg} alt="" style={{maxWidth:'100%',maxHeight:'72px',borderRadius:'5px',border:'1px solid #E6E07A',display:'block'}}/>
+                <button onClick={()=>setPendImg(null)} style={{
+                  position:'absolute',top:'-5px',right:'-5px',
+                  background:'#ff7272',border:'none',borderRadius:'50%',
+                  width:'14px',height:'14px',color:'#fff',cursor:'pointer',fontSize:'8px',padding:0,
+                  display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,
+                }}>✕</button>
+              </div>
+            )}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'5px'}}>
+              <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',color:'#B8A600',padding:'1px 3px',fontFamily:'inherit'}}>📎 이미지</button>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
+              <button onClick={addNote} style={{background:'#F5E820',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'10px',padding:'.22rem .65rem',fontFamily:'inherit',color:'#5a4800',fontWeight:'bold'}}>추가 →</button>
+            </div>
+          </div>
+
+          {/* notes list */}
+          <div style={{overflowY:'auto',padding:'6px 10px 10px',flex:1}}>
+            {notes.length===0&&(
+              <div style={{textAlign:'center',color:'#ccc',fontSize:'10px',padding:'18px 0'}}>아직 메모가 없어.</div>
+            )}
+            {notes.map(note=>(
+              <div key={note.id} style={{
+                background:'#fff',border:'1px solid #EDE98A',borderRadius:'8px',
+                padding:'8px 28px 8px 10px',marginBottom:'6px',position:'relative',
+              }}>
+                {note.img&&<img src={note.img} alt="" style={{width:'100%',borderRadius:'5px',marginBottom:'5px',display:'block'}}/>}
+                {note.text&&<div style={{fontSize:'10px',color:'#333',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{note.text}</div>}
+                <button onClick={()=>delNote(note.id)} style={{
+                  position:'absolute',top:'6px',right:'7px',background:'none',border:'none',
+                  color:'#ccc',cursor:'pointer',fontSize:'10px',padding:0,lineHeight:1,
+                }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
