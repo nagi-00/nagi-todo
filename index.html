@@ -514,7 +514,7 @@ function App() {
       <WeatherWidget color={color}/>
       <PomodoroWidget color={color}/>
       <MusicWidget color={color}/>
-      <StickyWidget/>
+      <StickyWidget color={color}/>
       <DemianWidget/>
     </div>
   );
@@ -1310,14 +1310,14 @@ function MusicWidget({color}) {
 /* ══════════════════════════════════════════════════════════
    StickyWidget  (floating memo pad — text + image)
 ══════════════════════════════════════════════════════════ */
-function StickyWidget() {
+function StickyWidget({color}) {
+  const ac = color || '#888';
   const [open,   setOpen]  = React.useState(false);
   const [notes,  setNotes] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem('stickies'))||[];}catch{return [];} });
   const [input,  setInput] = React.useState('');
   const [pendImg,setPendImg]= React.useState(null);
   const wrapRef  = React.useRef(null);
   const fileRef  = React.useRef(null);
-  const taRef    = React.useRef(null);
 
   /* click-outside */
   React.useEffect(()=>{
@@ -1352,48 +1352,59 @@ function StickyWidget() {
     e.target.value='';
   }
 
-  const panelY = '46px';
+  /* theme-tinted palette */
+  const panelBg  = ac + '0e'; // 거의 흰색에 테마색 살짝
+  const border   = ac + '30';
+  const inputBg  = ac + '08';
+  const inputBdr = ac + '28';
+  const noteBdr  = ac + '22';
+  const labelClr = ac + 'aa';
+  const addBg    = ac + '22';
+
   return (
-    <div ref={wrapRef} style={{position:'fixed',bottom:'68px',right:'20px',zIndex:1000}}>
+    <div ref={wrapRef} style={{position:'fixed',top:'1rem',right:'1rem',zIndex:900}}>
       {/* toggle pill */}
       <button onClick={()=>setOpen(v=>!v)} style={{
         display:'flex',alignItems:'center',gap:'.3rem',
-        background:open?'#f5e820':'#fff',border:'none',borderRadius:'9999px',
+        background:open ? ac+'22' : '#fff',
+        border:`1px solid ${open ? ac+'44' : 'transparent'}`,
+        borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.09)',fontFamily:'inherit',
+        transition:'background .15s',
       }}>
-        <span style={{fontSize:'11px',color:'#c2a800'}}>✎</span>
-        <span style={{fontSize:'10px',color:'#bbb',letterSpacing:'.1em'}}>ᴍᴇᴍᴏ</span>
+        <span style={{fontSize:'11px',color:open ? ac : '#bbb'}}>✎</span>
+        <span style={{fontSize:'10px',color:open ? ac+'cc' : '#bbb',letterSpacing:'.1em'}}>ᴍᴇᴍᴏ</span>
       </button>
 
-      {/* panel */}
+      {/* panel — opens downward */}
       {open&&(
         <div style={{
-          position:'absolute',bottom:panelY,right:0,
+          position:'absolute',top:'calc(100% + 6px)',right:0,
           width:'264px',maxHeight:'440px',
-          background:'#FEFCE8',borderRadius:'12px',
-          boxShadow:'0 8px 28px rgba(0,0,0,0.13)',
-          border:'1px solid #EDE98A',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',
+          border:`1px solid ${border}`,
           display:'flex',flexDirection:'column',overflow:'hidden',
         }}>
           {/* header */}
-          <div style={{padding:'9px 13px 7px',borderBottom:'1px solid #EDE98A',flexShrink:0}}>
-            <span style={{fontSize:'9px',color:'#B8A600',letterSpacing:'.14em'}}>ᴍᴇᴍᴏ</span>
+          <div style={{padding:'9px 13px 7px',borderBottom:`1px solid ${border}`,flexShrink:0,background:panelBg}}>
+            <span style={{fontSize:'9px',color:labelClr,letterSpacing:'.14em'}}>ᴍᴇᴍᴏ</span>
           </div>
 
           {/* input area */}
-          <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:'1px solid #EDE98A'}}>
-            <textarea ref={taRef} value={input} onChange={e=>setInput(e.target.value)}
+          <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:`1px solid ${border}`,background:panelBg}}>
+            <textarea value={input} onChange={e=>setInput(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addNote();}}}
               placeholder="메모 입력. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
-              style={{width:'100%',background:'#FFFDE7',border:'1px solid #E6E07A',borderRadius:'6px',
+              style={{width:'100%',background:inputBg,border:`1px solid ${inputBdr}`,borderRadius:'6px',
                 padding:'.38rem .5rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
                 resize:'none',outline:'none',color:'#444',display:'block'}}
             />
             {/* pending image preview */}
             {pendImg&&(
               <div style={{position:'relative',display:'inline-block',marginTop:'5px'}}>
-                <img src={pendImg} alt="" style={{maxWidth:'100%',maxHeight:'72px',borderRadius:'5px',border:'1px solid #E6E07A',display:'block'}}/>
+                <img src={pendImg} alt="" style={{maxWidth:'100%',maxHeight:'72px',borderRadius:'5px',border:`1px solid ${inputBdr}`,display:'block'}}/>
                 <button onClick={()=>setPendImg(null)} style={{
                   position:'absolute',top:'-5px',right:'-5px',
                   background:'#ff7272',border:'none',borderRadius:'50%',
@@ -1403,9 +1414,9 @@ function StickyWidget() {
               </div>
             )}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'5px'}}>
-              <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',color:'#B8A600',padding:'1px 3px',fontFamily:'inherit'}}>📎 이미지</button>
+              <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',color:labelClr,padding:'1px 3px',fontFamily:'inherit'}}>📎 이미지</button>
               <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
-              <button onClick={addNote} style={{background:'#F5E820',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'10px',padding:'.22rem .65rem',fontFamily:'inherit',color:'#5a4800',fontWeight:'bold'}}>추가 →</button>
+              <button onClick={addNote} style={{background:addBg,border:`1px solid ${border}`,borderRadius:'6px',cursor:'pointer',fontSize:'10px',padding:'.22rem .65rem',fontFamily:'inherit',color:ac,fontWeight:'bold'}}>추가 →</button>
             </div>
           </div>
 
@@ -1416,7 +1427,7 @@ function StickyWidget() {
             )}
             {notes.map(note=>(
               <div key={note.id} style={{
-                background:'#fff',border:'1px solid #EDE98A',borderRadius:'8px',
+                background:'#fff',border:`1px solid ${noteBdr}`,borderRadius:'8px',
                 padding:'8px 28px 8px 10px',marginBottom:'6px',position:'relative',
               }}>
                 {note.img&&<img src={note.img} alt="" style={{width:'100%',borderRadius:'5px',marginBottom:'5px',display:'block'}}/>}
