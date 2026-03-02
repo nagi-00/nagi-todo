@@ -614,9 +614,11 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
             <div key={cat} style={{marginBottom:'.85rem'}}>
               <div style={{fontSize:'.54rem',letterSpacing:'.18em',color,fontWeight:'bold',marginBottom:'.45rem',textTransform:'uppercase'}}>{cat}</div>
               {list.map((it,i)=>(
-                <div key={i} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start'}}>
+                <div key={i} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start',
+                  backgroundColor:it.important?color+'33':'transparent',borderRadius:'3px',padding:it.important?'0 .3rem':'0 .3rem'}}>
                   <span style={{color,fontFamily:'monospace',flexShrink:0,marginTop:'.05rem'}}>{xBullet(it.state)}</span>
                   <span style={{color:it.state===1?'#bbb':'#333',flex:1,whiteSpace:'pre-wrap',textDecoration:it.state===1?'line-through':'none'}}>{it.text}</span>
+                  {it.important&&<span style={{color,flexShrink:0,fontSize:'.72rem',marginTop:'.15rem'}}>★</span>}
                 </div>
               ))}
               {pendingRtns.map((r,i)=>(
