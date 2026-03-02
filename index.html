@@ -165,6 +165,10 @@ function App() {
     e.stopPropagation(); if (editMode) return;
     db.ref('todos/'+dk).set(items.map((it,idx)=>idx===i?{...it,state:(it.state+1)%BULLET.length}:it));
   }
+  function toggleImportant(i,e) {
+    e.stopPropagation(); if (editMode) return;
+    db.ref('todos/'+dk).set(items.map((it,idx)=>idx===i?{...it,important:!it.important}:it));
+  }
   function editItem(i) {
     const nt=prompt('Edit:', items[i].text);
     if (nt!=null&&nt.trim()) { const c=[...items]; c[i]={...c[i],text:nt.trim()}; db.ref('todos/'+dk).set(c); }
@@ -457,7 +461,7 @@ function App() {
                             style={{
                               display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.22rem',
                               padding:'.05rem .2rem .05rem .1rem', borderRadius:'3px',
-                              backgroundColor: isMoved ? color+'22' : 'transparent',
+                              backgroundColor: isMoved ? color+'22' : item.important ? catColor+'1a' : 'transparent',
                               transition: isMoved ? 'none' : 'background-color .65s ease-out',
                             }}>
                             {/* up / down order buttons */}
@@ -479,6 +483,10 @@ function App() {
                             )}
                             <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
                             <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}>{item.text}</span>
+                            <button className="icon-btn" onClick={e=>toggleImportant(item.gi,e)}
+                              style={{color:item.important?catColor:'#ccc',flexShrink:0,fontSize:'.85rem',padding:'0 1px',alignSelf:'baseline'}}>
+                              {item.important?'★':'☆'}
+                            </button>
                             {editMode&&(
                               <>
                                 <button className="icon-btn" onClick={()=>editItem(item.gi)}>edit</button>
