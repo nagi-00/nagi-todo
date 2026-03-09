@@ -10,22 +10,20 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'HJSS', sans-serif;
-  background: #ebebeb;
-  color: #333;
+  background: #e0e5ec;
+  color: #3d4350;
   min-height: 100vh;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 3px; height: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+::-webkit-scrollbar-track { background: #e0e5ec; }
+::-webkit-scrollbar-thumb { background: #b8bec9; border-radius: 2px; }
 
 /* Shared */
-.drag-handle  { cursor: grab; color: #ccc; user-select: none; font-size: .95rem; flex-shrink: 0; }
-.completed    { color: #ccc; text-decoration: line-through; }
-.icon-btn     { background: none; border: none; cursor: pointer; padding: 0; color: #ccc; font-size: .72rem; font-family: inherit; }
-
-
+.drag-handle  { cursor: grab; color: #b8bec9; user-select: none; font-size: .95rem; flex-shrink: 0; }
+.completed    { color: #b8bec9; text-decoration: line-through; }
+.icon-btn     { background: none; border: none; cursor: pointer; padding: 0; color: #b8bec9; font-size: .72rem; font-family: inherit; }
 
 textarea:focus, input:focus, select:focus { outline: none; }
 button { font-family: inherit; }
@@ -88,25 +86,39 @@ function ytEmbed(raw) {
   } catch { return null; }
 }
 
+/* ─── Neumorphism tokens ────────────────────────────────── */
+const NM_BG  = '#e0e5ec';
+const NM_SD  = '#b8bec9';   /* shadow dark  */
+const NM_SL  = '#ffffff';   /* shadow light */
+/* elevated — element pops out */
+const NM_UP   = `6px 6px 14px ${NM_SD}, -6px -6px 14px ${NM_SL}`;
+const NM_UP_S = `3px 3px 8px ${NM_SD}, -3px -3px 8px ${NM_SL}`;
+/* inset — element pressed in */
+const NM_DN   = `inset 4px 4px 10px ${NM_SD}, inset -4px -4px 10px ${NM_SL}`;
+const NM_DN_S = `inset 2px 2px 6px ${NM_SD}, inset -2px -2px 6px ${NM_SL}`;
+
 /* ─── Micro Style Helpers ───────────────────────────────── */
 const CARD = {
-  background: '#fff',
-  borderRadius: '10px',
-  boxShadow: '0 1px 5px rgba(0,0,0,0.07)',
+  background: NM_BG,
+  borderRadius: '18px',
+  boxShadow: NM_UP,
   padding: '1.5rem',
 };
-function pill(bg='#f0f0f0', fg='#666', sm=false) {
+function pill(bg='#e0e5ec', fg='#666', sm=false) {
+  const neutral = bg==='#f0f0f0'||bg==='#f5f5f5'||bg==='#e8e8e8'||bg==='#e0e5ec'||bg==='#fff';
   return {
-    background: bg, color: fg,
+    background: neutral ? NM_BG : bg,
+    color: neutral ? fg : fg,
     border: 'none', borderRadius: '9999px',
     padding: sm ? '.28rem .7rem' : '.4rem .95rem',
     fontSize: sm ? '.72rem' : '.78rem',
     cursor: 'pointer', fontFamily: 'inherit',
     letterSpacing: '.03em',
+    boxShadow: neutral ? NM_UP_S : `2px 2px 6px ${NM_SD}, -2px -2px 6px ${NM_SL}`,
   };
 }
 function sectionLabel(extra) {
-  return { fontSize: '.6rem', letterSpacing: '.2em', color: '#bbb', marginBottom: '.5rem', display: 'block', ...extra };
+  return { fontSize: '.6rem', letterSpacing: '.2em', color: '#a0a8b4', marginBottom: '.5rem', display: 'block', ...extra };
 }
 
 
@@ -259,10 +271,11 @@ function App() {
         onClick={()=>setSidebar(v=>!v)}
         style={{
           position:'fixed',left:'1rem',top:'1rem',zIndex:100,
-          background:'#fff',border:'none',borderRadius:'9999px',
-          width:'2rem',height:'2rem',cursor:'pointer',
-          boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
-          color:'#999',fontSize:'.85rem',display:'flex',alignItems:'center',justifyContent:'center'
+          background:NM_BG,border:'none',borderRadius:'9999px',
+          width:'2.2rem',height:'2.2rem',cursor:'pointer',
+          boxShadow:sidebar?NM_DN_S:NM_UP_S,
+          color:'#8a92a0',fontSize:'.85rem',display:'flex',alignItems:'center',justifyContent:'center',
+          transition:'box-shadow .2s',
         }}
       >{sidebar?'←':'→'}</button>
 
@@ -271,23 +284,23 @@ function App() {
         onClick={()=>setTimePanel(v=>!v)}
         style={{
           position:'fixed',right:'1rem',top:'3.5rem',zIndex:1002,
-          background:timePanel?color:'#fff',border:'none',borderRadius:'9999px',
-          width:'2rem',height:'2rem',cursor:'pointer',
-          boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
-          color:timePanel?'#fff':'#bbb',fontSize:'.7rem',display:'flex',alignItems:'center',justifyContent:'center',
-          transition:'background .2s,color .2s',
+          background:timePanel?color:NM_BG,border:'none',borderRadius:'9999px',
+          width:'2.2rem',height:'2.2rem',cursor:'pointer',
+          boxShadow:timePanel?`inset 2px 2px 6px rgba(0,0,0,0.25)`:NM_UP_S,
+          color:timePanel?'#fff':'#a0a8b4',fontSize:'.7rem',display:'flex',alignItems:'center',justifyContent:'center',
+          transition:'background .2s,color .2s,box-shadow .2s',
         }}
       >
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px',width:'10px',height:'10px'}}>
-          {[0,1,2,3].map(i=><div key={i} style={{background:timePanel?'#fff':'#ccc',borderRadius:'1px'}}/>)}
+          {[0,1,2,3].map(i=><div key={i} style={{background:timePanel?'#fff':'#b8bec9',borderRadius:'1px'}}/>)}
         </div>
       </button>
 
       {/* ═══ Sidebar ═══ */}
       <aside style={{
         position:'fixed',left:0,top:0,bottom:0,width:'14.5rem',
-        background:'#fff',overflow:'auto',zIndex:20,
-        boxShadow:'2px 0 10px rgba(0,0,0,0.05)',
+        background:NM_BG,overflow:'auto',zIndex:20,
+        boxShadow:`4px 0 20px ${NM_SD}`,
         transform:sidebar?'translateX(0)':'translateX(-100%)',
         transition:'transform .25s ease',
       }}>
@@ -317,7 +330,7 @@ function App() {
             /* calendar */
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',fontSize:'.7rem'}}>
               {['S','M','T','W','T','F','S'].map((d,i)=>(
-                <div key={i} style={{textAlign:'center',padding:'.15rem 0',color:i===0?'#8A4545':i===6?'#434A8E':'#bbb',fontSize:'.6rem'}}>{d}</div>
+                <div key={i} style={{textAlign:'center',padding:'.15rem 0',color:i===0?'#8A4545':i===6?'#434A8E':'#a0a8b4',fontSize:'.6rem'}}>{d}</div>
               ))}
               {Array(new Date(sel.getFullYear(),sel.getMonth(),1).getDay()).fill(null).map((_,i)=><div key={i}/>)}
               {Array.from({length:new Date(sel.getFullYear(),sel.getMonth()+1,0).getDate()},(_,i)=>{
@@ -331,12 +344,14 @@ function App() {
                     style={{
                       width:'1.7rem',height:'1.7rem',margin:'0 auto',
                       display:'flex',alignItems:'center',justifyContent:'center',
-                      border:`1.5px solid ${isToday&&!isSel?c:'transparent'}`,
+                      border:'none',
                       borderRadius:'9999px',
-                      background:isSel?c:'transparent',
-                      color:isSel?'#fff':isToday?c:'#444',
+                      background:isSel?c:NM_BG,
+                      color:isSel?'#fff':isToday?c:'#5a6070',
                       fontWeight:isToday?'bold':'400',
                       position:'relative',cursor:'pointer',fontSize:'.78rem',
+                      boxShadow:isSel?`inset 2px 2px 5px rgba(0,0,0,0.25)`:isToday?`0 0 0 1.5px ${c}`:NM_UP_S,
+                      transition:'box-shadow .15s',
                     }}>
                     {i+1}
                     {allTodos[k]?.length>0&&(
@@ -350,8 +365,8 @@ function App() {
             /* notes list */
             <div>
               {Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,txt])=>(
-                <div key={d} style={{background:'#f8f8f8',borderRadius:'.5rem',padding:'.65rem .75rem',marginBottom:'.4rem'}}>
-                  <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.2rem'}}>
+                <div key={d} style={{background:NM_BG,borderRadius:'12px',padding:'.65rem .75rem',marginBottom:'.4rem',boxShadow:NM_DN_S}}>
+                  <div style={{fontSize:'.65rem',color:'#a0a8b4',marginBottom:'.2rem'}}>
                     {new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})}
                   </div>
                   <div style={{fontSize:'.82rem',fontWeight:'bold',whiteSpace:'pre-wrap',color:dColors[d]||accent,lineHeight:1.5}}>{txt}</div>
@@ -369,15 +384,19 @@ function App() {
         padding:'1rem',
         marginLeft:sidebar?'14.5rem':'0',
         transition:'margin-left .25s',
+        background:NM_BG,
+        minHeight:'100vh',
       }}>
         <div style={{maxWidth:'40rem',margin:'0 auto'}}>
 
           {/* tabs */}
-          <div style={{display:'flex',gap:'.35rem',paddingTop:'2.75rem',marginBottom:'.75rem'}}>
+          <div style={{display:'flex',gap:'.5rem',paddingTop:'2.75rem',marginBottom:'.85rem'}}>
             {[{k:'todo',l:'ᴛᴏᴅᴏ'},{k:'journal',l:'ᴊᴏᴜʀɴᴀʟ'},{k:'week',l:'ᴡᴇᴇᴋ'}].map(({k,l})=>(
               <button key={k} onClick={()=>setTab(k)} style={{
-                ...pill(tab===k?color:'#fff',tab===k?'#fff':'#bbb'),
-                boxShadow:tab===k?`0 2px 8px ${color}44`:'0 1px 3px rgba(0,0,0,0.08)',
+                ...pill(tab===k?color:NM_BG, tab===k?'#fff':'#8a92a0'),
+                boxShadow: tab===k
+                  ? `inset 3px 3px 7px rgba(0,0,0,0.22), inset -1px -1px 4px rgba(255,255,255,.4), 0 2px 8px ${color}55`
+                  : NM_UP_S,
                 transition:'all .2s',
               }}>{l}</button>
             ))}
@@ -389,10 +408,10 @@ function App() {
               <div style={CARD}>
                 {/* header row */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem',gap:'.5rem'}}>
-                  <h2 style={{fontSize:'1rem',fontWeight:'bold',lineHeight:1.5,flex:1,color:'#222'}}>{dlabel}</h2>
+                  <h2 style={{fontSize:'1rem',fontWeight:'bold',lineHeight:1.5,flex:1,color:'#3d4350'}}>{dlabel}</h2>
                   <input type="color" value={color}
                     onChange={e=>db.ref('dateColors/'+dk).set(e.target.value)}
-                    style={{width:'1.25rem',height:'1.25rem',border:'none',padding:0,borderRadius:'9999px',cursor:'pointer',flexShrink:0,marginTop:'.25rem'}}
+                    style={{width:'1.5rem',height:'1.5rem',border:'none',padding:0,borderRadius:'50%',cursor:'pointer',flexShrink:0,marginTop:'.2rem',boxShadow:NM_UP_S,appearance:'none',WebkitAppearance:'none'}}
                   />
                 </div>
 
@@ -402,12 +421,12 @@ function App() {
                   const pct  = Math.round(done / items.length * 100);
                   return (
                     <div style={{marginBottom:'1rem'}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
-                        <span style={{fontSize:'.58rem',letterSpacing:'.1em',color:'#ccc'}}>오늘의 완료율</span>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.3rem'}}>
+                        <span style={{fontSize:'.58rem',letterSpacing:'.1em',color:'#a0a8b4'}}>오늘의 완료율</span>
                         <span style={{fontSize:'.62rem',fontWeight:'bold',color}}>{pct}%</span>
                       </div>
-                      <div style={{height:'2.5px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
-                        <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:'9999px',transition:'width .6s ease'}}/>
+                      <div style={{height:'6px',background:NM_BG,borderRadius:'9999px',overflow:'hidden',boxShadow:NM_DN_S}}>
+                        <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:'9999px',transition:'width .6s ease',boxShadow:`0 0 6px ${color}88`}}/>
                       </div>
                     </div>
                   );
@@ -416,7 +435,8 @@ function App() {
                 {/* 오늘의 한마디 */}
                 {(!noteEdit&&noteText.trim()) ? (
                   <div
-                    style={{fontWeight:'bold',whiteSpace:'pre-wrap',color,lineHeight:1.65,cursor:'text',fontSize:'.9rem',marginBottom:'1rem'}}
+                    style={{fontWeight:'bold',whiteSpace:'pre-wrap',color,lineHeight:1.65,cursor:'text',fontSize:'.9rem',marginBottom:'1rem',
+                      background:NM_BG,borderRadius:'10px',padding:'.5rem .65rem',boxShadow:NM_DN_S}}
                     onDoubleClick={()=>setNoteEdit(true)}
                     onContextMenu={e=>{e.preventDefault();setNoteEdit(true);}}
                   >{noteText}</div>
@@ -427,19 +447,19 @@ function App() {
                     onFocus={()=>setNoteEdit(true)}
                     onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();db.ref('notes/'+dk).set(noteText.trim());setNoteEdit(false);}}}
                     placeholder="오늘의 한마디 (Enter 저장, Shift+Enter 줄바꿈)" rows={2}
-                    style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontWeight:'bold',color,fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.65,marginBottom:'1rem'}}
+                    style={{width:'100%',border:'none',padding:'.5rem .65rem',borderRadius:'10px',resize:'none',fontWeight:'bold',color,fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.65,marginBottom:'1rem',background:NM_BG,boxShadow:NM_DN_S}}
                   />
                 )}
 
                 {/* input row */}
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'.5rem',marginBottom:'1.1rem'}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'.6rem',marginBottom:'1.2rem'}}>
                   {CATS.map(cat=>(
                     <textarea key={cat}
                       value={inputs[cat]}
                       onChange={e=>setIn(cat,e.target.value)}
                       onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo(cat);}}}
                       placeholder={cat} rows={3}
-                      style={{border:'1px solid #eee',padding:'.4rem .5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.78rem',lineHeight:1.55,color:'#555',background:'#fafafa'}}
+                      style={{border:'none',padding:'.5rem .55rem',borderRadius:'10px',resize:'vertical',fontFamily:'inherit',fontSize:'.78rem',lineHeight:1.55,color:'#5a6070',background:NM_BG,boxShadow:NM_DN_S}}
                     />
                   ))}
                 </div>
@@ -495,7 +515,7 @@ function App() {
                             )}
                           </div>
                         );})}
-                        {list.length===0 && pendingRtns.length===0 && !editMode && <div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
+                        {list.length===0 && pendingRtns.length===0 && !editMode && <div style={{fontSize:'.75rem',color:'#c8cdd6',padding:'.1rem 0'}}>—</div>}
                       </div>
                       {/* routine ghost items — OUTSIDE Sortable, clickable to apply */}
                       {pendingRtns.map((r,i)=>(
@@ -512,7 +532,7 @@ function App() {
                         </div>
                       ))}
                       {idx<CATS.length-1&&(
-                        <div style={{borderTop:`1px solid ${color}22`,margin:'.6rem 0'}}/>
+                        <div style={{height:'1px',background:`linear-gradient(90deg,transparent,${color}33,transparent)`,margin:'.7rem 0'}}/>
                       )}
                     </div>
                   );
@@ -525,7 +545,7 @@ function App() {
                 )}
 
                 {/* bottom actions */}
-                <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
+                <div style={{display:'flex',gap:'.5rem',marginTop:'.9rem',paddingTop:'.9rem',borderTop:`1px solid ${NM_SD}44`}}>
                   {items.length>0&&(
                     <button onClick={exportImg} style={pill(color,'#fff')}>Export</button>
                   )}
@@ -691,8 +711,9 @@ function JournalTab({dlabel,journal,color,onSave}) {
   React.useEffect(()=>setMText(journal.morning||''),[journal.morning]);
   React.useEffect(()=>setEText(journal.evening||''),[journal.evening]);
 
-  const VIEW={whiteSpace:'pre-wrap',fontSize:'.9rem',color:'#444',lineHeight:1.8,minHeight:'5rem',cursor:'text',paddingBottom:'.25rem'};
-  const TA  ={width:'100%',border:'1px solid #eee',padding:'.5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.8,background:'#fafafa'};
+  const VIEW={whiteSpace:'pre-wrap',fontSize:'.9rem',color:'#4a5060',lineHeight:1.8,minHeight:'5rem',cursor:'text',paddingBottom:'.25rem',
+    background:NM_BG,borderRadius:'12px',padding:'.6rem .75rem',boxShadow:NM_DN_S};
+  const TA  ={width:'100%',border:'none',padding:'.6rem .75rem',borderRadius:'12px',resize:'vertical',fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.8,background:NM_BG,boxShadow:NM_DN_S,color:'#4a5060'};
 
   function save(f,t,se){ onSave(f,t.trim()); se(false); }
 
@@ -731,7 +752,7 @@ function JournalTab({dlabel,journal,color,onSave}) {
           placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장, Shift+Enter 줄바꿈)" rows={5} style={TA}/>
       )}
 
-      <div style={{borderTop:`1px solid ${color}20`,margin:'1.25rem 0'}}/>
+      <div style={{height:'1px',background:`linear-gradient(90deg,transparent,${color}33,transparent)`,margin:'1.25rem 0'}}/>
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.5rem'}}>
         <span style={{fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block'}}>ᴇᴠᴇɴɪɴɢ · ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
@@ -745,7 +766,7 @@ function JournalTab({dlabel,journal,color,onSave}) {
           placeholder="오늘 감사했던 것들을 적어봐. (Enter 저장, Shift+Enter 줄바꿈)" rows={5} style={TA}/>
       )}
 
-      <div style={{borderTop:`1px solid ${color}20`,margin:'1.25rem 0'}}/>
+      <div style={{height:'1px',background:`linear-gradient(90deg,transparent,${color}33,transparent)`,margin:'1.25rem 0'}}/>
 
       <span style={{fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block',marginBottom:'.5rem'}}>ᴍᴏᴏᴅ</span>
       <div style={{display:'flex',gap:'.65rem'}}>
@@ -808,22 +829,22 @@ function WeekTab({dColors,accent}) {
       </div>
 
       {/* category bars */}
-      <div style={{display:'flex',gap:'.4rem',marginBottom:'1.35rem'}}>
+      <div style={{display:'flex',gap:'.5rem',marginBottom:'1.35rem'}}>
         {catStats.map(({cat,total,done})=>{
           const c=CAT_HUE[cat]||accent, p=total?Math.round(done/total*100):0;
           return (
-            <div key={cat} style={{flex:1,background:'#f8f8f8',borderRadius:'.5rem',padding:'.7rem .5rem',textAlign:'center'}}>
-              <div style={{fontSize:'.58rem',color:'#bbb',marginBottom:'.25rem',lineHeight:1.4}}>{cat}</div>
-              <div style={{fontSize:'1.05rem',fontWeight:'bold',color:c,marginBottom:'.3rem'}}>{p}%</div>
-              <div style={{height:'2px',background:'#ebebeb',borderRadius:'9999px',overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${p}%`,background:c,borderRadius:'9999px'}}/>
+            <div key={cat} style={{flex:1,background:NM_BG,borderRadius:'14px',padding:'.8rem .55rem',textAlign:'center',boxShadow:NM_UP_S}}>
+              <div style={{fontSize:'.58rem',color:'#a0a8b4',marginBottom:'.25rem',lineHeight:1.4}}>{cat}</div>
+              <div style={{fontSize:'1.05rem',fontWeight:'bold',color:c,marginBottom:'.35rem'}}>{p}%</div>
+              <div style={{height:'5px',background:NM_BG,borderRadius:'9999px',overflow:'hidden',boxShadow:NM_DN_S}}>
+                <div style={{height:'100%',width:`${p}%`,background:c,borderRadius:'9999px',boxShadow:`0 0 5px ${c}88`}}/>
               </div>
             </div>
           );
         })}
       </div>
 
-      <div style={{borderTop:'1px solid #f0f0f0',marginBottom:'1rem'}}/>
+      <div style={{height:'1px',background:`linear-gradient(90deg,transparent,${NM_SD},transparent)`,marginBottom:'1rem'}}/>
 
       {/* day rows */}
       {data.map(({date,key,total,done,journal,note})=>{
@@ -832,26 +853,27 @@ function WeekTab({dColors,accent}) {
         const mood=MOODS.find(m=>m.l===journal.mood);
         return (
           <div key={key} style={{
-            padding:'.5rem .65rem',borderRadius:'.4rem',marginBottom:'.3rem',
-            border:`1.5px solid ${isToday?c:'transparent'}`,
-            background:isToday?`${c}07`:'transparent',
-            opacity:isFut?0.32:1,
+            padding:'.55rem .7rem',borderRadius:'12px',marginBottom:'.4rem',
+            background:NM_BG,
+            boxShadow: isToday ? `3px 3px 8px ${NM_SD}, -3px -3px 8px ${NM_SL}, inset 0 0 0 1.5px ${c}` : NM_UP_S,
+            opacity:isFut?0.35:1,
+            transition:'box-shadow .2s',
           }}>
             <div style={{display:'flex',alignItems:'center',gap:'.55rem'}}>
               <div style={{minWidth:'4.2rem',display:'flex',gap:'.3rem',alignItems:'baseline'}}>
-                <span style={{fontSize:'.67rem',color:'#bbb'}}>{date.toLocaleString('en-US',{weekday:'short'})}</span>
-                <span style={{fontSize:'.88rem',fontWeight:isToday?'bold':'500',color:isToday?c:'#333'}}>{date.getDate()}</span>
+                <span style={{fontSize:'.67rem',color:'#a0a8b4'}}>{date.toLocaleString('en-US',{weekday:'short'})}</span>
+                <span style={{fontSize:'.88rem',fontWeight:isToday?'bold':'500',color:isToday?c:'#4a5060'}}>{date.getDate()}</span>
               </div>
               <div style={{flex:1}}>
-                <div style={{height:'2.5px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
-                  <div style={{height:'100%',width:`${ratio*100}%`,background:c,borderRadius:'9999px',transition:'width .5s'}}/>
+                <div style={{height:'5px',background:NM_BG,borderRadius:'9999px',overflow:'hidden',boxShadow:NM_DN_S}}>
+                  <div style={{height:'100%',width:`${ratio*100}%`,background:c,borderRadius:'9999px',transition:'width .5s',boxShadow:`0 0 5px ${c}88`}}/>
                 </div>
               </div>
-              <span style={{fontSize:'.7rem',color:'#bbb',minWidth:'2rem',textAlign:'right'}}>{total?`${done}/${total}`:'—'}</span>
-              <span style={{fontSize:'.95rem',opacity:mood?1:0.12}}>{mood?mood.e:'·'}</span>
+              <span style={{fontSize:'.7rem',color:'#a0a8b4',minWidth:'2rem',textAlign:'right'}}>{total?`${done}/${total}`:'—'}</span>
+              <span style={{fontSize:'.95rem',opacity:mood?1:0.15}}>{mood?mood.e:'·'}</span>
             </div>
             {note&&!isFut&&(
-              <div style={{fontSize:'.7rem',color:'#bbb',marginTop:'.22rem',paddingLeft:'4.9rem',fontStyle:'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              <div style={{fontSize:'.7rem',color:'#a0a8b4',marginTop:'.22rem',paddingLeft:'4.9rem',fontStyle:'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
                 "{note}"
               </div>
             )}
@@ -888,10 +910,10 @@ function RoutineModal({routines,onClose}) {
     return `매주 ${days}`;
   }
 
-  const inp={border:'1px solid #eee',borderRadius:'.375rem',padding:'.38rem .55rem',fontFamily:'inherit',fontSize:'.82rem',background:'#fff',outline:'none'};
+  const inp={border:'none',borderRadius:'10px',padding:'.42rem .6rem',fontFamily:'inherit',fontSize:'.82rem',background:NM_BG,outline:'none',boxShadow:NM_DN_S,color:'#4a5060'};
 
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.22)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={onClose}>
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.18)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={onClose}>
       <div style={{...CARD,width:'100%',maxWidth:'350px',maxHeight:'78vh',overflow:'auto'}} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
           <span style={sectionLabel({marginBottom:0})}>ʀᴏᴜᴛɪɴᴇ</span>
@@ -899,19 +921,19 @@ function RoutineModal({routines,onClose}) {
         </div>
 
         {routines.length===0&&(
-          <div style={{textAlign:'center',color:'#e0e0e0',fontSize:'.85rem',padding:'1rem 0 .5rem'}}>등록된 루틴이 없어.</div>
+          <div style={{textAlign:'center',color:'#c0c8d4',fontSize:'.85rem',padding:'1rem 0 .5rem'}}>등록된 루틴이 없어.</div>
         )}
         {routines.map(r=>(
-          <div key={r.id} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.45rem .55rem',background:'#f8f8f8',borderRadius:'.4rem',marginBottom:'.3rem'}}>
+          <div key={r.id} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.5rem .6rem',background:NM_BG,borderRadius:'10px',marginBottom:'.35rem',boxShadow:NM_UP_S}}>
             <div style={{flex:1}}>
-              <div style={{fontSize:'.84rem',color:'#333'}}>{r.text}</div>
-              <div style={{fontSize:'.68rem',color:'#bbb',marginTop:'.1rem'}}>{r.category} · {rtnLabel(r)}</div>
+              <div style={{fontSize:'.84rem',color:'#4a5060'}}>{r.text}</div>
+              <div style={{fontSize:'.68rem',color:'#a0a8b4',marginTop:'.1rem'}}>{r.category} · {rtnLabel(r)}</div>
             </div>
             <button onClick={()=>db.ref('routines/'+r.id).remove()} className="icon-btn">✕</button>
           </div>
         ))}
 
-        {routines.length>0&&<div style={{borderTop:'1px solid #f0f0f0',margin:'.75rem 0'}}/>}
+        {routines.length>0&&<div style={{height:'1px',background:`linear-gradient(90deg,transparent,${NM_SD},transparent)`,margin:'.75rem 0'}}/>}
 
         <span style={sectionLabel()}>새 루틴 추가</span>
         <input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="할 일 내용"
@@ -927,16 +949,18 @@ function RoutineModal({routines,onClose}) {
           <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'.4rem'}}>
             {WEEK_KO.map((l,i)=>(
               <button key={i} onClick={()=>toggleWd(i)} style={{
-                padding:'.22rem .55rem',borderRadius:'9999px',border:'1px solid',
+                padding:'.22rem .55rem',borderRadius:'9999px',border:'none',
                 fontSize:'.72rem',cursor:'pointer',fontFamily:'inherit',
-                background:wds.includes(i)?'#222':'#fff',
-                color:wds.includes(i)?'#fff':'#bbb',
-                borderColor:wds.includes(i)?'#222':'#eee',
+                background:NM_BG,
+                color:wds.includes(i)?'#3d4350':'#a0a8b4',
+                boxShadow:wds.includes(i)?NM_DN_S:NM_UP_S,
+                fontWeight:wds.includes(i)?'bold':'normal',
+                transition:'box-shadow .15s',
               }}>{l}</button>
             ))}
           </div>
         )}
-        <button onClick={add} style={{...pill('#222','#fff'),width:'100%',padding:'.48rem',borderRadius:'.4rem',display:'block'}}>추가</button>
+        <button onClick={add} style={{...pill('#3d4350','#fff'),width:'100%',padding:'.5rem',borderRadius:'10px',display:'block',boxShadow:`3px 3px 8px ${NM_SD}, -3px -3px 8px ${NM_SL}`}}>추가</button>
       </div>
     </div>
   );
@@ -1004,24 +1028,25 @@ function WeatherWidget({color}) {
     <div ref={wrapRef} style={{position:'fixed',bottom:'116px',left:'20px',zIndex:1000}}>
       <button onClick={()=>setOpen(v=>!v)} style={{
         display:'flex',alignItems:'center',gap:'.35rem',
-        background:'#fff',border:'none',borderRadius:'9999px',
+        background:NM_BG,border:'none',borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+        boxShadow:open?NM_DN_S:NM_UP_S,fontFamily:'inherit',
+        transition:'box-shadow .2s',
       }}>
         <span style={{fontSize:'12px'}}>{emoji}</span>
-        <span style={{fontSize:'10px',color:weather?ac:'#ccc',letterSpacing:'.04em',fontVariantNumeric:'tabular-nums'}}>{temp||'날씨'}</span>
+        <span style={{fontSize:'10px',color:weather?ac:'#b8bec9',letterSpacing:'.04em',fontVariantNumeric:'tabular-nums'}}>{temp||'날씨'}</span>
       </button>
       {open && weather && (
         <div style={{
-          position:'absolute',bottom:'42px',left:0,width:'160px',
-          background:'#fff',borderRadius:'12px',
-          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',border:'1px solid #f0f0f0',
+          position:'absolute',bottom:'46px',left:0,width:'160px',
+          background:NM_BG,borderRadius:'16px',
+          boxShadow:NM_UP,
           padding:'14px 16px 12px',
         }}>
           <div style={{fontSize:'2rem',marginBottom:'6px'}}>{wmoEmoji(weather.weathercode)}</div>
-          <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333'}}>{Math.round(weather.temperature)}°</div>
-          <div style={{fontSize:'.72rem',color:'#999',marginTop:'2px'}}>{wmoDesc(weather.weathercode)}</div>
-          <div style={{fontSize:'.65rem',color:'#ccc',marginTop:'3px'}}>풍속 {weather.windspeed} km/h</div>
+          <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#3d4350'}}>{Math.round(weather.temperature)}°</div>
+          <div style={{fontSize:'.72rem',color:'#8a92a0',marginTop:'2px'}}>{wmoDesc(weather.weathercode)}</div>
+          <div style={{fontSize:'.65rem',color:'#b0b8c4',marginTop:'3px'}}>풍속 {weather.windspeed} km/h</div>
         </div>
       )}
     </div>
@@ -1103,27 +1128,28 @@ function PomodoroWidget({color}) {
   const circum=2*Math.PI*42;
   const progress=1-secs/(durations[mode]*60);
   const btnRow={display:'flex',alignItems:'center',justifyContent:'center',width:'22px',height:'22px',
-    borderRadius:'50%',border:'1px solid #e8e8e8',background:'#f8f8f8',cursor:'pointer',
-    fontSize:'13px',color:'#888',fontFamily:'inherit'};
+    borderRadius:'50%',border:'none',background:NM_BG,cursor:'pointer',
+    fontSize:'13px',color:'#8a92a0',fontFamily:'inherit',boxShadow:NM_UP_S};
 
   return (
     <div ref={wrapRef} style={{position:'fixed',bottom:'68px',left:'20px',zIndex:1000}}>
       {/* pill */}
       <button onClick={()=>{setOpen(v=>!v);}} style={{
         display:'flex',alignItems:'center',gap:'.35rem',
-        background:'#fff',border:'none',borderRadius:'9999px',
+        background:NM_BG,border:'none',borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+        boxShadow:open?NM_DN_S:NM_UP_S,fontFamily:'inherit',
+        transition:'box-shadow .2s',
       }}>
         <span style={{fontSize:'11px'}}>🍅</span>
-        <span style={{fontSize:'10px',letterSpacing:'.04em',color:running?ac:'#ccc',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
+        <span style={{fontSize:'10px',letterSpacing:'.04em',color:running?ac:'#b8bec9',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
       </button>
 
       {open&&(
         <div style={{
-          position:'absolute',bottom:'42px',left:0,width:'210px',
-          background:'#fff',borderRadius:'12px',
-          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',border:'1px solid #f0f0f0',
+          position:'absolute',bottom:'46px',left:0,width:'210px',
+          background:NM_BG,borderRadius:'18px',
+          boxShadow:NM_UP,
           padding:'14px 16px 12px',
         }}>
           {/* gear button */}
@@ -1135,13 +1161,13 @@ function PomodoroWidget({color}) {
           {showSettings?(
             /* Settings view */
             <div>
-              <div style={{fontWeight:'bold',fontSize:'11px',marginBottom:'.85rem',color:'#555'}}>타이머 설정</div>
+              <div style={{fontWeight:'bold',fontSize:'11px',marginBottom:'.85rem',color:'#5a6070'}}>타이머 설정</div>
               {Object.entries(MODE_LABELS).map(([m,label])=>(
                 <div key={m} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.6rem'}}>
-                  <span style={{fontSize:'.78rem',color:'#999',width:'52px'}}>{label}</span>
+                  <span style={{fontSize:'.78rem',color:'#8a92a0',width:'52px'}}>{label}</span>
                   <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
                     <button onClick={()=>adjustDur(m,-5)} style={btnRow}>−</button>
-                    <span style={{fontSize:'.82rem',fontWeight:'bold',color:'#333',width:'36px',textAlign:'center',fontVariantNumeric:'tabular-nums'}}>{durations[m]}분</span>
+                    <span style={{fontSize:'.82rem',fontWeight:'bold',color:'#3d4350',width:'36px',textAlign:'center',fontVariantNumeric:'tabular-nums'}}>{durations[m]}분</span>
                     <button onClick={()=>adjustDur(m,+5)} style={btnRow}>+</button>
                   </div>
                 </div>
@@ -1151,41 +1177,43 @@ function PomodoroWidget({color}) {
             /* Timer view */
             <>
               {/* mode tabs */}
-              <div style={{display:'flex',gap:'3px',marginBottom:'14px',paddingRight:'48px'}}>
+              <div style={{display:'flex',gap:'5px',marginBottom:'14px',paddingRight:'48px'}}>
                 {Object.entries(MODE_LABELS).map(([k,l])=>(
                   <button key={k} onClick={()=>switchMode(k)} style={{
-                    flex:1,border:'none',borderRadius:'6px',padding:'.28rem 0',fontSize:'9px',cursor:'pointer',fontFamily:'inherit',
-                    background:mode===k?ac:'#f5f5f5',color:mode===k?'#fff':'#bbb',
+                    flex:1,border:'none',borderRadius:'8px',padding:'.28rem 0',fontSize:'9px',cursor:'pointer',fontFamily:'inherit',
+                    background:mode===k?ac:NM_BG,color:mode===k?'#fff':'#a0a8b4',
+                    boxShadow:mode===k?`inset 2px 2px 5px rgba(0,0,0,.2)`:NM_UP_S,
+                    transition:'all .15s',
                   }}>{l}</button>
                 ))}
               </div>
 
               {/* circular timer */}
               <div style={{display:'flex',justifyContent:'center',marginBottom:'12px'}}>
-                <div style={{position:'relative',width:'100px',height:'100px'}}>
+                <div style={{position:'relative',width:'100px',height:'100px',borderRadius:'50%',boxShadow:NM_DN}}>
                   <svg width="100" height="100" style={{transform:'rotate(-90deg)',position:'absolute',inset:0}}>
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="#f0f0f0" strokeWidth="4"/>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke={NM_SD} strokeWidth="4"/>
                     <circle cx="50" cy="50" r="42" fill="none" stroke={ac} strokeWidth="4"
                       strokeDasharray={`${circum}`} strokeDashoffset={`${circum*(1-progress)}`}
-                      strokeLinecap="round" style={{transition:'stroke-dashoffset 0.8s linear'}}/>
+                      strokeLinecap="round" style={{transition:'stroke-dashoffset 0.8s linear',filter:`drop-shadow(0 0 4px ${ac}88)`}}/>
                   </svg>
                   <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'2px'}}>
-                    <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333',fontVariantNumeric:'tabular-nums',letterSpacing:'0.02em'}}>{timeStr}</div>
-                    <div style={{fontSize:'.5rem',color:'#ccc',letterSpacing:'.16em'}}>{MODE_LABELS[mode].toUpperCase()}</div>
+                    <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#3d4350',fontVariantNumeric:'tabular-nums',letterSpacing:'0.02em'}}>{timeStr}</div>
+                    <div style={{fontSize:'.5rem',color:'#b0b8c4',letterSpacing:'.16em'}}>{MODE_LABELS[mode].toUpperCase()}</div>
                   </div>
                 </div>
               </div>
 
               {/* controls */}
-              <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
-                <button onClick={reset} style={{background:'#f5f5f5',border:'none',borderRadius:'50%',width:'30px',height:'30px',cursor:'pointer',fontSize:'12px',color:'#ccc',display:'flex',alignItems:'center',justifyContent:'center'}}>↺</button>
-                <button onClick={()=>setRunning(r=>!r)} style={{background:ac,border:'none',borderRadius:'50%',width:'40px',height:'40px',cursor:'pointer',color:'#fff',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 3px 10px ${ac}44`}}>{running?'⏸':'▶'}</button>
+              <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'10px',marginBottom:'10px'}}>
+                <button onClick={reset} style={{background:NM_BG,border:'none',borderRadius:'50%',width:'32px',height:'32px',cursor:'pointer',fontSize:'12px',color:'#a0a8b4',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:NM_UP_S}}>↺</button>
+                <button onClick={()=>setRunning(r=>!r)} style={{background:ac,border:'none',borderRadius:'50%',width:'42px',height:'42px',cursor:'pointer',color:'#fff',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`3px 3px 8px ${NM_SD}, -3px -3px 8px ${NM_SL}, 0 4px 14px ${ac}55`}}>{running?'⏸':'▶'}</button>
               </div>
 
               {/* session dots */}
-              <div style={{display:'flex',justifyContent:'center',gap:'5px'}}>
+              <div style={{display:'flex',justifyContent:'center',gap:'6px'}}>
                 {[0,1,2,3].map(i=>(
-                  <div key={i} style={{width:'6px',height:'6px',borderRadius:'50%',background:i<session?ac:'#ebebeb',transition:'background .3s'}}/>
+                  <div key={i} style={{width:'7px',height:'7px',borderRadius:'50%',background:i<session?ac:NM_BG,boxShadow:i<session?`0 0 5px ${ac}88`:NM_DN_S,transition:'background .3s,box-shadow .3s'}}/>
                 ))}
               </div>
             </>
@@ -1268,26 +1296,26 @@ function MusicWidget({color}) {
       {/* pill toggle */}
       <button onClick={()=>setOpen(v=>!v)} style={{
         display:'flex',alignItems:'center',gap:'.35rem',
-        background:'#fff',border:'none',borderRadius:'9999px',
+        background:NM_BG,border:'none',borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+        boxShadow:open?NM_DN_S:NM_UP_S,fontFamily:'inherit',
+        transition:'box-shadow .2s',
       }}>
-        <span style={{fontSize:'12px',color:currentEmbed?ac:'#ccc'}}>♪</span>
-        <span style={{fontSize:'10px',color:'#bbb',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
+        <span style={{fontSize:'12px',color:currentEmbed?ac:'#b8bec9'}}>♪</span>
+        <span style={{fontSize:'10px',color:'#b0b8c4',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
       </button>
 
       {/* panel — always in DOM; moves off-screen when closed so iframe keeps playing */}
       <div style={{
-        position:'absolute',bottom:'42px',
+        position:'absolute',bottom:'46px',
         left:open?'0':'-9999px',
-        width:'290px',background:'#fff',borderRadius:'12px',overflow:'hidden',
-        boxShadow:open?'0 8px 28px rgba(0,0,0,0.11)':'none',
-        border:'1px solid #f0f0f0',
+        width:'290px',background:NM_BG,borderRadius:'18px',overflow:'hidden',
+        boxShadow:open?NM_UP:'none',
       }}>
         {/* header */}
         {open&&(
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px',borderBottom:'1px solid #f7f7f7'}}>
-            <span style={{fontSize:'9px',color:'#bbb',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px',borderBottom:`1px solid ${NM_SD}55`}}>
+            <span style={{fontSize:'9px',color:'#a0a8b4',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
             <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:ac,cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit',fontWeight:'bold'}}>+ 추가</button>
           </div>
         )}
@@ -1297,9 +1325,9 @@ function MusicWidget({color}) {
           <div style={{display:'flex',gap:'6px',padding:'8px 10px'}}>
             <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTrack()}
               placeholder="YouTube URL (영상·플레이리스트 모두 가능)"
-              style={{flex:1,background:'#f8f8f8',border:'1px solid #eee',borderRadius:'6px',padding:'.3rem .55rem',color:'#555',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
+              style={{flex:1,background:NM_BG,border:'none',borderRadius:'8px',padding:'.3rem .55rem',color:'#4a5060',fontSize:'10px',fontFamily:'inherit',outline:'none',boxShadow:NM_DN_S}}
             />
-            <button onClick={addTrack} style={{background:ac,border:'none',borderRadius:'6px',color:'#fff',cursor:'pointer',fontSize:'11px',padding:'0 .55rem'}}>→</button>
+            <button onClick={addTrack} style={{background:ac,border:'none',borderRadius:'8px',color:'#fff',cursor:'pointer',fontSize:'11px',padding:'0 .55rem',boxShadow:`2px 2px 5px ${NM_SD}`}}>→</button>
           </div>
         )}
 
@@ -1309,12 +1337,14 @@ function MusicWidget({color}) {
             {playlist.map((track,i)=>(
               <div key={i} onClick={()=>setCurrent(i)} style={{
                 display:'flex',alignItems:'center',gap:'6px',
-                padding:'5px 8px',borderRadius:'6px',marginBottom:'2px',
-                background:i===current?ac+'18':'transparent',cursor:'pointer',
+                padding:'5px 8px',borderRadius:'8px',marginBottom:'3px',
+                background:i===current?ac+'22':NM_BG,
+                boxShadow:i===current?NM_DN_S:'none',
+                cursor:'pointer',transition:'background .15s',
               }}>
-                <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
-                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
-                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
+                <span style={{fontSize:'8px',color:i===current?ac:'#c0c8d4'}}>▶</span>
+                <span style={{fontSize:'9px',color:i===current?'#3d4350':'#a0a8b4',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#b8bec9',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
               </div>
             ))}
           </div>
@@ -1322,15 +1352,16 @@ function MusicWidget({color}) {
 
         {/* controls — prev · play/pause · next · shuffle · volume */}
         {open&&playlist.length>0&&(
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'4px',padding:'6px 10px 7px',borderTop:'1px solid #f5f5f5'}}>
-            <button onClick={()=>setShuffle(v=>!v)} title="셔플" style={{...ctrlBtn,fontSize:'12px',color:shuffle?ac:'#ccc'}}>⇌</button>
-            <button onClick={prevTrack} title="이전곡" style={{...ctrlBtn,fontSize:'12px',color:'#bbb'}}>⏮</button>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'6px',padding:'8px 10px 9px',borderTop:`1px solid ${NM_SD}55`}}>
+            <button onClick={()=>setShuffle(v=>!v)} title="셔플" style={{...ctrlBtn,fontSize:'12px',color:shuffle?ac:'#b8bec9'}}>⇌</button>
+            <button onClick={prevTrack} title="이전곡" style={{...ctrlBtn,fontSize:'12px',color:'#b0b8c4'}}>⏮</button>
             <button onClick={togglePlay} title={playing?'일시정지':'재생'} style={{
-              width:'26px',height:'26px',borderRadius:'50%',flexShrink:0,
+              width:'28px',height:'28px',borderRadius:'50%',flexShrink:0,
               background:ac,border:'none',color:'#fff',cursor:'pointer',fontSize:'10px',
               display:'flex',alignItems:'center',justifyContent:'center',
+              boxShadow:`2px 2px 6px ${NM_SD}, -2px -2px 6px ${NM_SL}, 0 3px 10px ${ac}55`,
             }}>{playing?'⏸':'▶'}</button>
-            <button onClick={nextTrack} title="다음곡" style={{...ctrlBtn,fontSize:'12px',color:'#bbb'}}>⏭</button>
+            <button onClick={nextTrack} title="다음곡" style={{...ctrlBtn,fontSize:'12px',color:'#b0b8c4'}}>⏭</button>
             <input type="range" min="0" max="100" value={volume}
               onChange={e=>handleVolume(Number(e.target.value))}
               title={`음량 ${volume}%`}
@@ -1342,9 +1373,9 @@ function MusicWidget({color}) {
         {/* empty state */}
         {open&&playlist.length===0&&(
           <div style={{padding:'20px 12px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px'}}>
-            <span style={{fontSize:'20px',opacity:.15}}>♪</span>
-            <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
-            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
+            <span style={{fontSize:'20px',opacity:.12}}>♪</span>
+            <span style={{fontSize:'10px',color:'#b8bec9',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
+            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:NM_BG,border:'none',borderRadius:'8px',color:'#8a92a0',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit',boxShadow:NM_UP_S}}>+ 추가</button>
           </div>
         )}
 
@@ -1397,59 +1428,49 @@ function StickyWidget({color, open, onOpen, onClose}) {
     e.target.value='';
   }
 
-  /* theme-tinted palette */
-  const panelBg  = ac + '0e'; // 거의 흰색에 테마색 살짝
-  const border   = ac + '30';
-  const inputBg  = ac + '08';
-  const inputBdr = ac + '28';
-  const noteBdr  = ac + '22';
-  const labelClr = ac + 'aa';
-  const addBg    = ac + '22';
-
   return (
     <div style={{position:'fixed',top:'1rem',right:'1rem',zIndex:900}}>
       {/* toggle pill */}
       <button onClick={()=>open?onClose():onOpen()} style={{
         display:'flex',alignItems:'center',gap:'.3rem',
-        background:open ? ac+'22' : '#fff',
-        border:`1px solid ${open ? ac+'44' : 'transparent'}`,
+        background:NM_BG,
+        border:'none',
         borderRadius:'9999px',
         padding:'.38rem .85rem',cursor:'pointer',
-        boxShadow:'0 2px 10px rgba(0,0,0,0.09)',fontFamily:'inherit',
-        transition:'background .15s',
+        boxShadow:open?NM_DN_S:NM_UP_S,fontFamily:'inherit',
+        transition:'box-shadow .15s',
       }}>
-        <span style={{fontSize:'11px',color:open ? ac : '#bbb'}}>✎</span>
-        <span style={{fontSize:'10px',color:open ? ac+'cc' : '#bbb',letterSpacing:'.1em'}}>ᴍᴇᴍᴏ</span>
+        <span style={{fontSize:'11px',color:open ? ac : '#b8bec9'}}>✎</span>
+        <span style={{fontSize:'10px',color:open ? ac+'cc' : '#b0b8c4',letterSpacing:'.1em'}}>ᴍᴇᴍᴏ</span>
       </button>
 
       {/* panel — opens downward */}
       {open&&(
         <div style={{
-          position:'absolute',top:'calc(100% + 6px)',right:0,
+          position:'absolute',top:'calc(100% + 8px)',right:0,
           width:'264px',maxHeight:'440px',
-          background:'#fff',borderRadius:'12px',
-          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',
-          border:`1px solid ${border}`,
+          background:NM_BG,borderRadius:'18px',
+          boxShadow:NM_UP,
           display:'flex',flexDirection:'column',overflow:'hidden',
         }}>
           {/* header */}
-          <div style={{padding:'9px 13px 7px',borderBottom:`1px solid ${border}`,flexShrink:0,background:panelBg}}>
-            <span style={{fontSize:'9px',color:labelClr,letterSpacing:'.14em'}}>ᴍᴇᴍᴏ</span>
+          <div style={{padding:'10px 14px 8px',borderBottom:`1px solid ${NM_SD}55`,flexShrink:0}}>
+            <span style={{fontSize:'9px',color:`${ac}aa`,letterSpacing:'.14em'}}>ᴍᴇᴍᴏ</span>
           </div>
 
           {/* input area */}
-          <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:`1px solid ${border}`,background:panelBg}}>
+          <div style={{padding:'8px 12px 7px',flexShrink:0,borderBottom:`1px solid ${NM_SD}55`}}>
             <textarea value={input} onChange={e=>setInput(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addNote();}}}
               placeholder="메모 입력. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
-              style={{width:'100%',background:inputBg,border:`1px solid ${inputBdr}`,borderRadius:'6px',
-                padding:'.38rem .5rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
-                resize:'none',outline:'none',color:'#444',display:'block'}}
+              style={{width:'100%',background:NM_BG,border:'none',borderRadius:'8px',
+                padding:'.4rem .55rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
+                resize:'none',outline:'none',color:'#4a5060',display:'block',boxShadow:NM_DN_S}}
             />
             {/* pending image preview */}
             {pendImg&&(
               <div style={{position:'relative',display:'inline-block',marginTop:'5px'}}>
-                <img src={pendImg} alt="" style={{maxWidth:'100%',maxHeight:'72px',borderRadius:'5px',border:`1px solid ${inputBdr}`,display:'block'}}/>
+                <img src={pendImg} alt="" style={{maxWidth:'100%',maxHeight:'72px',borderRadius:'8px',display:'block'}}/>
                 <button onClick={()=>setPendImg(null)} style={{
                   position:'absolute',top:'-5px',right:'-5px',
                   background:'#ff7272',border:'none',borderRadius:'50%',
@@ -1458,28 +1479,29 @@ function StickyWidget({color, open, onOpen, onClose}) {
                 }}>✕</button>
               </div>
             )}
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'5px'}}>
-              <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',color:labelClr,padding:'1px 3px',fontFamily:'inherit'}}>📎 이미지</button>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'6px'}}>
+              <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',color:`${ac}aa`,padding:'1px 3px',fontFamily:'inherit'}}>📎 이미지</button>
               <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
-              <button onClick={addNote} style={{background:addBg,border:`1px solid ${border}`,borderRadius:'6px',cursor:'pointer',fontSize:'10px',padding:'.22rem .65rem',fontFamily:'inherit',color:ac,fontWeight:'bold'}}>추가 →</button>
+              <button onClick={addNote} style={{background:NM_BG,border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'10px',padding:'.25rem .7rem',fontFamily:'inherit',color:ac,fontWeight:'bold',boxShadow:NM_UP_S}}>추가 →</button>
             </div>
           </div>
 
           {/* notes list */}
-          <div style={{overflowY:'auto',padding:'6px 10px 10px',flex:1}}>
+          <div style={{overflowY:'auto',padding:'7px 11px 11px',flex:1}}>
             {notes.length===0&&(
-              <div style={{textAlign:'center',color:'#ccc',fontSize:'10px',padding:'18px 0'}}>아직 메모가 없어.</div>
+              <div style={{textAlign:'center',color:'#b8bec9',fontSize:'10px',padding:'18px 0'}}>아직 메모가 없어.</div>
             )}
             {notes.map(note=>(
               <div key={note.id} style={{
-                background:'#fff',border:`1px solid ${noteBdr}`,borderRadius:'8px',
-                padding:'8px 28px 8px 10px',marginBottom:'6px',position:'relative',
+                background:NM_BG,borderRadius:'10px',
+                padding:'9px 28px 9px 11px',marginBottom:'6px',position:'relative',
+                boxShadow:NM_UP_S,
               }}>
-                {note.img&&<img src={note.img} alt="" style={{width:'100%',borderRadius:'5px',marginBottom:'5px',display:'block'}}/>}
-                {note.text&&<div style={{fontSize:'10px',color:'#333',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{note.text}</div>}
+                {note.img&&<img src={note.img} alt="" style={{width:'100%',borderRadius:'7px',marginBottom:'5px',display:'block'}}/>}
+                {note.text&&<div style={{fontSize:'10px',color:'#4a5060',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{note.text}</div>}
                 <button onClick={()=>delNote(note.id)} style={{
-                  position:'absolute',top:'6px',right:'7px',background:'none',border:'none',
-                  color:'#ccc',cursor:'pointer',fontSize:'10px',padding:0,lineHeight:1,
+                  position:'absolute',top:'7px',right:'8px',background:'none',border:'none',
+                  color:'#b8bec9',cursor:'pointer',fontSize:'10px',padding:0,lineHeight:1,
                 }}>✕</button>
               </div>
             ))}
@@ -1522,73 +1544,74 @@ function DemianWidget() {
   function upd(d,f,v) { const n=parseInt(v,10); if(isNaN(n)||n<0||n>23) return; setEdit(p=>({...p,[d]:{...(p[d]||{s:0,e:0}),[f]:n}})); }
   function tog(d) { setEdit(p=>{ const n={...p}; n[d]?delete n[d]:n[d]=DEF_SCHED[d]||{s:6,e:18}; return n; }); }
 
-  const numInp={width:'2.9rem',padding:'.2rem',border:'1px solid #eee',borderRadius:'4px',textAlign:'center',fontSize:'10px',fontFamily:'inherit',outline:'none'};
+  const numInp={width:'2.9rem',padding:'.2rem',border:'none',borderRadius:'6px',textAlign:'center',fontSize:'10px',fontFamily:'inherit',outline:'none',background:NM_BG,boxShadow:NM_DN_S,color:'#4a5060'};
 
   return (
     <>
       <div onClick={()=>{setVis(v=>!v);if(vis)setCfg(false);}} style={{
         position:'fixed',bottom:'20px',right:'20px',
         width:'50px',height:'50px',borderRadius:'50%',
-        background:online?'#b8b8b8':'#d8d8d8',
+        background:NM_BG,
         display:'flex',alignItems:'center',justifyContent:'center',
         cursor:'pointer',zIndex:1000,
-        boxShadow:'0 4px 16px rgba(0,0,0,0.14)',
-        transition:'background .3s',
+        boxShadow:vis?NM_DN:NM_UP,
+        transition:'box-shadow .3s',
       }}>
-        <span style={{fontSize:'19px'}}>🖤</span>
+        <span style={{fontSize:'19px',filter:online?'none':'grayscale(1) opacity(.5)'}}>🖤</span>
       </div>
 
       {vis&&(
         <div style={{
-          position:'fixed',bottom:'80px',right:'20px',width:'265px',
-          background:'#fff',borderRadius:'12px',padding:'15px 17px',
-          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',zIndex:999,
+          position:'fixed',bottom:'82px',right:'20px',width:'265px',
+          background:NM_BG,borderRadius:'18px',padding:'15px 17px',
+          boxShadow:NM_UP,zIndex:999,
         }}>
           <button onClick={e=>{e.stopPropagation();cfg?setCfg(false):(setEdit({...sched}),setCfg(true));}} style={{
             position:'absolute',top:'10px',right:'13px',
-            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#ccc',padding:0,fontFamily:'inherit'
+            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#b0b8c4',padding:0,fontFamily:'inherit'
           }}>⚙ 설정</button>
 
           {cfg?(
             <div>
-              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.7rem'}}>위젯 설정</div>
-              <div style={{fontSize:'10px',color:'#ccc',marginBottom:'.5rem'}}>요일별 집중 시간 (24시)</div>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.7rem',color:'#4a5060'}}>위젯 설정</div>
+              <div style={{fontSize:'10px',color:'#b0b8c4',marginBottom:'.5rem'}}>요일별 집중 시간 (24시)</div>
               {[1,2,3,4,5,6,0].map(d=>(
                 <div key={d} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.38rem'}}>
                   <button onClick={()=>tog(d)} style={{
                     width:'1.4rem',height:'.85rem',borderRadius:'9999px',border:'none',cursor:'pointer',padding:0,flexShrink:0,
-                    background:edit[d]?'#444':'#e8e8e8',position:'relative',transition:'background .2s',
+                    background:edit[d]?'#5a6070':NM_BG,position:'relative',transition:'background .2s',
+                    boxShadow:edit[d]?`inset 2px 2px 4px rgba(0,0,0,.25)`:NM_DN_S,
                   }}>
-                    <span style={{position:'absolute',top:'1px',left:edit[d]?'6px':'1px',width:'calc(.85rem - 4px)',height:'calc(.85rem - 4px)',borderRadius:'50%',background:'#fff',transition:'left .2s'}}/>
+                    <span style={{position:'absolute',top:'1px',left:edit[d]?'6px':'1px',width:'calc(.85rem - 4px)',height:'calc(.85rem - 4px)',borderRadius:'50%',background:'#fff',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}}/>
                   </button>
-                  <span style={{width:'1.2rem',fontSize:'11px',fontWeight:'600',color:edit[d]?'#333':'#ccc'}}>{DAY_KO[d]}</span>
+                  <span style={{width:'1.2rem',fontSize:'11px',fontWeight:'600',color:edit[d]?'#3d4350':'#b8bec9'}}>{DAY_KO[d]}</span>
                   {edit[d]?(
                     <>
                       <input type="number" min="0" max="23" value={edit[d].s} onChange={e=>upd(d,'s',e.target.value)} style={numInp}/>
-                      <span style={{color:'#ddd',fontSize:'9px'}}>–</span>
+                      <span style={{color:'#c8cdd6',fontSize:'9px'}}>–</span>
                       <input type="number" min="0" max="23" value={edit[d].e} onChange={e=>upd(d,'e',e.target.value)} style={numInp}/>
-                      <span style={{color:'#ccc',fontSize:'9px'}}>시</span>
+                      <span style={{color:'#b0b8c4',fontSize:'9px'}}>시</span>
                     </>
                   ):(
-                    <span style={{fontSize:'9px',color:'#ccc'}}>휴일</span>
+                    <span style={{fontSize:'9px',color:'#b8bec9'}}>휴일</span>
                   )}
                 </div>
               ))}
               <div style={{display:'flex',gap:'.4rem',marginTop:'.65rem'}}>
-                <button onClick={()=>setCfg(false)} style={{...pill('#f5f5f5','#aaa',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>취소</button>
-                <button onClick={save} style={{...pill('#222','#fff',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>저장</button>
+                <button onClick={()=>setCfg(false)} style={{...pill(NM_BG,'#8a92a0',true),flex:1,borderRadius:'8px',padding:'.35rem'}}>취소</button>
+                <button onClick={save} style={{...pill('#3d4350','#fff',true),flex:1,borderRadius:'8px',padding:'.35rem'}}>저장</button>
               </div>
             </div>
           ):online?(
             <>
-              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.35rem',letterSpacing:'.05em'}}>ᴅᴇᴍɪᴀɴ</div>
-              <div style={{fontSize:'12px',color:'#555',lineHeight:1.7}}>{msg}</div>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.35rem',letterSpacing:'.05em',color:'#3d4350'}}>ᴅᴇᴍɪᴀɴ</div>
+              <div style={{fontSize:'12px',color:'#5a6070',lineHeight:1.7}}>{msg}</div>
             </>
           ):(
             <>
-              <div style={{textAlign:'center',color:'#aaa',fontSize:'12px',marginBottom:'.45rem'}}>😴 휴식의 시간이야.</div>
-              <div style={{fontSize:'10px',textAlign:'center',color:'#ccc',lineHeight:1.95}}>
-                <div style={{fontWeight:'bold',marginBottom:'.1rem',letterSpacing:'.04em',color:'#bbb'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
+              <div style={{textAlign:'center',color:'#a0a8b4',fontSize:'12px',marginBottom:'.45rem'}}>😴 휴식의 시간이야.</div>
+              <div style={{fontSize:'10px',textAlign:'center',color:'#b8bec9',lineHeight:1.95}}>
+                <div style={{fontWeight:'bold',marginBottom:'.1rem',letterSpacing:'.04em',color:'#a8b0bc'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
                 {Object.entries(sched).map(([d,r])=>(
                   <div key={d}>{DAY_KO[d]}&nbsp;&nbsp;{String(r.s).padStart(2,'0')}:00 – {String(r.e).padStart(2,'0')}:00</div>
                 ))}
@@ -1624,7 +1647,7 @@ function TimeBlockPanel({dk, color, open, onClose}) {
   const dayBlocks = blocks[dk] || {};
 
   function slotColor(level) {
-    if (level === 0) return '#ebebeb';
+    if (level === 0) return NM_BG;
     if (level === 1) return color + '50';
     if (level === 2) return color + '99';
     return color;
@@ -1703,6 +1726,12 @@ function TimeBlockPanel({dk, color, open, onClose}) {
                   : (isHov && !paintMode)
                     ? 'inset 0 0 0 1.5px rgba(0,0,0,0.22)'
                     : 'none';
+                const baseShadow = level === 0
+                  ? (isCurSlot ? `inset 0 0 0 2px ${color}` : NM_DN_S)
+                  : (isCurSlot ? `inset 0 0 0 2px ${color}` : `0 1px 4px ${NM_SD}`);
+                const finalShadow = (isHov && !paintMode)
+                  ? `inset 0 0 0 1.5px rgba(0,0,0,0.18), ${baseShadow}`
+                  : baseShadow;
                 return (
                   <div key={slot}
                     onMouseDown={interactive ? e => handleSlotDown(e, h, slot) : undefined}
@@ -1711,9 +1740,9 @@ function TimeBlockPanel({dk, color, open, onClose}) {
                     style={{
                       width:'14px', height:'14px',
                       background: bg,
-                      borderRadius:'2px',
+                      borderRadius:'3px',
                       cursor: interactive ? (paintMode ? 'crosshair' : 'pointer') : 'default',
-                      boxShadow: shadow,
+                      boxShadow: finalShadow,
                       transition: 'background .12s, box-shadow .08s',
                     }}
                   />
@@ -1768,9 +1797,9 @@ function TimeBlockPanel({dk, color, open, onClose}) {
       {/* ── slide panel ── */}
       <aside style={{
         position:'fixed', right:0, top:0, bottom:0, width:'13rem',
-        background:'#fff', overflow:'auto',
+        background:NM_BG, overflow:'auto',
         zIndex: open ? 1001 : 20,
-        boxShadow:'-2px 0 10px rgba(0,0,0,0.06)',
+        boxShadow:`-4px 0 20px ${NM_SD}`,
         transform: open ? 'translateX(0)' : 'translateX(100%)',
         transition:'transform .25s ease',
       }}>
@@ -1794,20 +1823,21 @@ function TimeBlockPanel({dk, color, open, onClose}) {
 
           {grid(true)}
 
-          <div style={{marginTop:'.9rem',borderTop:'1px solid #f5f5f5',paddingTop:'.75rem'}}>
+          <div style={{marginTop:'.9rem',borderTop:`1px solid ${NM_SD}55`,paddingTop:'.75rem'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               {paintMode ? levelPicker : legend}
               <button onClick={()=>setPaintMode(v=>!v)} style={{
-                background:'none',border:'none',cursor:'pointer',padding:'3px',
+                background: paintMode ? NM_BG : NM_BG,
+                border:'none',cursor:'pointer',padding:'5px 6px',
                 display:'flex',alignItems:'center',
-                background: paintMode ? color+'15' : 'none',
-                borderRadius:'4px', transition:'background .15s',
+                boxShadow: paintMode ? NM_DN_S : NM_UP_S,
+                borderRadius:'6px', transition:'box-shadow .15s',
               }}>
                 {paintIcon}
               </button>
             </div>
             {!paintMode && totalFocusMin > 0 && (
-              <div style={{fontSize:'.58rem',color:'#ccc',marginTop:'.5rem'}}>총 {totalFocusMin}m 기록</div>
+              <div style={{fontSize:'.58rem',color:'#b0b8c4',marginTop:'.5rem'}}>총 {totalFocusMin}m 기록</div>
             )}
           </div>
         </div>
