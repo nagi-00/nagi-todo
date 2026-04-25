@@ -6,6 +6,7 @@
 <link rel="icon" href="./favi.ico" type="image/x-icon" />
 <style>
 @font-face { font-family:'HJSS'; src:url('./HJSS.ttf') format('truetype'); }
+@font-face { font-family:'Dangam'; src:url('./ChangwonDangamAsac-Bold.ttf') format('truetype'); font-weight:bold; }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -541,165 +542,326 @@ function App() {
 
 
 /* ══════════════════════════════════════════════════════════
-   XCard  (export, off-screen)
+   XCard  (TODO export — receipt style)
 ══════════════════════════════════════════════════════════ */
 function XCard({dlabel,noteText,items,color,routines=[]}) {
   const done=items.filter(it=>it.state===1).length, total=items.length;
   const appliedTexts=new Set(items.map(it=>it.text));
-  const perfEdge=(flip)=>({
-    height:'10px',
-    background:'repeating-linear-gradient(90deg,#e8e8e8 0 6px,#fff 6px 12px)',
-    borderTop:flip?'1px dashed #ddd':'none',
-    borderBottom:flip?'none':'1px dashed #ddd',
-  });
-  /* ☐ → · (미완료는 작은 점으로) */
-  function xBullet(state) {
-    if (state===0) return '·';
-    if (state===1) return '✓';
-    return '✗';
-  }
+
+  const TEXTURES = ['./papertex1.jpg','./papertex2.jpg','./papertex3.png','./papertex4.jpg','./papertex5.png','./papertex6.jpg'];
+  const [tex] = React.useState(() => TEXTURES[Math.floor(Math.random() * TEXTURES.length)]);
+
+  function xBullet(state){ if(state===0)return '·'; if(state===1)return '✓'; return '✗'; }
+
+  /* date·time stamp like 25.04.25  10:08 */
+  const now = new Date();
+  const stamp =
+    String(now.getFullYear()).slice(2)+'.'+
+    String(now.getMonth()+1).padStart(2,'0')+'.'+
+    String(now.getDate()).padStart(2,'0')+'   '+
+    String(now.getHours()).padStart(2,'0')+':'+
+    String(now.getMinutes()).padStart(2,'0');
+
+  /* shorter subtitle (eg "FRIDAY · APR 25 · 2026") */
+  const sub = dlabel.toUpperCase();
+
+  const MONO = "'Courier New', ui-monospace, monospace";
+
   return (
-    <div id="xcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'320px'}}>
-      {/* colored header band */}
-      <div style={{background:color,padding:'1.2rem 1.75rem 1rem'}}>
-        <div style={{fontSize:'.52rem',letterSpacing:'.28em',color:'rgba(255,255,255,.55)',marginBottom:'.25rem'}}>𝐝 : ᴛᴏᴅᴏ</div>
-        <div style={{fontSize:'.9rem',fontWeight:'bold',color:'#fff',lineHeight:1.4}}>{dlabel}</div>
-        {noteText&&<div style={{fontSize:'.75rem',color:'rgba(255,255,255,.82)',marginTop:'.4rem',whiteSpace:'pre-wrap',lineHeight:1.55}}>{noteText}</div>}
-      </div>
+    <div id="xcard" style={{
+      position:'fixed', left:'-9999px', top:0,
+      fontFamily:'HJSS, sans-serif',
+      width:'380px',
+      background:'#f3ecd9',
+      backgroundImage:`url('${tex}')`,
+      backgroundSize:'cover',
+      backgroundPosition:'center',
+      padding:'2.4rem 2rem 2.2rem',
+      position:'fixed',
+    }}>
+      {/* warm cream wash for legibility on busy texture */}
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.55)',pointerEvents:'none'}}/>
 
-      {/* perforated tear line */}
-      <div style={perfEdge(false)}/>
+      <div style={{position:'relative',zIndex:1}}>
 
-      {/* item list */}
-      <div style={{padding:'1.2rem 1.75rem 1.4rem'}}>
-        {CATS.map((cat)=>{
-          const list=items.filter(it=>it.category===cat);
-          const pendingRtns=routines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
-          if (!list.length&&!pendingRtns.length) return null;
-          return (
-            <div key={cat} style={{marginBottom:'.85rem'}}>
-              <div style={{fontSize:'.54rem',letterSpacing:'.18em',color,fontWeight:'bold',marginBottom:'.45rem',textTransform:'uppercase'}}>{cat}</div>
-              {list.map((it,i)=>(
-                <div key={i} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start',
-                  backgroundColor:it.important?color+'33':'transparent',borderRadius:'3px',padding:it.important?'0 .3rem':'0 .3rem'}}>
-                  <span style={{color,fontFamily:'monospace',flexShrink:0,marginTop:'.05rem'}}>{xBullet(it.state)}</span>
-                  <span style={{color:it.state===1?'#bbb':'#333',flex:1,whiteSpace:'pre-wrap',textDecoration:it.state===1?'line-through':'none'}}>{it.text}</span>
-                  {it.important&&<span style={{color,flexShrink:0,fontSize:'.72rem',marginTop:'.15rem'}}>★</span>}
+        {/* ── Title (Dailylog) ── */}
+        <div style={{
+          fontFamily:'Dangam, serif',
+          fontSize:'3.2rem',
+          color,
+          textAlign:'center',
+          lineHeight:.95,
+          letterSpacing:'-.01em',
+          textShadow:`2px 3px 0 ${color}33, 1px 1px 0 ${color}55`,
+          marginBottom:'.45rem',
+        }}>Dailylog</div>
+
+        {/* ── Subtitle (date) ── */}
+        <div style={{
+          fontFamily:MONO,
+          fontSize:'.66rem',
+          color:'#222',
+          textAlign:'center',
+          letterSpacing:'.18em',
+          marginBottom:'1.6rem',
+        }}>{sub}</div>
+
+        {/* ── Note text ── */}
+        {noteText && (
+          <div style={{
+            fontFamily:MONO,
+            fontSize:'.66rem',
+            color:'#3a3a3a',
+            textAlign:'center',
+            fontStyle:'italic',
+            whiteSpace:'pre-wrap',
+            lineHeight:1.7,
+            margin:'0 .3rem 1.4rem',
+            paddingBottom:'1rem',
+            borderBottom:'1px dashed #99908266',
+          }}>« {noteText} »</div>
+        )}
+
+        {/* ── List ── */}
+        <div style={{fontFamily:MONO,fontSize:'.74rem',color:'#1a1a1a',lineHeight:1.95}}>
+          {CATS.map(cat=>{
+            const list=items.filter(it=>it.category===cat);
+            const pendingRtns=routines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
+            if (!list.length&&!pendingRtns.length) return null;
+            return (
+              <div key={cat} style={{marginBottom:'.95rem'}}>
+                {/* dotted section header */}
+                <div style={{textAlign:'center',color:color,fontSize:'.55rem',letterSpacing:'.22em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
+                  ─── {cat} ───
                 </div>
-              ))}
-              {pendingRtns.map((r,i)=>(
-                <div key={`xrtn-${i}`} style={{display:'flex',gap:'.45rem',marginBottom:'.28rem',fontSize:'.82rem',lineHeight:1.6,alignItems:'flex-start'}}>
-                  <span style={{color:'#ccc',flexShrink:0,marginTop:'.05rem'}}>·</span>
-                  <span style={{color:'#bbb',flex:1,whiteSpace:'pre-wrap'}}>{r.text}</span>
-                  <span style={{fontSize:'.58rem',color:'#d5d5d5',flexShrink:0}}>루틴</span>
-                </div>
-              ))}
-            </div>
-          );
-        })}
-
-        {/* footer */}
-        <div style={{borderTop:`1.5px solid ${color}33`,paddingTop:'.65rem',marginTop:'.2rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontSize:'.64rem',color,fontWeight:'bold'}}>{done} / {total} done</span>
-          <span style={{fontSize:'.58rem',letterSpacing:'.1em',color:'#ccc'}}>nagi-todo</span>
+                {list.map((it,i)=>(
+                  <div key={i} style={{
+                    display:'flex',gap:'.6rem',alignItems:'flex-start',
+                    color:it.state===1?'#999':'#1a1a1a',
+                    textDecoration:it.state===1?'line-through':'none',
+                    background:it.important?color+'22':'transparent',
+                    padding:it.important?'0 .35rem':'0',
+                    borderRadius:'2px',
+                  }}>
+                    <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
+                    {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
+                    <span style={{flexShrink:0,minWidth:'.7rem',textAlign:'right'}}>{xBullet(it.state)}</span>
+                  </div>
+                ))}
+                {pendingRtns.map((r,i)=>(
+                  <div key={`xr-${i}`} style={{display:'flex',gap:'.6rem',color:'#aaa',alignItems:'flex-start'}}>
+                    <span style={{flex:1,whiteSpace:'pre-wrap'}}>{r.text}</span>
+                    <span style={{flexShrink:0}}>·</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </div>
-      </div>
 
-      {/* bottom perforated tear line */}
-      <div style={perfEdge(true)}/>
+        {/* ── Total ── */}
+        <div style={{
+          marginTop:'1.3rem',
+          paddingTop:'.55rem',
+          borderTop:'1px dashed #999082aa',
+          fontFamily:MONO,
+          fontSize:'.74rem',
+          display:'flex',
+          justifyContent:'space-between',
+          color:'#1a1a1a',
+        }}>
+          <span style={{letterSpacing:'.08em'}}>TOTAL    DONE</span>
+          <span style={{fontWeight:'bold',color}}>{done} / {total}</span>
+        </div>
+
+        {/* ── Stamp ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.66rem',
+          color:'#3a3a3a',
+          marginTop:'1.6rem',
+          letterSpacing:'.14em',
+        }}>{stamp}</div>
+
+        {/* ── Credit footer ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.55rem',
+          color:'#6a6a6a',
+          marginTop:'1.5rem',
+          letterSpacing:'.22em',
+        }}>RECEIPT BY ⓒnagi</div>
+      </div>
     </div>
   );
 }
 
 
 /* ══════════════════════════════════════════════════════════
-   BoardingPass  (journal full export, off-screen)
+   BoardingPass  (JOURNAL export — concert ticket style)
 ══════════════════════════════════════════════════════════ */
 function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, svgMood, dream}) {
   const c = color || '#888';
   const moodObj = SVG_MOODS.find(m => m.key === svgMood);
   const validG  = (gratitude||[]).filter(g => g.trim());
 
-  const SL = {fontSize:'.42rem',letterSpacing:'.18em',color:c,marginBottom:'.32rem',textTransform:'uppercase',display:'block'};
-  const BD = {fontSize:'.72rem',color:'#333',lineHeight:1.72,whiteSpace:'pre-wrap'};
+  /* white text on dark theme-tinted background */
+  const FG       = 'rgba(255,255,255,0.95)';
+  const FG_DIM   = 'rgba(255,255,255,0.55)';
+  const FG_FAINT = 'rgba(255,255,255,0.4)';
+  const ROW      = '1px solid rgba(255,255,255,0.16)';
 
-  /* barcode decoration */
-  const barcodeWidths = [2,1,3,1,2,4,1,2,3,1,2,1,3,2,1,4,2,1,3,2,1,2,4,1,2,1,3,2,1,2,3,1];
-  const barcode = (
-    <div style={{display:'flex',alignItems:'stretch',height:'26px',gap:'1px',overflow:'hidden'}}>
-      {barcodeWidths.map((w,i)=>(
-        <div key={i} style={{width:`${w*2}px`,background:i%2===0?c+'cc':'transparent',flexShrink:0}}/>
-      ))}
+  /* date + time stamp */
+  const release = dk.replace(/-/g,'.');
+  const dateMD  = release.slice(5);
+  const now = new Date();
+  const timeS = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+' KST';
+
+  /* dark layer + paper texture, both absolute, layered on top of theme color */
+  const overlays = (
+    <>
+      <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',inset:0,
+        backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.14,mixBlendMode:'soft-light',pointerEvents:'none'}}/>
+    </>
+  );
+
+  /* meta row */
+  const Row = ({label, children}) => (
+    <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
+      <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',textTransform:'uppercase',alignSelf:'center'}}>{label}</div>
+      <div style={{flex:1,fontSize:'.7rem',color:FG,lineHeight:1.5}}>{children}</div>
     </div>
   );
 
+  /* body section */
+  const Section = ({label, body, italic}) => body.trim() ? (
+    <div style={{marginBottom:'1rem'}}>
+      <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>{label}</div>
+      <div style={{fontSize:'.7rem',color:FG,lineHeight:1.75,whiteSpace:'pre-wrap',fontStyle:italic?'italic':'normal'}}>{body}</div>
+    </div>
+  ) : null;
+
+  /* notch position: between meta block and body */
+  const NOTCH_TOP = 230;
+
   return (
-    <div id="bpcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'500px',border:'1px solid #eee'}}>
+    <div id="bpcard" style={{
+      position:'fixed', left:'-9999px', top:0,
+      width:'380px',
+      background:'#fff',
+      padding:'14px 14px 0',
+      fontFamily:'HJSS, sans-serif',
+    }}>
+      {/* ─── ticket body ─── */}
+      <div style={{
+        position:'relative',
+        background:c,
+        borderRadius:'12px 12px 0 0',
+        overflow:'hidden',
+      }}>
+        {overlays}
 
-      {/* ── header band ── */}
-      <div style={{background:c,padding:'.9rem 1.4rem .8rem',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
-        <div>
-          <div style={{fontSize:'.4rem',letterSpacing:'.28em',color:'rgba(255,255,255,.5)',marginBottom:'.15rem'}}>𝐝 : ɴᴀɢɪ · ᴊᴏᴜʀɴᴀʟ</div>
-          <div style={{fontSize:'.88rem',fontWeight:'bold',color:'#fff',lineHeight:1.3}}>{dlabel}</div>
-        </div>
-        {moodObj&&(
-          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',opacity:.82}}>
-            <MoodSVG mkey={svgMood} size={16} color='rgba(255,255,255,.85)'/>
-            <span style={{fontSize:'.38rem',color:'rgba(255,255,255,.6)',letterSpacing:'.06em'}}>{moodObj.label}</span>
-          </div>
-        )}
-      </div>
+        {/* content */}
+        <div style={{position:'relative',zIndex:2,padding:'1.4rem 1.4rem 1.6rem'}}>
 
-      {/* ── body: main + stub ── */}
-      <div style={{display:'flex',alignItems:'stretch',minHeight:'200px'}}>
+          {/* tiny header */}
+          <div style={{fontSize:'.46rem',color:FG_FAINT,letterSpacing:'.22em',marginBottom:'1.1rem'}}>JOURNAL TICKET</div>
 
-        {/* left — main */}
-        <div style={{flex:1,padding:'1rem 1.1rem 1rem 1.4rem',display:'flex',flexDirection:'column',gap:'.8rem'}}>
-          {morning.trim()&&(
-            <div><span style={SL}>ᴍᴏʀɴɪɴɢ</span><div style={BD}>{morning}</div></div>
-          )}
-          {validG.length>0&&(
-            <div>
-              <span style={SL}>ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
-              {validG.map((g,i)=>(
-                <div key={i} style={{display:'flex',gap:'.35rem',marginBottom:'.16rem',fontSize:'.72rem',lineHeight:1.65,alignItems:'flex-start'}}>
-                  <span style={{color:c,flexShrink:0,fontFamily:'monospace',fontSize:'.58rem',marginTop:'.1rem'}}>{i+1}.</span>
-                  <span style={{color:'#333',flex:1,whiteSpace:'pre-wrap'}}>{g}</span>
-                </div>
-              ))}
+          {/* TITLE */}
+          <div style={{fontSize:'.46rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.3rem'}}>TITLE</div>
+          <div style={{fontSize:'1.15rem',color:FG,fontWeight:'bold',lineHeight:1.25,marginBottom:'1.3rem'}}>{dlabel}</div>
+
+          {/* divider */}
+          <div style={{borderTop:ROW,marginBottom:'.1rem'}}/>
+
+          {/* meta rows */}
+          <Row label="RELEASE">{release}</Row>
+          <Row label="STARRING">
+            {moodObj ? (
+              <span style={{display:'inline-flex',alignItems:'center',gap:'.45rem',verticalAlign:'middle'}}>
+                <MoodSVG mkey={svgMood} size={14} color={FG}/>
+                <span>{moodObj.label}</span>
+              </span>
+            ) : '—'}
+          </Row>
+
+          {/* DATE + TIME row */}
+          <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
+            <div style={{flex:1,display:'flex'}}>
+              <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>DATE</div>
+              <div style={{fontSize:'.7rem',color:FG}}>{dateMD}</div>
             </div>
-          )}
-          {diary.trim()&&(
-            <div><span style={SL}>ᴅɪᴀʀʏ</span><div style={BD}>{diary}</div></div>
-          )}
-        </div>
+            <div style={{flex:1,display:'flex'}}>
+              <div style={{flex:'0 0 50px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>TIME</div>
+              <div style={{fontSize:'.7rem',color:FG}}>{timeS}</div>
+            </div>
+          </div>
 
-        {/* vertical perf line */}
-        <div style={{
-          width:'1px',flexShrink:0,
-          background:'repeating-linear-gradient(180deg,#ccc 0 7px,transparent 7px 14px)',
-          margin:'12px 0',
-        }}/>
+          {/* body sections */}
+          <div style={{marginTop:'1.5rem'}}>
+            <Section label="MORNING"   body={morning}/>
+            {validG.length>0 && (
+              <div style={{marginBottom:'1rem'}}>
+                <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>GRATITUDE</div>
+                {validG.map((g,i)=>(
+                  <div key={i} style={{display:'flex',gap:'.45rem',fontSize:'.7rem',color:FG,lineHeight:1.7,marginBottom:'.18rem'}}>
+                    <span style={{color:FG_FAINT,flexShrink:0,fontFamily:'monospace',fontSize:'.6rem',marginTop:'.1rem'}}>{i+1}.</span>
+                    <span style={{whiteSpace:'pre-wrap'}}>{g}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Section label="DIARY"   body={diary}/>
+            <Section label="EVENING" body={evening}/>
+            <Section label="DREAM"   body={dream} italic/>
+          </div>
 
-        {/* right — stub */}
-        <div style={{width:'148px',padding:'1rem 1.2rem 1rem 1rem',display:'flex',flexDirection:'column',gap:'.7rem'}}>
-          {evening.trim()&&(
-            <div><span style={SL}>ᴇᴠᴇɴɪɴɢ</span><div style={{...BD,fontSize:'.68rem'}}>{evening}</div></div>
-          )}
-          {dream.trim()&&(
-            <div><span style={SL}>ᴅʀᴇᴀᴍ</span><div style={{...BD,fontSize:'.68rem',fontStyle:'italic',color:'#444'}}>{dream}</div></div>
-          )}
-          <div style={{marginTop:'auto',paddingTop:'.5rem',borderTop:`1px solid ${c}22`}}>
-            <div style={{fontSize:'.38rem',letterSpacing:'.08em',color:'#ccc',marginBottom:'2px'}}>{dk}</div>
-            <div style={{fontSize:'.38rem',letterSpacing:'.12em',color:c+'88',textTransform:'uppercase'}}>nagi-todo</div>
+          {/* footer label */}
+          <div style={{fontSize:'.4rem',color:FG_FAINT,letterSpacing:'.22em',textAlign:'center',marginTop:'1.6rem',textTransform:'uppercase'}}>
+            𝐝 : ɴᴀɢɪ ᴊᴏᴜʀɴᴀʟ
           </div>
         </div>
+
+        {/* ─ side notches (tear) ─ */}
+        <div style={{position:'absolute',left:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
+        <div style={{position:'absolute',right:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
       </div>
 
-      {/* ── barcode footer ── */}
-      <div style={{padding:'8px 1.4rem 10px',background:'#f8f8f8',borderTop:'1px solid #f0f0f0',display:'flex',justifyContent:'center'}}>
-        {barcode}
+      {/* ─── scallop bottom edge ─── */}
+      <div style={{
+        position:'relative',
+        height:'10px',
+        background:c,
+        overflow:'hidden',
+      }}>
+        <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)'}}/>
+        <div style={{position:'absolute',inset:0,
+          backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',
+          opacity:0.14,mixBlendMode:'soft-light'}}/>
       </div>
+      <div style={{
+        display:'flex',
+        justifyContent:'space-between',
+        padding:'0 4px',
+        marginTop:'-7px',
+        position:'relative',
+        zIndex:2,
+      }}>
+        {Array.from({length:18}).map((_,i)=>(
+          <div key={i} style={{
+            width:'14px',height:'14px',
+            borderRadius:'50%',
+            background:'#fff',
+            flexShrink:0,
+          }}/>
+        ))}
+      </div>
+      {/* spacer below scallop so circles aren't clipped */}
+      <div style={{height:'8px'}}/>
     </div>
   );
 }
