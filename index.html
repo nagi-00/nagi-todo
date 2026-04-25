@@ -116,7 +116,6 @@ function sectionLabel(extra) {
 function App() {
   /* state */
   const [sel,        setSel]       = React.useState(new Date());
-  const [sidebar,    setSidebar]   = React.useState(true);
   const [allTodos,   setAllTodos]  = React.useState({});
   const [accent,     setAccent]    = React.useState('#888');
   const [dColors,    setDColors]   = React.useState({});
@@ -131,7 +130,6 @@ function App() {
   const [journals,   setJournals]  = React.useState({});
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
-  const [dailyPanel, setDailyPanel] = React.useState(false);
   const [stickyOpen, setStickyOpen]= React.useState(false);
 
   const dk      = sel.toLocaleDateString('sv-SE');
@@ -254,44 +252,12 @@ function App() {
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
 
-      {/* sidebar toggle */}
-      <button
-        onClick={()=>setSidebar(v=>!v)}
-        style={{
-          position:'fixed',left:'1rem',top:'1rem',zIndex:100,
-          background:'#fff',border:'none',borderRadius:'9999px',
-          width:'2rem',height:'2rem',cursor:'pointer',
-          boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
-          color:'#999',fontSize:'.85rem',display:'flex',alignItems:'center',justifyContent:'center'
-        }}
-      >{sidebar?'←':'→'}</button>
-
-      {/* daily panel toggle */}
-      <button
-        onClick={()=>setDailyPanel(v=>!v)}
-        style={{
-          position:'fixed',right:'1rem',top:'3.5rem',zIndex:1002,
-          background:dailyPanel?color:'#fff',border:'none',borderRadius:'9999px',
-          width:'2rem',height:'2rem',cursor:'pointer',
-          boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
-          display:'flex',alignItems:'center',justifyContent:'center',
-          transition:'background .2s',
-        }}
-      >
-        <div style={{display:'flex',flexDirection:'column',gap:'2.5px',width:'11px'}}>
-          {[1,.7,1].map((w,i)=>(
-            <div key={i} style={{height:'1.5px',width:`${w*100}%`,background:dailyPanel?'#fff':'#c8c8c8',borderRadius:'1px',transition:'background .2s'}}/>
-          ))}
-        </div>
-      </button>
 
       {/* ═══ Sidebar ═══ */}
       <aside style={{
         position:'fixed',left:0,top:0,bottom:0,width:'14.5rem',
         background:'#fff',overflow:'auto',zIndex:20,
         boxShadow:'2px 0 10px rgba(0,0,0,0.05)',
-        transform:sidebar?'translateX(0)':'translateX(-100%)',
-        transition:'transform .25s ease',
       }}>
         <div style={{padding:'1.25rem 1rem 2rem'}}>
 
@@ -329,7 +295,7 @@ function App() {
                 const c=dColors[k]||accent;
                 return (
                   <button key={i}
-                    onClick={()=>{setSel(d);if(window.innerWidth<768)setSidebar(false);}}
+                    onClick={()=>setSel(d)}
                     style={{
                       width:'1.7rem',height:'1.7rem',margin:'0 auto',
                       display:'flex',alignItems:'center',justifyContent:'center',
@@ -369,8 +335,7 @@ function App() {
       <main style={{
         flex:1,
         padding:'1rem',
-        marginLeft:sidebar?'14.5rem':'0',
-        transition:'margin-left .25s',
+        marginLeft:'14.5rem',
       }}>
         <div style={{maxWidth:'40rem',margin:'0 auto'}}>
 
@@ -546,7 +511,7 @@ function App() {
 
           {/* ── JOURNAL ── */}
           {tab==='journal'&&(
-            <JournalTab dlabel={dlabel} journal={journal} color={color} onSave={saveJournal}/>
+            <JournalTab dlabel={dlabel} dk={dk} journal={journal} color={color} onSave={saveJournal}/>
           )}
 
           {/* ── WEEK ── */}
@@ -557,15 +522,14 @@ function App() {
         </div>
       </main>
 
-      {/* click-outside overlay — closes all slide panels */}
-      {(sidebar||dailyPanel||stickyOpen)&&(
-        <div onClick={()=>{setSidebar(false);setDailyPanel(false);setStickyOpen(false);}}
+      {/* click-outside overlay — closes floating panels */}
+      {stickyOpen&&(
+        <div onClick={()=>setStickyOpen(false)}
           style={{position:'fixed',inset:0,zIndex:15}}/>
       )}
 
       {/* modals & widgets */}
       {showRtn&&<RoutineModal routines={routines} onClose={()=>setShowRtn(false)}/>}
-      <DailyPanel dk={dk} dlabel={dlabel} color={color} open={dailyPanel} onClose={()=>setDailyPanel(false)}/>
       <WeatherWidget color={color}/>
       <PomodoroWidget color={color}/>
       <MusicWidget color={color}/>
@@ -649,32 +613,92 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
 
 
 /* ══════════════════════════════════════════════════════════
-   JCard  (journal postcard export, off-screen)
+   BoardingPass  (journal full export, off-screen)
 ══════════════════════════════════════════════════════════ */
-function JCard({dlabel, label, text, color}) {
-  const c = color || '#888888';
+function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, svgMood, dream}) {
+  const c = color || '#888';
+  const moodObj = SVG_MOODS.find(m => m.key === svgMood);
+  const validG  = (gratitude||[]).filter(g => g.trim());
+
+  const SL = {fontSize:'.42rem',letterSpacing:'.18em',color:c,marginBottom:'.32rem',textTransform:'uppercase',display:'block'};
+  const BD = {fontSize:'.72rem',color:'#333',lineHeight:1.72,whiteSpace:'pre-wrap'};
+
+  /* barcode decoration */
+  const barcodeWidths = [2,1,3,1,2,4,1,2,3,1,2,1,3,2,1,4,2,1,3,2,1,2,4,1,2,1,3,2,1,2,3,1];
+  const barcode = (
+    <div style={{display:'flex',alignItems:'stretch',height:'26px',gap:'1px',overflow:'hidden'}}>
+      {barcodeWidths.map((w,i)=>(
+        <div key={i} style={{width:`${w*2}px`,background:i%2===0?c+'cc':'transparent',flexShrink:0}}/>
+      ))}
+    </div>
+  );
+
   return (
-    <div id="jcard" style={{
-      position:'fixed',left:'-9999px',top:0,
-      fontFamily:'HJSS,sans-serif',
-      width:'380px',
-      /* airmail stripe outer border */
-      background:`repeating-linear-gradient(-45deg,${c}66 0px,${c}66 5px,#FAF9F5 5px,#FAF9F5 13px)`,
-      padding:'9px',
-    }}>
-      {/* inner cream content area */}
-      <div style={{background:'#FAF9F5',padding:'1.4rem 1.9rem 1.2rem'}}>
-        <div style={{fontSize:'.38rem',letterSpacing:'.28em',color:c+'88',marginBottom:'1rem',textTransform:'uppercase'}}>𝐝 : ɴᴀɢɪ</div>
-        <div style={{fontSize:'.5rem',letterSpacing:'.2em',color:c+'aa',textTransform:'uppercase',marginBottom:'.3rem'}}>{label}</div>
-        <div style={{fontSize:'.82rem',fontWeight:'bold',color:'#1a1a1a',marginBottom:'.9rem',lineHeight:1.4}}>{dlabel}</div>
-        {/* top rule — dark theme color */}
-        <div style={{borderTop:`1.5px solid ${c}cc`,marginBottom:'.85rem'}}/>
-        <div style={{fontSize:'.72rem',color:'#2a2a2a',lineHeight:2.1,whiteSpace:'pre-wrap',minHeight:'3rem'}}>{text||'—'}</div>
-        {/* bottom rule */}
-        <div style={{borderTop:`1px solid ${c}55`,marginTop:'1.4rem',paddingTop:'.55rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontSize:'.42rem',letterSpacing:'.12em',color:c+'77',textTransform:'uppercase'}}>nagi-todo</span>
-          <span style={{fontSize:'.42rem',letterSpacing:'.06em',color:c+'77'}}>{dlabel}</span>
+    <div id="bpcard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'500px',border:'1px solid #eee'}}>
+
+      {/* ── header band ── */}
+      <div style={{background:c,padding:'.9rem 1.4rem .8rem',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+        <div>
+          <div style={{fontSize:'.4rem',letterSpacing:'.28em',color:'rgba(255,255,255,.5)',marginBottom:'.15rem'}}>𝐝 : ɴᴀɢɪ · ᴊᴏᴜʀɴᴀʟ</div>
+          <div style={{fontSize:'.88rem',fontWeight:'bold',color:'#fff',lineHeight:1.3}}>{dlabel}</div>
         </div>
+        {moodObj&&(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',opacity:.82}}>
+            <MoodSVG mkey={svgMood} size={16} color='rgba(255,255,255,.85)'/>
+            <span style={{fontSize:'.38rem',color:'rgba(255,255,255,.6)',letterSpacing:'.06em'}}>{moodObj.label}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── body: main + stub ── */}
+      <div style={{display:'flex',alignItems:'stretch',minHeight:'200px'}}>
+
+        {/* left — main */}
+        <div style={{flex:1,padding:'1rem 1.1rem 1rem 1.4rem',display:'flex',flexDirection:'column',gap:'.8rem'}}>
+          {morning.trim()&&(
+            <div><span style={SL}>ᴍᴏʀɴɪɴɢ</span><div style={BD}>{morning}</div></div>
+          )}
+          {validG.length>0&&(
+            <div>
+              <span style={SL}>ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
+              {validG.map((g,i)=>(
+                <div key={i} style={{display:'flex',gap:'.35rem',marginBottom:'.16rem',fontSize:'.72rem',lineHeight:1.65,alignItems:'flex-start'}}>
+                  <span style={{color:c,flexShrink:0,fontFamily:'monospace',fontSize:'.58rem',marginTop:'.1rem'}}>{i+1}.</span>
+                  <span style={{color:'#333',flex:1,whiteSpace:'pre-wrap'}}>{g}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {diary.trim()&&(
+            <div><span style={SL}>ᴅɪᴀʀʏ</span><div style={BD}>{diary}</div></div>
+          )}
+        </div>
+
+        {/* vertical perf line */}
+        <div style={{
+          width:'1px',flexShrink:0,
+          background:'repeating-linear-gradient(180deg,#ccc 0 7px,transparent 7px 14px)',
+          margin:'12px 0',
+        }}/>
+
+        {/* right — stub */}
+        <div style={{width:'148px',padding:'1rem 1.2rem 1rem 1rem',display:'flex',flexDirection:'column',gap:'.7rem'}}>
+          {evening.trim()&&(
+            <div><span style={SL}>ᴇᴠᴇɴɪɴɢ</span><div style={{...BD,fontSize:'.68rem'}}>{evening}</div></div>
+          )}
+          {dream.trim()&&(
+            <div><span style={SL}>ᴅʀᴇᴀᴍ</span><div style={{...BD,fontSize:'.68rem',fontStyle:'italic',color:'#444'}}>{dream}</div></div>
+          )}
+          <div style={{marginTop:'auto',paddingTop:'.5rem',borderTop:`1px solid ${c}22`}}>
+            <div style={{fontSize:'.38rem',letterSpacing:'.08em',color:'#ccc',marginBottom:'2px'}}>{dk}</div>
+            <div style={{fontSize:'.38rem',letterSpacing:'.12em',color:c+'88',textTransform:'uppercase'}}>nagi-todo</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── barcode footer ── */}
+      <div style={{padding:'8px 1.4rem 10px',background:'#f8f8f8',borderTop:'1px solid #f0f0f0',display:'flex',justifyContent:'center'}}>
+        {barcode}
       </div>
     </div>
   );
@@ -684,83 +708,147 @@ function JCard({dlabel, label, text, color}) {
 /* ══════════════════════════════════════════════════════════
    JournalTab
 ══════════════════════════════════════════════════════════ */
-function JournalTab({dlabel,journal,color,onSave}) {
-  const [mEdit,setMEdit]=React.useState(false);
-  const [eEdit,setEEdit]=React.useState(false);
-  const [mText,setMText]=React.useState('');
-  const [eText,setEText]=React.useState('');
-  const [jcardData, setJcardData] = React.useState(null);
-  React.useEffect(()=>setMText(journal.morning||''),[journal.morning]);
-  React.useEffect(()=>setEText(journal.evening||''),[journal.evening]);
+function JournalTab({dlabel, dk, journal, color, onSave}) {
+  const [mEdit,    setMEdit]    = React.useState(false);
+  const [eEdit,    setEEdit]    = React.useState(false);
+  const [mText,    setMText]    = React.useState('');
+  const [eText,    setEText]    = React.useState('');
+  const [gratitude,setGratitude]= React.useState(['','','']);
+  const [diary,    setDiary]    = React.useState('');
+  const [svgMood,  setSvgMood]  = React.useState(null);
+  const [dream,    setDream]    = React.useState('');
+  const [exporting,setExporting]= React.useState(false);
 
-  const VIEW={whiteSpace:'pre-wrap',fontSize:'.9rem',color:'#444',lineHeight:1.8,minHeight:'5rem',cursor:'text',paddingBottom:'.25rem'};
-  const TA  ={width:'100%',border:'1px solid #eee',padding:'.5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.8,background:'#fafafa'};
+  React.useEffect(()=>setMText(journal.morning||''),  [journal.morning]);
+  React.useEffect(()=>setEText(journal.evening||''),  [journal.evening]);
+
+  React.useEffect(()=>{
+    const r=db.ref('daily/'+dk);
+    const h=r.on('value',s=>{
+      const v=s.val()||{};
+      setGratitude(Array.isArray(v.gratitude)?v.gratitude:['','','']);
+      setDiary(v.diary||'');
+      setSvgMood(v.mood||null);
+      setDream(v.dream||'');
+    });
+    return()=>r.off('value',h);
+  },[dk]);
 
   function save(f,t,se){ onSave(f,t.trim()); se(false); }
+  function saveGratitude(idx,val){
+    const next=[...gratitude]; next[idx]=val; setGratitude(next);
+    db.ref('daily/'+dk+'/gratitude').set(next);
+  }
+  function saveSvgMood(key){
+    const next=svgMood===key?null:key; setSvgMood(next);
+    db.ref('daily/'+dk+'/mood').set(next);
+  }
 
-  async function exportSection(label, text) {
-    setJcardData({label, text});
-    await new Promise(r => setTimeout(r, 180));
-    const el = document.getElementById('jcard');
-    if (!el) { setJcardData(null); return; }
-    const cv = await html2canvas(el, {scale:2, useCORS:true});
-    setJcardData(null);
-    cv.toBlob(async blob => {
-      if (!blob) return;
-      try {
-        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
-        alert('클립보드에 복사했어.');
-      } catch {
-        const u=URL.createObjectURL(blob), a=document.createElement('a');
-        a.href=u; a.download=`journal-${new Date().toLocaleDateString('sv-SE')}.png`; a.click(); URL.revokeObjectURL(u);
-      }
+  const hasContent=mText.trim()||eText.trim()||gratitude.some(g=>g.trim())||diary.trim()||svgMood||dream.trim();
+
+  async function exportBoarding(){
+    setExporting(true);
+    await new Promise(r=>setTimeout(r,200));
+    const el=document.getElementById('bpcard'); if(!el){setExporting(false);return;}
+    const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
+    setExporting(false);
+    cv.toBlob(async blob=>{
+      if(!blob)return;
+      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      catch{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`journal-${dk}.png`;a.click();URL.revokeObjectURL(u); }
     });
   }
 
+  const VIEW={whiteSpace:'pre-wrap',fontSize:'.9rem',color:'#444',lineHeight:1.8,minHeight:'3rem',cursor:'text',paddingBottom:'.25rem'};
+  const TA  ={width:'100%',border:'1px solid #eee',padding:'.5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.8,background:'#fafafa'};
+  const SM  ={...TA,fontSize:'.82rem',lineHeight:1.65};
+  const DIV ={borderTop:`1px solid ${color}20`,margin:'1.25rem 0'};
+  const LBL ={fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block',marginBottom:'.5rem'};
+
   return (
     <div style={CARD}>
-      <h2 style={{fontSize:'1rem',fontWeight:'bold',marginBottom:'1.5rem',color:'#222'}}>{dlabel}</h2>
 
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.5rem'}}>
-        <span style={{fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block'}}>ᴍᴏʀɴɪɴɢ</span>
-        {mText.trim() && <button onClick={()=>exportSection('ᴍᴏʀɴɪɴɢ', mText)} className="icon-btn" style={{fontSize:'.62rem',color:color+'88'}}>↗ export</button>}
+      {/* header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem'}}>
+        <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
+        {hasContent&&(
+          <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
+        )}
       </div>
-      {(!mEdit&&mText.trim()) ? (
+
+      {/* ── Morning ── */}
+      <span style={LBL}>ᴍᴏʀɴɪɴɢ</span>
+      {(!mEdit&&mText.trim())?(
         <div style={VIEW} onDoubleClick={()=>setMEdit(true)} onContextMenu={e=>{e.preventDefault();setMEdit(true);}}>{mText}</div>
       ):(
         <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
-          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장, Shift+Enter 줄바꿈)" rows={5} style={TA}/>
+          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
       )}
 
-      <div style={{borderTop:`1px solid ${color}20`,margin:'1.25rem 0'}}/>
+      <div style={DIV}/>
 
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.5rem'}}>
-        <span style={{fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block'}}>ᴇᴠᴇɴɪɴɢ · ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
-        {eText.trim() && <button onClick={()=>exportSection('ᴇᴠᴇɴɪɴɢ · ɢʀᴀᴛɪᴛᴜᴅᴇ', eText)} className="icon-btn" style={{fontSize:'.62rem',color:color+'88'}}>↗ export</button>}
+      {/* ── Gratitude ── */}
+      <span style={LBL}>ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
+      {[0,1,2].map(i=>(
+        <div key={i} style={{display:'flex',alignItems:'center',gap:'.35rem',marginBottom:'.35rem'}}>
+          <span style={{fontSize:'.62rem',color,flexShrink:0,fontFamily:'monospace',width:'.8rem',textAlign:'right'}}>{i+1}.</span>
+          <textarea value={gratitude[i]} onChange={e=>saveGratitude(i,e.target.value)}
+            placeholder={`감사한 점 ${i+1}`} rows={1} style={{...SM,resize:'none'}}/>
+        </div>
+      ))}
+
+      <div style={DIV}/>
+
+      {/* ── Diary ── */}
+      <span style={LBL}>ᴅɪᴀʀʏ</span>
+      <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref('daily/'+dk+'/diary').set(e.target.value);}}
+        placeholder="오늘 하루를 짧게 기록해봐." rows={4} style={TA}/>
+
+      <div style={DIV}/>
+
+      {/* ── Mood ── */}
+      <span style={LBL}>ᴍᴏᴏᴅ</span>
+      <div style={{display:'flex',gap:'4px',justifyContent:'space-between'}}>
+        {SVG_MOODS.map(({key,label})=>{
+          const active=svgMood===key;
+          return (
+            <button key={key} onClick={()=>saveSvgMood(key)} title={label} style={{
+              background:'none',border:'none',cursor:'pointer',padding:'5px 4px',
+              display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',
+              opacity:svgMood&&!active?0.2:1,transition:'opacity .15s',
+            }}>
+              <MoodSVG mkey={key} size={20} color={active?color:'#c8c8c8'}/>
+              <span style={{fontSize:'.48rem',color:active?color:'#ccc',letterSpacing:'.03em'}}>{label}</span>
+            </button>
+          );
+        })}
       </div>
-      {(!eEdit&&eText.trim()) ? (
+
+      <div style={DIV}/>
+
+      {/* ── Evening ── */}
+      <span style={LBL}>ᴇᴠᴇɴɪɴɢ</span>
+      {(!eEdit&&eText.trim())?(
         <div style={VIEW} onDoubleClick={()=>setEEdit(true)} onContextMenu={e=>{e.preventDefault();setEEdit(true);}}>{eText}</div>
       ):(
         <textarea autoFocus={eEdit} value={eText} onChange={e=>setEText(e.target.value)} onFocus={()=>setEEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('evening',eText,setEEdit);}}}
-          placeholder="오늘 감사했던 것들을 적어봐. (Enter 저장, Shift+Enter 줄바꿈)" rows={5} style={TA}/>
+          placeholder="오늘 저녁의 회고를 적어봐. (Enter 저장)" rows={4} style={TA}/>
       )}
 
-      <div style={{borderTop:`1px solid ${color}20`,margin:'1.25rem 0'}}/>
+      <div style={DIV}/>
 
-      <span style={{fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block',marginBottom:'.5rem'}}>ᴍᴏᴏᴅ</span>
-      <div style={{display:'flex',gap:'.65rem'}}>
-        {MOODS.map(({e,l})=>(
-          <button key={l} onClick={()=>onSave('mood',journal.mood===l?null:l)} title={l} style={{
-            fontSize:'1.4rem',background:'none',border:'none',cursor:'pointer',padding:0,
-            opacity:(!journal.mood||journal.mood===l)?1:0.18,
-            transform:journal.mood===l?'scale(1.3)':'scale(1)',
-            transition:'all .15s ease',
-          }}>{e}</button>
-        ))}
-      </div>
-      {jcardData && <JCard dlabel={dlabel} color={color} label={jcardData.label} text={jcardData.text}/>}
+      {/* ── Dream ── */}
+      <span style={LBL}>ᴅʀᴇᴀᴍ</span>
+      <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref('daily/'+dk+'/dream').set(e.target.value);}}
+        placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야." rows={4} style={{...TA,fontStyle:'italic'}}/>
+
+      {exporting&&(
+        <BoardingPass dlabel={dlabel} dk={dk} color={color}
+          morning={mText} evening={eText}
+          gratitude={gratitude} diary={diary} svgMood={svgMood} dream={dream}/>
+      )}
     </div>
   );
 }
@@ -1656,212 +1744,6 @@ function MoodSVG({mkey, size=20, color='currentColor'}) {
 }
 
 
-/* ══════════════════════════════════════════════════════════
-   DailyCard  (off-screen ticket export)
-══════════════════════════════════════════════════════════ */
-function DailyCard({dlabel, dk, color, gratitude, diary, mood, dream}) {
-  const c = color || '#888';
-  const perf = (flip) => ({
-    height:'10px',
-    background:'repeating-linear-gradient(90deg,#e8e8e8 0 6px,#fff 6px 12px)',
-    borderTop:  flip ? '1px dashed #ddd' : 'none',
-    borderBottom: flip ? 'none' : '1px dashed #ddd',
-  });
-  const validG = (gratitude||[]).filter(g=>g.trim());
-  const moodObj = SVG_MOODS.find(m=>m.key===mood);
-  return (
-    <div id="dailycard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'280px'}}>
-      <div style={{background:c, padding:'1rem 1.5rem .9rem'}}>
-        <div style={{fontSize:'.46rem',letterSpacing:'.28em',color:'rgba(255,255,255,.5)',marginBottom:'.18rem'}}>𝐝 : ɴᴀɢɪ</div>
-        <div style={{fontSize:'.82rem',fontWeight:'bold',color:'#fff',lineHeight:1.4}}>{dlabel}</div>
-        {moodObj&&<div style={{fontSize:'.55rem',color:'rgba(255,255,255,.65)',marginTop:'.22rem',letterSpacing:'.06em'}}>{moodObj.label}</div>}
-      </div>
-      <div style={perf(false)}/>
-      <div style={{padding:'1rem 1.5rem'}}>
-        {validG.length>0&&(
-          <div style={{marginBottom:'.8rem'}}>
-            <div style={{fontSize:'.44rem',letterSpacing:'.18em',color:c,marginBottom:'.42rem',textTransform:'uppercase'}}>감사</div>
-            {validG.map((g,i)=>(
-              <div key={i} style={{display:'flex',gap:'.38rem',marginBottom:'.2rem',fontSize:'.74rem',lineHeight:1.6,alignItems:'flex-start'}}>
-                <span style={{color:c,flexShrink:0,fontFamily:'monospace',fontSize:'.6rem',marginTop:'.1rem'}}>{i+1}.</span>
-                <span style={{color:'#333',flex:1,whiteSpace:'pre-wrap'}}>{g}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {validG.length>0&&(diary.trim()||dream.trim())&&(
-          <div style={{borderTop:`1px solid ${c}22`,marginBottom:'.8rem'}}/>
-        )}
-        {diary.trim()&&(
-          <div style={{marginBottom:'.8rem'}}>
-            <div style={{fontSize:'.44rem',letterSpacing:'.18em',color:c,marginBottom:'.42rem',textTransform:'uppercase'}}>다이어리</div>
-            <div style={{fontSize:'.74rem',color:'#333',lineHeight:1.72,whiteSpace:'pre-wrap'}}>{diary}</div>
-          </div>
-        )}
-        {dream.trim()&&(
-          <>
-            {diary.trim()&&<div style={{borderTop:`1px solid ${c}22`,marginBottom:'.8rem'}}/>}
-            <div>
-              <div style={{fontSize:'.44rem',letterSpacing:'.18em',color:c,marginBottom:'.42rem',textTransform:'uppercase'}}>꿈일기</div>
-              <div style={{fontSize:'.74rem',color:'#444',lineHeight:1.72,whiteSpace:'pre-wrap',fontStyle:'italic'}}>{dream}</div>
-            </div>
-          </>
-        )}
-        <div style={{borderTop:`1.5px solid ${c}33`,paddingTop:'.5rem',marginTop:'.75rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontSize:'.44rem',letterSpacing:'.1em',color:c+'88',textTransform:'uppercase'}}>nagi-todo</span>
-          <span style={{fontSize:'.44rem',letterSpacing:'.06em',color:'#ccc'}}>{dk}</span>
-        </div>
-      </div>
-      <div style={perf(true)}/>
-    </div>
-  );
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   DailyPanel  (right-side slide panel)
-══════════════════════════════════════════════════════════ */
-function DailyPanel({dk, dlabel, color, open, onClose}) {
-  const [gratitude, setGratitude] = React.useState(['','','']);
-  const [diary,     setDiary]     = React.useState('');
-  const [mood,      setMood]      = React.useState(null);
-  const [dream,     setDream]     = React.useState('');
-  const [exporting, setExporting] = React.useState(false);
-
-  React.useEffect(()=>{
-    const r=db.ref('daily/'+dk);
-    const h=r.on('value',s=>{
-      const v=s.val()||{};
-      setGratitude(Array.isArray(v.gratitude)?v.gratitude:['','','']);
-      setDiary(v.diary||'');
-      setMood(v.mood||null);
-      setDream(v.dream||'');
-    });
-    return()=>r.off('value',h);
-  },[dk]);
-
-  function saveGratitude(idx, val) {
-    const next=[...gratitude]; next[idx]=val; setGratitude(next);
-    db.ref('daily/'+dk+'/gratitude').set(next);
-  }
-  function saveMood(key) {
-    const next=mood===key?null:key; setMood(next);
-    db.ref('daily/'+dk+'/mood').set(next);
-  }
-
-  const hasContent=gratitude.some(g=>g.trim())||diary.trim()||mood||dream.trim();
-
-  async function exportTicket() {
-    setExporting(true);
-    await new Promise(r=>setTimeout(r,200));
-    const el=document.getElementById('dailycard'); if(!el){setExporting(false);return;}
-    const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
-    setExporting(false);
-    cv.toBlob(async blob=>{
-      if(!blob)return;
-      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
-      catch{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`daily-${dk}.png`;a.click();URL.revokeObjectURL(u); }
-    });
-  }
-
-  const TA={
-    width:'100%',border:'1px solid #eee',padding:'.42rem .5rem',
-    borderRadius:'.35rem',resize:'vertical',fontFamily:'inherit',
-    fontSize:'.8rem',lineHeight:1.65,color:'#555',background:'#fafafa',
-  };
-  const DIV={borderTop:`1px solid ${color}18`,margin:'.85rem 0'};
-
-  return (
-    <>
-      <aside style={{
-        position:'fixed',right:0,top:0,bottom:0,width:'15rem',
-        background:'#fff',overflow:'auto',
-        zIndex:open?1001:20,
-        boxShadow:'-2px 0 10px rgba(0,0,0,0.06)',
-        transform:open?'translateX(0)':'translateX(100%)',
-        transition:'transform .25s ease',
-      }}>
-        <div style={{padding:'1.25rem 1rem 2rem'}}>
-
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.1rem',paddingTop:'.6rem'}}>
-            <span style={sectionLabel({marginBottom:0})}>ᴅᴀɪʟʏ</span>
-            <div style={{display:'flex',gap:'.35rem',alignItems:'center'}}>
-              {hasContent&&(
-                <button onClick={exportTicket} style={{...pill(color,'#fff',true),padding:'.2rem .55rem'}}>↗</button>
-              )}
-              <button onClick={onClose} className="icon-btn" style={{fontSize:'1rem'}}>✕</button>
-            </div>
-          </div>
-
-          {/* ── Gratitude ── */}
-          <span style={sectionLabel()}>감사한 점</span>
-          {[0,1,2].map(i=>(
-            <div key={i} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.32rem'}}>
-              <span style={{fontSize:'.6rem',color,flexShrink:0,fontFamily:'monospace',width:'.75rem',textAlign:'right'}}>{i+1}.</span>
-              <textarea
-                value={gratitude[i]}
-                onChange={e=>saveGratitude(i,e.target.value)}
-                placeholder={`감사한 점 ${i+1}`}
-                rows={1}
-                style={{...TA,resize:'none'}}
-              />
-            </div>
-          ))}
-
-          <div style={DIV}/>
-
-          {/* ── Diary ── */}
-          <span style={sectionLabel()}>다이어리</span>
-          <textarea
-            value={diary}
-            onChange={e=>{setDiary(e.target.value);db.ref('daily/'+dk+'/diary').set(e.target.value);}}
-            placeholder="오늘 하루를 짧게 기록해봐."
-            rows={4}
-            style={TA}
-          />
-
-          <div style={DIV}/>
-
-          {/* ── Mood ── */}
-          <span style={sectionLabel()}>무드</span>
-          <div style={{display:'flex',gap:'2px',justifyContent:'space-between'}}>
-            {SVG_MOODS.map(({key,label})=>{
-              const active=mood===key;
-              return (
-                <button key={key} onClick={()=>saveMood(key)} title={label} style={{
-                  background:'none',border:'none',cursor:'pointer',padding:'5px 3px',
-                  display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',
-                  opacity:mood&&!active?0.2:1,
-                  transition:'opacity .15s',
-                }}>
-                  <MoodSVG mkey={key} size={18} color={active?color:'#c8c8c8'}/>
-                  <span style={{fontSize:'.46rem',color:active?color:'#ccc',letterSpacing:'.03em'}}>{label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={DIV}/>
-
-          {/* ── Dream ── */}
-          <span style={sectionLabel()}>꿈일기</span>
-          <textarea
-            value={dream}
-            onChange={e=>{setDream(e.target.value);db.ref('daily/'+dk+'/dream').set(e.target.value);}}
-            placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야."
-            rows={4}
-            style={{...TA,fontStyle:'italic'}}
-          />
-
-        </div>
-      </aside>
-
-      {exporting&&(
-        <DailyCard dlabel={dlabel} dk={dk} color={color} gratitude={gratitude} diary={diary} mood={mood} dream={dream}/>
-      )}
-    </>
-  );
-}
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
