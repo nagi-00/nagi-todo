@@ -131,7 +131,7 @@ function App() {
   const [journals,   setJournals]  = React.useState({});
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
-  const [timePanel,  setTimePanel] = React.useState(false);
+  const [dailyPanel, setDailyPanel] = React.useState(false);
   const [stickyOpen, setStickyOpen]= React.useState(false);
 
   const dk      = sel.toLocaleDateString('sv-SE');
@@ -266,20 +266,22 @@ function App() {
         }}
       >{sidebar?'←':'→'}</button>
 
-      {/* time block toggle */}
+      {/* daily panel toggle */}
       <button
-        onClick={()=>setTimePanel(v=>!v)}
+        onClick={()=>setDailyPanel(v=>!v)}
         style={{
           position:'fixed',right:'1rem',top:'3.5rem',zIndex:1002,
-          background:timePanel?color:'#fff',border:'none',borderRadius:'9999px',
+          background:dailyPanel?color:'#fff',border:'none',borderRadius:'9999px',
           width:'2rem',height:'2rem',cursor:'pointer',
           boxShadow:'0 1px 4px rgba(0,0,0,0.12)',
-          color:timePanel?'#fff':'#bbb',fontSize:'.7rem',display:'flex',alignItems:'center',justifyContent:'center',
-          transition:'background .2s,color .2s',
+          display:'flex',alignItems:'center',justifyContent:'center',
+          transition:'background .2s',
         }}
       >
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px',width:'10px',height:'10px'}}>
-          {[0,1,2,3].map(i=><div key={i} style={{background:timePanel?'#fff':'#ccc',borderRadius:'1px'}}/>)}
+        <div style={{display:'flex',flexDirection:'column',gap:'2.5px',width:'11px'}}>
+          {[1,.7,1].map((w,i)=>(
+            <div key={i} style={{height:'1.5px',width:`${w*100}%`,background:dailyPanel?'#fff':'#c8c8c8',borderRadius:'1px',transition:'background .2s'}}/>
+          ))}
         </div>
       </button>
 
@@ -556,14 +558,14 @@ function App() {
       </main>
 
       {/* click-outside overlay — closes all slide panels */}
-      {(sidebar||timePanel||stickyOpen)&&(
-        <div onClick={()=>{setSidebar(false);setTimePanel(false);setStickyOpen(false);}}
+      {(sidebar||dailyPanel||stickyOpen)&&(
+        <div onClick={()=>{setSidebar(false);setDailyPanel(false);setStickyOpen(false);}}
           style={{position:'fixed',inset:0,zIndex:15}}/>
       )}
 
       {/* modals & widgets */}
       {showRtn&&<RoutineModal routines={routines} onClose={()=>setShowRtn(false)}/>}
-      <TimeBlockPanel dk={dk} color={color} open={timePanel} onClose={()=>setTimePanel(false)}/>
+      <DailyPanel dk={dk} dlabel={dlabel} color={color} open={dailyPanel} onClose={()=>setDailyPanel(false)}/>
       <WeatherWidget color={color}/>
       <PomodoroWidget color={color}/>
       <MusicWidget color={color}/>
@@ -1602,237 +1604,261 @@ function DemianWidget() {
 }
 
 
+/* ── SVG Mood Symbols ── */
+const SVG_MOODS = [
+  { key:'sunny',   label:'맑음'  },
+  { key:'cloudy',  label:'구름'  },
+  { key:'neutral', label:'보통'  },
+  { key:'rainy',   label:'비'    },
+  { key:'stormy',  label:'폭풍'  },
+];
+
+function MoodSVG({mkey, size=20, color='currentColor'}) {
+  const s = {width:size, height:size, display:'block', flexShrink:0};
+  const p = {fill:'none', stroke:color, strokeWidth:1.6, strokeLinecap:'round', strokeLinejoin:'round'};
+  if (mkey==='sunny') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <circle cx="12" cy="12" r="4"/>
+      <line x1="12" y1="2"   x2="12" y2="5"/>
+      <line x1="12" y1="19"  x2="12" y2="22"/>
+      <line x1="2"  y1="12"  x2="5"  y2="12"/>
+      <line x1="19" y1="12"  x2="22" y2="12"/>
+      <line x1="5.6"  y1="5.6"   x2="7.8"  y2="7.8"/>
+      <line x1="16.2" y1="16.2"  x2="18.4" y2="18.4"/>
+      <line x1="5.6"  y1="18.4"  x2="7.8"  y2="16.2"/>
+      <line x1="16.2" y1="7.8"   x2="18.4" y2="5.6"/>
+    </svg>
+  );
+  if (mkey==='cloudy') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <path d="M6 17a5 5 0 1 1 4.9-6 4 4 0 1 1 7.1 4H6z"/>
+    </svg>
+  );
+  if (mkey==='neutral') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <circle cx="12" cy="12" r="8"/>
+    </svg>
+  );
+  if (mkey==='rainy') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <path d="M6 15a5 5 0 1 1 4.9-6 4 4 0 1 1 7.1 4H6z"/>
+      <line x1="8"  y1="19" x2="7"  y2="22"/>
+      <line x1="13" y1="19" x2="12" y2="22"/>
+      <line x1="18" y1="19" x2="17" y2="22"/>
+    </svg>
+  );
+  if (mkey==='stormy') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <polyline points="13 2 7 14 12 14 10 22 18 10 13 10 13 2"/>
+    </svg>
+  );
+  return null;
+}
+
+
 /* ══════════════════════════════════════════════════════════
-   TimeBlockPanel  (right-side slide panel)
+   DailyCard  (off-screen ticket export)
 ══════════════════════════════════════════════════════════ */
-function TimeBlockPanel({dk, color, open, onClose}) {
-  const [blocks,     setBlocks]     = React.useState(() => {
-    try { return JSON.parse(localStorage.getItem('timeBlocks')) || {}; }
-    catch { return {}; }
+function DailyCard({dlabel, dk, color, gratitude, diary, mood, dream}) {
+  const c = color || '#888';
+  const perf = (flip) => ({
+    height:'10px',
+    background:'repeating-linear-gradient(90deg,#e8e8e8 0 6px,#fff 6px 12px)',
+    borderTop:  flip ? '1px dashed #ddd' : 'none',
+    borderBottom: flip ? 'none' : '1px dashed #ddd',
   });
-  const [paintMode,  setPaintMode]  = React.useState(false);
-  const [paintLevel, setPaintLevel] = React.useState(2);
-  const [hov,        setHov]        = React.useState(null); // "h,slot" string key
-  const isPaintingRef = React.useRef(false);
-
-  React.useEffect(() => {
-    function up() { isPaintingRef.current = false; }
-    window.addEventListener('mouseup', up);
-    return () => window.removeEventListener('mouseup', up);
-  }, []);
-
-  const dayBlocks = blocks[dk] || {};
-
-  function slotColor(level) {
-    if (level === 0) return '#ebebeb';
-    if (level === 1) return color + '50';
-    if (level === 2) return color + '99';
-    return color;
-  }
-
-  function toggleSlot(h, slot) {
-    const cur = (dayBlocks[h] || [0,0,0,0,0,0])[slot];
-    const newSlots = [...(dayBlocks[h] || [0,0,0,0,0,0])];
-    newSlots[slot] = (cur + 1) % 4;
-    const next = {...blocks, [dk]: {...dayBlocks, [h]: newSlots}};
-    setBlocks(next);
-    localStorage.setItem('timeBlocks', JSON.stringify(next));
-  }
-
-  function applyPaint(h, slot) {
-    setBlocks(prev => {
-      const prevDay   = prev[dk] || {};
-      const prevSlots = prevDay[h] || [0,0,0,0,0,0];
-      if (prevSlots[slot] === paintLevel) return prev;
-      const newSlots = [...prevSlots];
-      newSlots[slot]  = paintLevel;
-      const next = {...prev, [dk]: {...prevDay, [h]: newSlots}};
-      localStorage.setItem('timeBlocks', JSON.stringify(next));
-      return next;
-    });
-  }
-
-  function handleSlotDown(e, h, slot) {
-    e.preventDefault();
-    if (paintMode) { isPaintingRef.current = true; applyPaint(h, slot); }
-    else           { toggleSlot(h, slot); }
-  }
-
-  function handleSlotEnter(h, slot) {
-    setHov(`${h},${slot}`);
-    if (paintMode && isPaintingRef.current) applyPaint(h, slot);
-  }
-
-  const HOURS = Array.from({length: 18}, (_, i) => i + 6);
-  const now = new Date();
-  const nowH = now.getHours(), nowM = now.getMinutes();
-
-  const totalDeepMin  = Object.values(dayBlocks).reduce((s,sl)=>s+(sl||[]).filter(v=>v===3).length*10,0);
-  const totalFocusMin = Object.values(dayBlocks).reduce((s,sl)=>s+(sl||[]).filter(v=>v>0).length*10,0);
-
-  async function exportImg() {
-    const el = document.getElementById('tbcard'); if (!el) return;
-    const cv = await html2canvas(el, {backgroundColor:'#fff', scale:2, useCORS:true});
-    cv.toBlob(async blob => {
-      if (!blob) return;
-      try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
-      catch { const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`timeblock-${dk}.png`;a.click();URL.revokeObjectURL(u); }
-    });
-  }
-
-  const grid = (interactive) => (
-    <div style={{display:'flex',flexDirection:'column',gap:'3px',userSelect:'none'}}>
-      {HOURS.map(h => {
-        const slots = dayBlocks[h] || [0,0,0,0,0,0];
-        const isCurHour = interactive && h === nowH;
-        return (
-          <div key={h} style={{display:'flex',alignItems:'center',gap:'7px'}}>
-            <span style={{
-              fontSize:'.58rem', width:'1.4rem', textAlign:'right', flexShrink:0,
-              color: isCurHour ? color : '#ccc',
-              fontWeight: isCurHour ? 'bold' : 'normal',
-            }}>{h}</span>
-            <div style={{display:'flex',gap:'2px'}}>
-              {slots.map((level, slot) => {
-                const isCurSlot = isCurHour && slot === Math.floor(nowM / 10);
-                const isHov     = interactive && hov === `${h},${slot}`;
-                // paint-mode hover: preview the paint color; normal hover: subtle ring
-                const bg = (isHov && paintMode) ? slotColor(paintLevel) : slotColor(level);
-                const shadow = isCurSlot
-                  ? `inset 0 0 0 2px ${color}`
-                  : (isHov && !paintMode)
-                    ? 'inset 0 0 0 1.5px rgba(0,0,0,0.22)'
-                    : 'none';
-                return (
-                  <div key={slot}
-                    onMouseDown={interactive ? e => handleSlotDown(e, h, slot) : undefined}
-                    onMouseEnter={interactive ? () => handleSlotEnter(h, slot) : undefined}
-                    onMouseLeave={interactive ? () => setHov(null) : undefined}
-                    style={{
-                      width:'14px', height:'14px',
-                      background: bg,
-                      borderRadius:'2px',
-                      cursor: interactive ? (paintMode ? 'crosshair' : 'pointer') : 'default',
-                      boxShadow: shadow,
-                      transition: 'background .12s, box-shadow .08s',
-                    }}
-                  />
-                );
-              })}
-            </div>
+  const validG = (gratitude||[]).filter(g=>g.trim());
+  const moodObj = SVG_MOODS.find(m=>m.key===mood);
+  return (
+    <div id="dailycard" style={{position:'fixed',left:'-9999px',top:0,fontFamily:'HJSS,sans-serif',background:'#fff',width:'280px'}}>
+      <div style={{background:c, padding:'1rem 1.5rem .9rem'}}>
+        <div style={{fontSize:'.46rem',letterSpacing:'.28em',color:'rgba(255,255,255,.5)',marginBottom:'.18rem'}}>𝐝 : ɴᴀɢɪ</div>
+        <div style={{fontSize:'.82rem',fontWeight:'bold',color:'#fff',lineHeight:1.4}}>{dlabel}</div>
+        {moodObj&&<div style={{fontSize:'.55rem',color:'rgba(255,255,255,.65)',marginTop:'.22rem',letterSpacing:'.06em'}}>{moodObj.label}</div>}
+      </div>
+      <div style={perf(false)}/>
+      <div style={{padding:'1rem 1.5rem'}}>
+        {validG.length>0&&(
+          <div style={{marginBottom:'.8rem'}}>
+            <div style={{fontSize:'.44rem',letterSpacing:'.18em',color:c,marginBottom:'.42rem',textTransform:'uppercase'}}>감사</div>
+            {validG.map((g,i)=>(
+              <div key={i} style={{display:'flex',gap:'.38rem',marginBottom:'.2rem',fontSize:'.74rem',lineHeight:1.6,alignItems:'flex-start'}}>
+                <span style={{color:c,flexShrink:0,fontFamily:'monospace',fontSize:'.6rem',marginTop:'.1rem'}}>{i+1}.</span>
+                <span style={{color:'#333',flex:1,whiteSpace:'pre-wrap'}}>{g}</span>
+              </div>
+            ))}
           </div>
-        );
-      })}
-    </div>
-  );
-
-  const legend = (
-    <div style={{display:'flex',flexDirection:'column',gap:'.35rem'}}>
-      {[1,2,3].map(l=>(
-        <div key={l} style={{display:'flex',alignItems:'center',gap:'5px'}}>
-          <div style={{width:'9px',height:'9px',borderRadius:'1px',background:slotColor(l)}}/>
-          <span style={{fontSize:'.55rem',color:'#bbb'}}>{['낮음','보통','딥포커스'][l-1]}</span>
+        )}
+        {validG.length>0&&(diary.trim()||dream.trim())&&(
+          <div style={{borderTop:`1px solid ${c}22`,marginBottom:'.8rem'}}/>
+        )}
+        {diary.trim()&&(
+          <div style={{marginBottom:'.8rem'}}>
+            <div style={{fontSize:'.44rem',letterSpacing:'.18em',color:c,marginBottom:'.42rem',textTransform:'uppercase'}}>다이어리</div>
+            <div style={{fontSize:'.74rem',color:'#333',lineHeight:1.72,whiteSpace:'pre-wrap'}}>{diary}</div>
+          </div>
+        )}
+        {dream.trim()&&(
+          <>
+            {diary.trim()&&<div style={{borderTop:`1px solid ${c}22`,marginBottom:'.8rem'}}/>}
+            <div>
+              <div style={{fontSize:'.44rem',letterSpacing:'.18em',color:c,marginBottom:'.42rem',textTransform:'uppercase'}}>꿈일기</div>
+              <div style={{fontSize:'.74rem',color:'#444',lineHeight:1.72,whiteSpace:'pre-wrap',fontStyle:'italic'}}>{dream}</div>
+            </div>
+          </>
+        )}
+        <div style={{borderTop:`1.5px solid ${c}33`,paddingTop:'.5rem',marginTop:'.75rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:'.44rem',letterSpacing:'.1em',color:c+'88',textTransform:'uppercase'}}>nagi-todo</span>
+          <span style={{fontSize:'.44rem',letterSpacing:'.06em',color:'#ccc'}}>{dk}</span>
         </div>
-      ))}
+      </div>
+      <div style={perf(true)}/>
     </div>
   );
+}
 
-  /* paint-mode level picker (level 0 = 없음/erase) */
-  const LEVEL_LABELS = ['없음','낮음','보통','딥포커스'];
-  const levelPicker = (
-    <div style={{display:'flex',gap:'4px',alignItems:'center'}}>
-      <span style={{fontSize:'.52rem',color:'#ccc',marginRight:'1px'}}>컬러</span>
-      {[0,1,2,3].map(l=>(
-        <div key={l} title={LEVEL_LABELS[l]} onClick={()=>setPaintLevel(l)} style={{
-          width:'15px', height:'15px', background:slotColor(l), borderRadius:'2px',
-          cursor:'pointer',
-          boxShadow: l===0 ? 'inset 0 0 0 1px #ccc' : 'none',
-          outline: paintLevel===l ? `2px solid ${color}` : '2px solid transparent',
-          outlineOffset:'1.5px', transition:'outline .1s',
-        }}/>
-      ))}
-    </div>
-  );
 
-  /* CSS paint-brush icon: 3 horizontal bars fading opacity */
-  const paintIcon = (
-    <div style={{display:'flex',flexDirection:'column',gap:'2px',width:'12px'}}>
-      {[1,.6,.3].map((op,i)=>(
-        <div key={i} style={{height:'3px',background:paintMode?color:'#ccc',borderRadius:'1px',opacity:op,transition:'background .15s'}}/>
-      ))}
-    </div>
-  );
+/* ══════════════════════════════════════════════════════════
+   DailyPanel  (right-side slide panel)
+══════════════════════════════════════════════════════════ */
+function DailyPanel({dk, dlabel, color, open, onClose}) {
+  const [gratitude, setGratitude] = React.useState(['','','']);
+  const [diary,     setDiary]     = React.useState('');
+  const [mood,      setMood]      = React.useState(null);
+  const [dream,     setDream]     = React.useState('');
+  const [exporting, setExporting] = React.useState(false);
+
+  React.useEffect(()=>{
+    const r=db.ref('daily/'+dk);
+    const h=r.on('value',s=>{
+      const v=s.val()||{};
+      setGratitude(Array.isArray(v.gratitude)?v.gratitude:['','','']);
+      setDiary(v.diary||'');
+      setMood(v.mood||null);
+      setDream(v.dream||'');
+    });
+    return()=>r.off('value',h);
+  },[dk]);
+
+  function saveGratitude(idx, val) {
+    const next=[...gratitude]; next[idx]=val; setGratitude(next);
+    db.ref('daily/'+dk+'/gratitude').set(next);
+  }
+  function saveMood(key) {
+    const next=mood===key?null:key; setMood(next);
+    db.ref('daily/'+dk+'/mood').set(next);
+  }
+
+  const hasContent=gratitude.some(g=>g.trim())||diary.trim()||mood||dream.trim();
+
+  async function exportTicket() {
+    setExporting(true);
+    await new Promise(r=>setTimeout(r,200));
+    const el=document.getElementById('dailycard'); if(!el){setExporting(false);return;}
+    const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
+    setExporting(false);
+    cv.toBlob(async blob=>{
+      if(!blob)return;
+      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      catch{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`daily-${dk}.png`;a.click();URL.revokeObjectURL(u); }
+    });
+  }
+
+  const TA={
+    width:'100%',border:'1px solid #eee',padding:'.42rem .5rem',
+    borderRadius:'.35rem',resize:'vertical',fontFamily:'inherit',
+    fontSize:'.8rem',lineHeight:1.65,color:'#555',background:'#fafafa',
+  };
+  const DIV={borderTop:`1px solid ${color}18`,margin:'.85rem 0'};
 
   return (
     <>
-      {/* ── slide panel ── */}
       <aside style={{
-        position:'fixed', right:0, top:0, bottom:0, width:'13rem',
-        background:'#fff', overflow:'auto',
-        zIndex: open ? 1001 : 20,
+        position:'fixed',right:0,top:0,bottom:0,width:'15rem',
+        background:'#fff',overflow:'auto',
+        zIndex:open?1001:20,
         boxShadow:'-2px 0 10px rgba(0,0,0,0.06)',
-        transform: open ? 'translateX(0)' : 'translateX(100%)',
+        transform:open?'translateX(0)':'translateX(100%)',
         transition:'transform .25s ease',
       }}>
         <div style={{padding:'1.25rem 1rem 2rem'}}>
 
-          {/* header */}
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.9rem',paddingTop:'.6rem'}}>
-            <span style={sectionLabel({marginBottom:0})}>ᴛɪᴍᴇ ʙʟᴏᴄᴋ</span>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1.1rem',paddingTop:'.6rem'}}>
+            <span style={sectionLabel({marginBottom:0})}>ᴅᴀɪʟʏ</span>
             <div style={{display:'flex',gap:'.35rem',alignItems:'center'}}>
-              {totalFocusMin > 0 && (
-                <button onClick={exportImg} style={{...pill(color,'#fff',true),padding:'.2rem .55rem'}}>↗</button>
+              {hasContent&&(
+                <button onClick={exportTicket} style={{...pill(color,'#fff',true),padding:'.2rem .55rem'}}>↗</button>
               )}
               <button onClick={onClose} className="icon-btn" style={{fontSize:'1rem'}}>✕</button>
             </div>
           </div>
 
-          <div style={{fontSize:'.62rem',color,fontWeight:'bold',marginBottom:'.8rem',visibility:totalDeepMin>0?'visible':'hidden'}}>
-            {Math.floor(totalDeepMin/60)>0?`${Math.floor(totalDeepMin/60)}h `:''}
-            {totalDeepMin%60>0?`${totalDeepMin%60}m `:''}딥포커스
-          </div>
-
-          {grid(true)}
-
-          <div style={{marginTop:'.9rem',borderTop:'1px solid #f5f5f5',paddingTop:'.75rem'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              {paintMode ? levelPicker : legend}
-              <button onClick={()=>setPaintMode(v=>!v)} style={{
-                background:'none',border:'none',cursor:'pointer',padding:'3px',
-                display:'flex',alignItems:'center',
-                background: paintMode ? color+'15' : 'none',
-                borderRadius:'4px', transition:'background .15s',
-              }}>
-                {paintIcon}
-              </button>
+          {/* ── Gratitude ── */}
+          <span style={sectionLabel()}>감사한 점</span>
+          {[0,1,2].map(i=>(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.32rem'}}>
+              <span style={{fontSize:'.6rem',color,flexShrink:0,fontFamily:'monospace',width:'.75rem',textAlign:'right'}}>{i+1}.</span>
+              <textarea
+                value={gratitude[i]}
+                onChange={e=>saveGratitude(i,e.target.value)}
+                placeholder={`감사한 점 ${i+1}`}
+                rows={1}
+                style={{...TA,resize:'none'}}
+              />
             </div>
-            {!paintMode && totalFocusMin > 0 && (
-              <div style={{fontSize:'.58rem',color:'#ccc',marginTop:'.5rem'}}>총 {totalFocusMin}m 기록</div>
-            )}
+          ))}
+
+          <div style={DIV}/>
+
+          {/* ── Diary ── */}
+          <span style={sectionLabel()}>다이어리</span>
+          <textarea
+            value={diary}
+            onChange={e=>{setDiary(e.target.value);db.ref('daily/'+dk+'/diary').set(e.target.value);}}
+            placeholder="오늘 하루를 짧게 기록해봐."
+            rows={4}
+            style={TA}
+          />
+
+          <div style={DIV}/>
+
+          {/* ── Mood ── */}
+          <span style={sectionLabel()}>무드</span>
+          <div style={{display:'flex',gap:'2px',justifyContent:'space-between'}}>
+            {SVG_MOODS.map(({key,label})=>{
+              const active=mood===key;
+              return (
+                <button key={key} onClick={()=>saveMood(key)} title={label} style={{
+                  background:'none',border:'none',cursor:'pointer',padding:'5px 3px',
+                  display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',
+                  opacity:mood&&!active?0.2:1,
+                  transition:'opacity .15s',
+                }}>
+                  <MoodSVG mkey={key} size={18} color={active?color:'#c8c8c8'}/>
+                  <span style={{fontSize:'.46rem',color:active?color:'#ccc',letterSpacing:'.03em'}}>{label}</span>
+                </button>
+              );
+            })}
           </div>
+
+          <div style={DIV}/>
+
+          {/* ── Dream ── */}
+          <span style={sectionLabel()}>꿈일기</span>
+          <textarea
+            value={dream}
+            onChange={e=>{setDream(e.target.value);db.ref('daily/'+dk+'/dream').set(e.target.value);}}
+            placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야."
+            rows={4}
+            style={{...TA,fontStyle:'italic'}}
+          />
+
         </div>
       </aside>
 
-      {/* ── off-screen export card ── */}
-      <div id="tbcard" style={{
-        position:'fixed', left:'-9999px', top:0,
-        fontFamily:'HJSS,sans-serif', background:'#fff',
-        width:'200px', padding:'1.25rem 1rem 1rem',
-      }}>
-        <div style={{fontSize:'.5rem',letterSpacing:'.2em',color,marginBottom:'.2rem'}}>ᴛɪᴍᴇ ʙʟᴏᴄᴋ</div>
-        <div style={{fontSize:'.58rem',color:'#bbb',marginBottom:'.75rem'}}>{dk}</div>
-        {grid(false)}
-        <div style={{marginTop:'.75rem',borderTop:`1.5px solid ${color}33`,paddingTop:'.6rem',display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
-          {legend}
-          {totalDeepMin > 0 && (
-            <div style={{fontSize:'.6rem',color,fontWeight:'bold',textAlign:'right'}}>
-              {Math.floor(totalDeepMin/60)>0?`${Math.floor(totalDeepMin/60)}h `:''}
-              {totalDeepMin%60>0?`${totalDeepMin%60}m`:''}
-              <div style={{fontSize:'.5rem',fontWeight:'normal',color:'#bbb'}}>딥포커스</div>
-            </div>
-          )}
-        </div>
-      </div>
+      {exporting&&(
+        <DailyCard dlabel={dlabel} dk={dk} color={color} gratitude={gratitude} diary={diary} mood={mood} dream={dream}/>
+      )}
     </>
   );
 }
