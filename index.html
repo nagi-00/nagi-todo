@@ -1208,13 +1208,13 @@ function WeatherWidget({color}) {
 
   function wmoEmoji(c) {
     if (c===0)       return '☀️';
-    if (c<=2)        return '🌤';
+    if (c<=2)        return '🌥️';
     if (c<=3)        return '☁️';
     if (c<=49)       return '🌫';
-    if (c<=67)       return '🌧';
+    if (c<=67)       return '🌧️';
     if (c<=77)       return '❄️';
-    if (c<=84)       return '🌧';
-    if (c<=99)       return '⛈';
+    if (c<=84)       return '☔';
+    if (c<=99)       return '⛈️';
     return '🌡';
   }
   function wmoDesc(c) {
@@ -1286,7 +1286,7 @@ function WeatherWidget({color}) {
 ══════════════════════════════════════════════════════════ */
 function PomodoroWidget({color}) {
   const ac = color || '#888';
-  const MODE_LABELS = {focus:'집중', short:'쉬기', long:'긴 쉬기'};
+  const MODE_LABELS = {focus:'집중', short:'휴식', long:'긴 휴식'};
 
   const [open,         setOpen]         = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
@@ -1594,7 +1594,7 @@ function MusicWidget({color}) {
         {/* empty state */}
         {open&&playlist.length===0&&(
           <div style={{padding:'20px 12px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px'}}>
-            <span style={{fontSize:'20px',opacity:.15}}>♪</span>
+            <span style={{fontSize:'20px',opacity:.15}}>🎧</span>
             <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
             <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
           </div>
@@ -1693,7 +1693,7 @@ function StickyWidget({color, open, onOpen, onClose}) {
           <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:`1px solid ${border}`,background:panelBg}}>
             <textarea value={input} onChange={e=>setInput(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addNote();}}}
-              placeholder="메모 입력. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
+              placeholder="메모를 입력해봐. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
               style={{width:'100%',background:inputBg,border:`1px solid ${inputBdr}`,borderRadius:'6px',
                 padding:'.38rem .5rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
                 resize:'none',outline:'none',color:'#444',display:'block'}}
