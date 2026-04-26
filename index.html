@@ -601,8 +601,8 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
       backgroundPosition:'center',
       padding:'2.4rem 2rem 2.2rem',
     }}>
-      {/* warm cream wash for legibility on busy texture */}
-      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.38)',pointerEvents:'none'}}/>
+      {/* warm cream wash (kept very faint so multiply blends with texture grain) */}
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.18)',pointerEvents:'none'}}/>
 
       <div style={{position:'relative',zIndex:1,mixBlendMode:'multiply'}}>
 
@@ -654,6 +654,7 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
                     textDecoration:it.state===1?'line-through':'none',
                     background:it.important?color+'22':'transparent',
                     padding:it.important?'0 .35rem':'0',
+                    margin:it.important?'0 -.35rem':'0',
                     borderRadius:'2px',
                   }}>
                     <span style={{flexShrink:0,minWidth:'.7rem'}}>{xBullet(it.state)}</span>
@@ -760,10 +761,10 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
     }}>
       {/* faint theme-color wash so accents harmonize with bg */}
       <div style={{position:'absolute',inset:0,background:c,opacity:0.22,pointerEvents:'none'}}/>
-      {/* paper texture grain */}
+      {/* paper texture grain (overlay blend for stronger grain on dark) */}
       <div style={{position:'absolute',inset:0,
         backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
-        opacity:0.13,mixBlendMode:'soft-light',pointerEvents:'none'}}/>
+        opacity:0.42,mixBlendMode:'overlay',pointerEvents:'none'}}/>
 
       <div style={{position:'relative',zIndex:1}}>
 
@@ -775,18 +776,8 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
           textAlign:'center',
           lineHeight:.95,
           letterSpacing:'-.01em',
-          marginBottom:'.3rem',
+          marginBottom:'1.4rem',
         }}>nightlog</div>
-
-        {/* date subtitle (kept here — on dark bg it grounds the title) */}
-        <div style={{
-          fontFamily:MONO,
-          fontSize:'.6rem',
-          color:FG_DIM,
-          textAlign:'center',
-          letterSpacing:'.18em',
-          marginBottom:'1.6rem',
-        }}>{dlabel.toUpperCase()}</div>
 
         {/* ── Sections ── */}
         <div style={{fontFamily:MONO,fontSize:'.74rem',color:FG,lineHeight:1.95}}>
