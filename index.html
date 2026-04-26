@@ -745,10 +745,10 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
 
   const MONO = "'Courier New', ui-monospace, monospace";
 
-  /* dark palette — saturated for newsprint legibility under top texture */
-  const FG       = '#fafbff';
-  const FG_DIM   = 'rgba(250,251,255,0.78)';
-  const FG_FAINT = 'rgba(250,251,255,0.55)';
+  /* dark palette — high contrast against near-black base */
+  const FG       = '#ffffff';
+  const FG_DIM   = 'rgba(255,255,255,0.72)';
+  const FG_FAINT = 'rgba(255,255,255,0.45)';
 
   /* section header with full-width dashes */
   const SectionHeader = ({label}) => (
@@ -764,15 +764,15 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
       position:'fixed', left:'-9999px', top:0,
       fontFamily:'HJSS, sans-serif',
       width:'380px',
-      background:'#0f1320',
+      background:'#06070f',
       padding:'2.4rem 2rem 2.2rem',
     }}>
-      {/* faint theme-color wash so accents harmonize with bg */}
-      <div style={{position:'absolute',inset:0,background:c,opacity:0.22,pointerEvents:'none'}}/>
-      {/* paper texture grain on bg (under content) */}
+      {/* saturated theme tint — thin so bg stays dark, not mid-gray */}
+      <div style={{position:'absolute',inset:0,background:c,opacity:0.12,pointerEvents:'none'}}/>
+      {/* paper texture grain under content */}
       <div style={{position:'absolute',inset:0,
         backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
-        opacity:0.28,mixBlendMode:'overlay',pointerEvents:'none'}}/>
+        opacity:0.18,mixBlendMode:'overlay',pointerEvents:'none'}}/>
 
       <div style={{position:'relative',zIndex:1}}>
 
@@ -876,11 +876,11 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
         }}>JOURNAL BY ⓒnagi</div>
       </div>
 
-      {/* paper texture grain ON TOP of everything — newsprint feel; survives html2canvas blend-mode loss */}
+      {/* paper texture grain ON TOP — newsprint feel; survives html2canvas blend-mode loss */}
       <div style={{
         position:'absolute',inset:0,
         backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
-        opacity:0.2,mixBlendMode:'overlay',
+        opacity:0.13,mixBlendMode:'overlay',
         pointerEvents:'none',zIndex:2,
       }}/>
     </div>
