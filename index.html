@@ -135,7 +135,7 @@ function App() {
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
-  const journal = journals[dk] || { morning:'', evening:'', mood:null };
+  const journal = journals[dk] || { morning:'', mood:null };
   const color   = dColors[dk] || accent;
   const dlabel  = sel.toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const todayDk = new Date().toLocaleDateString('sv-SE');
@@ -233,7 +233,7 @@ function App() {
 
   React.useEffect(()=>{
     const r=db.ref('journal/'+dk);
-    const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',evening:'',mood:null}})));
+    const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',mood:null}})));
     return()=>r.off('value',h);
   },[dk]);
 
@@ -702,7 +702,7 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
 /* ══════════════════════════════════════════════════════════
    BoardingPass  (JOURNAL export — concert ticket style)
 ══════════════════════════════════════════════════════════ */
-function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, svgMood, dream}) {
+function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dream}) {
   const c = color || '#888';
   const moodObj = SVG_MOODS.find(m => m.key === svgMood);
   const validG  = (gratitude||[]).filter(g => g.trim());
@@ -816,7 +816,6 @@ function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, sv
               </div>
             )}
             <Section label="DIARY"   body={diary}/>
-            <Section label="EVENING" body={evening}/>
             <Section label="DREAM"   body={dream} italic/>
           </div>
 
@@ -872,9 +871,7 @@ function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, sv
 ══════════════════════════════════════════════════════════ */
 function JournalTab({dlabel, dk, journal, color, onSave}) {
   const [mEdit,    setMEdit]    = React.useState(false);
-  const [eEdit,    setEEdit]    = React.useState(false);
   const [mText,    setMText]    = React.useState('');
-  const [eText,    setEText]    = React.useState('');
   const [gratitude,setGratitude]= React.useState(['','','']);
   const [diary,    setDiary]    = React.useState('');
   const [svgMood,  setSvgMood]  = React.useState(null);
@@ -882,7 +879,6 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
   const [exporting,setExporting]= React.useState(false);
 
   React.useEffect(()=>setMText(journal.morning||''),  [journal.morning]);
-  React.useEffect(()=>setEText(journal.evening||''),  [journal.evening]);
 
   React.useEffect(()=>{
     const r=db.ref('daily/'+dk);
@@ -905,8 +901,6 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
     const next=svgMood===key?null:key; setSvgMood(next);
     db.ref('daily/'+dk+'/mood').set(next);
   }
-
-  const hasContent=mText.trim()||eText.trim()||gratitude.some(g=>g.trim())||diary.trim()||svgMood||dream.trim();
 
   async function exportBoarding(){
     setExporting(true);
@@ -933,9 +927,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       {/* header */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem'}}>
         <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
-        {hasContent&&(
-          <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
-        )}
+        <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
       </div>
 
       {/* ── Morning ── */}
@@ -965,7 +957,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       {/* ── Diary ── */}
       <span style={LBL}>ᴅɪᴀʀʏ</span>
       <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref('daily/'+dk+'/diary').set(e.target.value);}}
-        placeholder="오늘 하루를 짧게 기록해봐." rows={4} style={TA}/>
+        placeholder="오늘 하루를 기록해봐. 아침의 생각, 저녁의 회고 모두 여기에." rows={6} style={TA}/>
 
       <div style={DIV}/>
 
@@ -989,18 +981,6 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
 
       <div style={DIV}/>
 
-      {/* ── Evening ── */}
-      <span style={LBL}>ᴇᴠᴇɴɪɴɢ</span>
-      {(!eEdit&&eText.trim())?(
-        <div style={VIEW} onDoubleClick={()=>setEEdit(true)} onContextMenu={e=>{e.preventDefault();setEEdit(true);}}>{eText}</div>
-      ):(
-        <textarea autoFocus={eEdit} value={eText} onChange={e=>setEText(e.target.value)} onFocus={()=>setEEdit(true)}
-          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('evening',eText,setEEdit);}}}
-          placeholder="오늘 저녁의 회고를 적어봐. (Enter 저장)" rows={4} style={TA}/>
-      )}
-
-      <div style={DIV}/>
-
       {/* ── Dream ── */}
       <span style={LBL}>ᴅʀᴇᴀᴍ</span>
       <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref('daily/'+dk+'/dream').set(e.target.value);}}
@@ -1008,7 +988,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
 
       {exporting&&(
         <BoardingPass dlabel={dlabel} dk={dk} color={color}
-          morning={mText} evening={eText}
+          morning={mText}
           gratitude={gratitude} diary={diary} svgMood={svgMood} dream={dream}/>
       )}
     </div>
