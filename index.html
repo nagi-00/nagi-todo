@@ -937,7 +937,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       ):(
         <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
-          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
+          placeholder="오늘 아침의 생각을 자유롭게. " rows={4} style={TA}/>
       )}
 
       <div style={DIV}/>
@@ -957,7 +957,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       {/* ── Diary ── */}
       <span style={LBL}>ᴅɪᴀʀʏ</span>
       <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref('daily/'+dk+'/diary').set(e.target.value);}}
-        placeholder="오늘 하루를 기록해봐. 아침의 생각, 저녁의 회고 모두 여기에." rows={6} style={TA}/>
+        placeholder="오늘 하루를 회고하며 기록해봐. " rows={6} style={TA}/>
 
       <div style={DIV}/>
 
