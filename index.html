@@ -31,6 +31,11 @@ body {
 textarea:focus, input:focus, select:focus { outline: none; }
 button { font-family: inherit; }
 select { font-family: inherit; }
+
+/* music track marquee */
+.mq-wrap { flex:1; overflow:hidden; position:relative; height:13px; }
+.mq-inner { display:inline-block; white-space:nowrap; padding-left:100%; animation: mq-scroll 14s linear infinite; }
+@keyframes mq-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 </style>
 </head>
 <body>
@@ -496,10 +501,13 @@ function App() {
                     </div>
                   );
                 })}
-                {/* apply routines banner — only show when none have been applied yet */}
-                {items.length===0&&appRoutines.length>0&&(
-                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:'.3rem'}}>
-                    <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                {/* import banner — show carry/apply at start of day */}
+                {items.length===0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',gap:'.4rem',marginTop:'.3rem'}}>
+                    <button onClick={carryFromPrev} style={{...pill('#f5f5f5','#888',true)}} title="전날 ☒ 항목 가져오기">☒ 가져오기</button>
+                    {appRoutines.length>0&&(
+                      <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                    )}
                   </div>
                 )}
 
@@ -508,7 +516,6 @@ function App() {
                   {items.length>0&&(
                     <button onClick={exportImg} style={pill(color,'#fff')}>Export</button>
                   )}
-                  <button onClick={carryFromPrev} style={pill('#f5f5f5','#aaa')} title="전날 ☒ 항목 가져오기">☒ 가져오기</button>
                   <button onClick={()=>setShowRtn(true)} style={pill('#f5f5f5','#aaa')}>루틴</button>
                   <div style={{flex:1}}/>
                   <button onClick={()=>setEditMode(v=>!v)} style={pill(editMode?'#e8e8e8':'#f5f5f5',editMode?'#555':'#bbb')}>
@@ -699,167 +706,169 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
 
 
 /* ══════════════════════════════════════════════════════════
-   BoardingPass  (JOURNAL export — concert ticket style)
+   BoardingPass  (JOURNAL export — nightlog receipt)
 ══════════════════════════════════════════════════════════ */
 function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dream}) {
   const c = color || '#888';
   const moodObj = SVG_MOODS.find(m => m.key === svgMood);
   const validG  = (gratitude||[]).filter(g => g.trim());
 
-  /* white text on dark theme-tinted background */
-  const FG       = 'rgba(255,255,255,0.95)';
-  const FG_DIM   = 'rgba(255,255,255,0.55)';
-  const FG_FAINT = 'rgba(255,255,255,0.4)';
-  const ROW      = '1px solid rgba(255,255,255,0.16)';
+  const TEXTURES = ['./papertex1.jpg','./papertex2.jpg','./papertex3.png','./papertex4.jpg','./papertex5.png','./papertex6.jpg'];
+  const [tex] = React.useState(() => TEXTURES[Math.floor(Math.random() * TEXTURES.length)]);
 
-  /* date + time stamp */
-  const release = dk.replace(/-/g,'.');
-  const dateMD  = release.slice(5);
+  const filled = [morning.trim(), validG.length>0, diary.trim(), svgMood, dream.trim()].filter(Boolean).length;
+
+  /* date·time stamp like 26.04.26  23:08 */
   const now = new Date();
-  const timeS = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+' KST';
+  const stamp =
+    String(now.getFullYear()).slice(2)+'.'+
+    String(now.getMonth()+1).padStart(2,'0')+'.'+
+    String(now.getDate()).padStart(2,'0')+'   '+
+    String(now.getHours()).padStart(2,'0')+':'+
+    String(now.getMinutes()).padStart(2,'0');
 
-  /* dark layer + paper texture, both absolute, layered on top of theme color */
-  const overlays = (
-    <>
-      <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',inset:0,
-        backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',backgroundPosition:'center',
-        opacity:0.14,mixBlendMode:'soft-light',pointerEvents:'none'}}/>
-    </>
-  );
+  const MONO = "'Courier New', ui-monospace, monospace";
 
-  /* meta row */
-  const Row = ({label, children}) => (
-    <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
-      <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',textTransform:'uppercase',alignSelf:'center'}}>{label}</div>
-      <div style={{flex:1,fontSize:'.7rem',color:FG,lineHeight:1.5}}>{children}</div>
+  /* dark palette */
+  const FG       = 'rgba(245,245,250,0.92)';
+  const FG_DIM   = 'rgba(245,245,250,0.62)';
+  const FG_FAINT = 'rgba(245,245,250,0.4)';
+
+  /* section header with full-width dashes */
+  const SectionHeader = ({label}) => (
+    <div style={{display:'flex',alignItems:'center',gap:'.3rem',color:c,fontSize:'.55rem',letterSpacing:'.18em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.95}}>
+      <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em'}}>{'─'.repeat(30)}</span>
+      <span style={{flexShrink:0,letterSpacing:'.22em',padding:'0 .1rem'}}>{label}</span>
+      <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em',textAlign:'right'}}>{'─'.repeat(30)}</span>
     </div>
   );
-
-  /* body section */
-  const Section = ({label, body, italic}) => body.trim() ? (
-    <div style={{marginBottom:'1rem'}}>
-      <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>{label}</div>
-      <div style={{fontSize:'.7rem',color:FG,lineHeight:1.75,whiteSpace:'pre-wrap',fontStyle:italic?'italic':'normal'}}>{body}</div>
-    </div>
-  ) : null;
-
-  /* notch position: between meta block and body */
-  const NOTCH_TOP = 230;
 
   return (
     <div id="bpcard" style={{
       position:'fixed', left:'-9999px', top:0,
-      width:'380px',
-      background:'#fff',
-      padding:'14px 14px 0',
       fontFamily:'HJSS, sans-serif',
+      width:'380px',
+      background:'#0f1320',
+      padding:'2.4rem 2rem 2.2rem',
     }}>
-      {/* ─── ticket body ─── */}
-      <div style={{
-        position:'relative',
-        background:c,
-        borderRadius:'12px 12px 0 0',
-        overflow:'hidden',
-      }}>
-        {overlays}
+      {/* faint theme-color wash so accents harmonize with bg */}
+      <div style={{position:'absolute',inset:0,background:c,opacity:0.22,pointerEvents:'none'}}/>
+      {/* paper texture grain */}
+      <div style={{position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.13,mixBlendMode:'soft-light',pointerEvents:'none'}}/>
 
-        {/* content */}
-        <div style={{position:'relative',zIndex:2,padding:'1.4rem 1.4rem 1.6rem'}}>
+      <div style={{position:'relative',zIndex:1}}>
 
-          {/* tiny header */}
-          <div style={{fontSize:'.46rem',color:FG_FAINT,letterSpacing:'.22em',marginBottom:'1.1rem'}}>JOURNAL TICKET</div>
+        {/* ── Title (nightlog) ── */}
+        <div style={{
+          fontFamily:'Dangam, serif',
+          fontSize:'3.2rem',
+          color:c,
+          textAlign:'center',
+          lineHeight:.95,
+          letterSpacing:'-.01em',
+          marginBottom:'.3rem',
+        }}>nightlog</div>
 
-          {/* TITLE */}
-          <div style={{fontSize:'.46rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.3rem'}}>TITLE</div>
-          <div style={{fontSize:'1.15rem',color:FG,fontWeight:'bold',lineHeight:1.25,marginBottom:'1.3rem'}}>{dlabel}</div>
+        {/* date subtitle (kept here — on dark bg it grounds the title) */}
+        <div style={{
+          fontFamily:MONO,
+          fontSize:'.6rem',
+          color:FG_DIM,
+          textAlign:'center',
+          letterSpacing:'.18em',
+          marginBottom:'1.6rem',
+        }}>{dlabel.toUpperCase()}</div>
 
-          {/* divider */}
-          <div style={{borderTop:ROW,marginBottom:'.1rem'}}/>
+        {/* ── Sections ── */}
+        <div style={{fontFamily:MONO,fontSize:'.74rem',color:FG,lineHeight:1.95}}>
 
-          {/* meta rows */}
-          <Row label="RELEASE">{release}</Row>
-          <Row label="STARRING">
-            {moodObj ? (
-              <span style={{display:'inline-flex',alignItems:'center',gap:'.45rem',verticalAlign:'middle'}}>
-                <MoodSVG mkey={svgMood} size={14} color={FG}/>
+          {morning.trim() && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="MORNING"/>
+              <div style={{whiteSpace:'pre-wrap'}}>{morning}</div>
+            </div>
+          )}
+
+          {validG.length>0 && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="GRATITUDE"/>
+              {validG.map((g,i)=>(
+                <div key={i} style={{display:'flex',gap:'.5rem',alignItems:'flex-start'}}>
+                  <span style={{flexShrink:0,color:FG_FAINT,minWidth:'.9rem'}}>{i+1}.</span>
+                  <span style={{flex:1,whiteSpace:'pre-wrap'}}>{g}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {diary.trim() && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="DIARY"/>
+              <div style={{whiteSpace:'pre-wrap'}}>{diary}</div>
+            </div>
+          )}
+
+          {moodObj && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="MOOD"/>
+              <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}>
+                <MoodSVG mkey={svgMood} size={16} color={c}/>
                 <span>{moodObj.label}</span>
-              </span>
-            ) : '—'}
-          </Row>
-
-          {/* DATE + TIME row */}
-          <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
-            <div style={{flex:1,display:'flex'}}>
-              <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>DATE</div>
-              <div style={{fontSize:'.7rem',color:FG}}>{dateMD}</div>
-            </div>
-            <div style={{flex:1,display:'flex'}}>
-              <div style={{flex:'0 0 50px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>TIME</div>
-              <div style={{fontSize:'.7rem',color:FG}}>{timeS}</div>
-            </div>
-          </div>
-
-          {/* body sections */}
-          <div style={{marginTop:'1.5rem'}}>
-            <Section label="MORNING"   body={morning}/>
-            {validG.length>0 && (
-              <div style={{marginBottom:'1rem'}}>
-                <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>GRATITUDE</div>
-                {validG.map((g,i)=>(
-                  <div key={i} style={{display:'flex',gap:'.45rem',fontSize:'.7rem',color:FG,lineHeight:1.7,marginBottom:'.18rem'}}>
-                    <span style={{color:FG_FAINT,flexShrink:0,fontFamily:'monospace',fontSize:'.6rem',marginTop:'.1rem'}}>{i+1}.</span>
-                    <span style={{whiteSpace:'pre-wrap'}}>{g}</span>
-                  </div>
-                ))}
               </div>
-            )}
-            <Section label="DIARY"   body={diary}/>
-            <Section label="DREAM"   body={dream} italic/>
-          </div>
+            </div>
+          )}
 
-          {/* footer label */}
-          <div style={{fontSize:'.4rem',color:FG_FAINT,letterSpacing:'.22em',textAlign:'center',marginTop:'1.6rem',textTransform:'uppercase'}}>
-            𝐝 : ɴᴀɢɪ ᴊᴏᴜʀɴᴀʟ
-          </div>
+          {dream.trim() && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="DREAM"/>
+              <div style={{whiteSpace:'pre-wrap',fontStyle:'italic'}}>{dream}</div>
+            </div>
+          )}
+
+          {filled===0 && (
+            <div style={{textAlign:'center',color:FG_FAINT,padding:'1.5rem 0',fontSize:'.7rem'}}>
+              ─ no entries today ─
+            </div>
+          )}
         </div>
 
-        {/* ─ side notches (tear) ─ */}
-        <div style={{position:'absolute',left:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
-        <div style={{position:'absolute',right:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
-      </div>
+        {/* ── Total entries ── */}
+        <div style={{
+          marginTop:'1.3rem',
+          paddingTop:'.55rem',
+          borderTop:`1px dashed ${FG_FAINT}`,
+          fontFamily:MONO,
+          fontSize:'.74rem',
+          display:'flex',
+          justifyContent:'space-between',
+          color:FG,
+        }}>
+          <span style={{letterSpacing:'.08em'}}>TOTAL    ENTRIES</span>
+          <span style={{fontWeight:'bold',color:c}}>{filled} / 5</span>
+        </div>
 
-      {/* ─── scallop bottom edge ─── */}
-      <div style={{
-        position:'relative',
-        height:'10px',
-        background:c,
-        overflow:'hidden',
-      }}>
-        <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)'}}/>
-        <div style={{position:'absolute',inset:0,
-          backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',
-          opacity:0.14,mixBlendMode:'soft-light'}}/>
+        {/* ── Stamp ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.66rem',
+          color:FG_DIM,
+          marginTop:'1.6rem',
+          letterSpacing:'.14em',
+        }}>{stamp}</div>
+
+        {/* ── Credit footer ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.55rem',
+          color:FG_FAINT,
+          marginTop:'1.5rem',
+          letterSpacing:'.22em',
+        }}>JOURNAL BY ⓒnagi</div>
       </div>
-      <div style={{
-        display:'flex',
-        justifyContent:'space-between',
-        padding:'0 4px',
-        marginTop:'-7px',
-        position:'relative',
-        zIndex:2,
-      }}>
-        {Array.from({length:18}).map((_,i)=>(
-          <div key={i} style={{
-            width:'14px',height:'14px',
-            borderRadius:'50%',
-            background:'#fff',
-            flexShrink:0,
-          }}/>
-        ))}
-      </div>
-      {/* spacer below scallop so circles aren't clipped */}
-      <div style={{height:'8px'}}/>
     </div>
   );
 }
@@ -1540,17 +1549,28 @@ function MusicWidget({color}) {
         {/* playlist */}
         {open&&playlist.length>0&&(
           <div style={{maxHeight:'110px',overflowY:'auto',padding:'4px 10px 4px'}}>
-            {playlist.map((track,i)=>(
+            {playlist.map((track,i)=>{
+              const tname = track.title||`Track ${i+1}`;
+              const long  = tname.length>18;
+              const tcol  = i===current?'#444':'#bbb';
+              return (
               <div key={i} onClick={()=>setCurrent(i)} style={{
                 display:'flex',alignItems:'center',gap:'6px',
                 padding:'5px 8px',borderRadius:'6px',marginBottom:'2px',
                 background:i===current?ac+'18':'transparent',cursor:'pointer',
               }}>
                 <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
-                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{track.title||`Track ${i+1}`}</span>
+                {long ? (
+                  <div className="mq-wrap" title={tname}>
+                    <div className="mq-inner" style={{fontSize:'9px',color:tcol}}>{tname}</div>
+                  </div>
+                ) : (
+                  <span style={{fontSize:'9px',color:tcol,flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{tname}</span>
+                )}
                 <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
