@@ -601,10 +601,10 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
       backgroundPosition:'center',
       padding:'2.4rem 2rem 2.2rem',
     }}>
-      {/* warm cream wash (kept very faint so multiply blends with texture grain) */}
-      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.18)',pointerEvents:'none'}}/>
+      {/* warm cream wash (very faint) */}
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.22)',pointerEvents:'none',zIndex:0}}/>
 
-      <div style={{position:'relative',zIndex:1,mixBlendMode:'multiply'}}>
+      <div style={{position:'relative',zIndex:1}}>
 
         {/* ── Title (Dailylog) ── */}
         <div style={{
@@ -708,6 +708,14 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           letterSpacing:'.22em',
         }}>RECEIPT BY ⓒnagi</div>
       </div>
+
+      {/* paper texture grain ON TOP of everything — simulates ink-on-paper integration even when html2canvas drops mix-blend-mode */}
+      <div style={{
+        position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.32,mixBlendMode:'multiply',
+        pointerEvents:'none',zIndex:2,
+      }}/>
     </div>
   );
 }
