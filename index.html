@@ -62,7 +62,6 @@ const db = firebase.database();
 const CATS       = ['필연의 시간', '성장의 시간', '자유의 시간'];
 const BULLET     = ['☐', '☑', '☒'];
 const CAT_HUE    = { '필연의 시간': '#8A4545', '성장의 시간': '#434A8E', '자유의 시간': '#4a7c5a' };
-const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
 const DEF_SCHED  = {1:{s:6,e:13},2:{s:6,e:18},3:{s:6,e:13},4:{s:6,e:18},5:{s:6,e:21}};
 const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const WEEK_KO    = ['일','월','화','수','목','금','토'];
@@ -175,6 +174,18 @@ function App() {
   function delItem(i) { db.ref('todos/'+dk).set(items.filter((_,idx)=>idx!==i)); }
   function applyRtn() {
     const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0}));
+    db.ref('todos/'+dk).set([...items,...add]);
+  }
+  async function carryFromPrev() {
+    const prev = new Date(sel); prev.setDate(prev.getDate()-1);
+    const prevDk = prev.toLocaleDateString('sv-SE');
+    const snap = await db.ref('todos/'+prevDk).once('value');
+    const prevItems = snap.val()||[];
+    const crossed = prevItems.filter(it=>it.state===2);
+    if (!crossed.length) { alert('전날 ☒ 항목이 없어.'); return; }
+    const existingTexts = new Set(items.map(it=>it.text));
+    const add = crossed.filter(it=>!existingTexts.has(it.text)).map(it=>({type:'todo',category:it.category,text:it.text,state:0}));
+    if (!add.length) { alert('이미 모두 추가돼 있어.'); return; }
     db.ref('todos/'+dk).set([...items,...add]);
   }
   function applyOneRtn(r) {
@@ -497,6 +508,7 @@ function App() {
                   {items.length>0&&(
                     <button onClick={exportImg} style={pill(color,'#fff')}>Export</button>
                   )}
+                  <button onClick={carryFromPrev} style={pill('#f5f5f5','#aaa')} title="전날 ☒ 항목 가져오기">☒ 가져오기</button>
                   <button onClick={()=>setShowRtn(true)} style={pill('#f5f5f5','#aaa')}>루틴</button>
                   <div style={{flex:1}}/>
                   <button onClick={()=>setEditMode(v=>!v)} style={pill(editMode?'#e8e8e8':'#f5f5f5',editMode?'#555':'#bbb')}>
@@ -562,9 +574,6 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
     String(now.getHours()).padStart(2,'0')+':'+
     String(now.getMinutes()).padStart(2,'0');
 
-  /* shorter subtitle (eg "FRIDAY · APR 25 · 2026") */
-  const sub = dlabel.toUpperCase();
-
   const MONO = "'Courier New', ui-monospace, monospace";
 
   return (
@@ -577,12 +586,11 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
       backgroundSize:'cover',
       backgroundPosition:'center',
       padding:'2.4rem 2rem 2.2rem',
-      position:'fixed',
     }}>
       {/* warm cream wash for legibility on busy texture */}
-      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.55)',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.38)',pointerEvents:'none'}}/>
 
-      <div style={{position:'relative',zIndex:1}}>
+      <div style={{position:'relative',zIndex:1,mixBlendMode:'multiply'}}>
 
         {/* ── Title (Dailylog) ── */}
         <div style={{
@@ -592,19 +600,8 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           textAlign:'center',
           lineHeight:.95,
           letterSpacing:'-.01em',
-          textShadow:`2px 3px 0 ${color}33, 1px 1px 0 ${color}55`,
-          marginBottom:'.45rem',
+          marginBottom:'1.4rem',
         }}>Dailylog</div>
-
-        {/* ── Subtitle (date) ── */}
-        <div style={{
-          fontFamily:MONO,
-          fontSize:'.66rem',
-          color:'#222',
-          textAlign:'center',
-          letterSpacing:'.18em',
-          marginBottom:'1.6rem',
-        }}>{sub}</div>
 
         {/* ── Note text ── */}
         {noteText && (
@@ -631,8 +628,10 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
             return (
               <div key={cat} style={{marginBottom:'.95rem'}}>
                 {/* dotted section header */}
-                <div style={{textAlign:'center',color:color,fontSize:'.55rem',letterSpacing:'.22em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
-                  ─── {cat} ───
+                <div style={{display:'flex',alignItems:'center',gap:'.3rem',color:color,fontSize:'.55rem',letterSpacing:'.18em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
+                  <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em'}}>{'─'.repeat(30)}</span>
+                  <span style={{flexShrink:0,letterSpacing:'.22em',padding:'0 .1rem'}}>{cat}</span>
+                  <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em',textAlign:'right'}}>{'─'.repeat(30)}</span>
                 </div>
                 {list.map((it,i)=>(
                   <div key={i} style={{
@@ -643,9 +642,9 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
                     padding:it.important?'0 .35rem':'0',
                     borderRadius:'2px',
                   }}>
+                    <span style={{flexShrink:0,minWidth:'.7rem'}}>{xBullet(it.state)}</span>
                     <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
                     {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
-                    <span style={{flexShrink:0,minWidth:'.7rem',textAlign:'right'}}>{xBullet(it.state)}</span>
                   </div>
                 ))}
                 {pendingRtns.map((r,i)=>(
@@ -1058,10 +1057,9 @@ function WeekTab({dColors,accent}) {
       <div style={{borderTop:'1px solid #f0f0f0',marginBottom:'1rem'}}/>
 
       {/* day rows */}
-      {data.map(({date,key,total,done,journal,note})=>{
+      {data.map(({date,key,total,done,note})=>{
         const c=dColors[key]||accent, ratio=total?done/total:0;
         const isToday=key===todayKey, isFut=key>todayKey;
-        const mood=MOODS.find(m=>m.l===journal.mood);
         return (
           <div key={key} style={{
             padding:'.5rem .65rem',borderRadius:'.4rem',marginBottom:'.3rem',
@@ -1080,7 +1078,6 @@ function WeekTab({dColors,accent}) {
                 </div>
               </div>
               <span style={{fontSize:'.7rem',color:'#bbb',minWidth:'2rem',textAlign:'right'}}>{total?`${done}/${total}`:'—'}</span>
-              <span style={{fontSize:'.95rem',opacity:mood?1:0.12}}>{mood?mood.e:'·'}</span>
             </div>
             {note&&!isFut&&(
               <div style={{fontSize:'.7rem',color:'#bbb',marginTop:'.22rem',paddingLeft:'4.9rem',fontStyle:'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -1479,10 +1476,15 @@ function MusicWidget({color}) {
   function prevTrack() { if(playlist.length<=1) return; setCurrent(c=>(c-1+playlist.length)%playlist.length); }
   function handleVolume(v) { setVolume(v); ytCmd('setVolume',[v]); }
 
-  function addTrack() {
+  async function addTrack() {
     const u=ytEmbed(input);
     if (!u) { alert('유효한 YouTube URL을 넣어줘.'); return; }
-    const next=[...playlist,{embed:u}];
+    let title='';
+    try {
+      const res=await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(input.trim())}&format=json`);
+      if (res.ok) { const d=await res.json(); title=d.title||''; }
+    } catch {}
+    const next=[...playlist,{embed:u,title}];
     setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
     setCurrent(next.length-1); setUrlBar(false); setInput('');
   }
@@ -1545,7 +1547,7 @@ function MusicWidget({color}) {
                 background:i===current?ac+'18':'transparent',cursor:'pointer',
               }}>
                 <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
-                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{track.title||`Track ${i+1}`}</span>
                 <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
               </div>
             ))}
