@@ -745,10 +745,10 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
 
   const MONO = "'Courier New', ui-monospace, monospace";
 
-  /* dark palette */
-  const FG       = 'rgba(245,245,250,0.92)';
-  const FG_DIM   = 'rgba(245,245,250,0.62)';
-  const FG_FAINT = 'rgba(245,245,250,0.4)';
+  /* dark palette — saturated for newsprint legibility under top texture */
+  const FG       = '#fafbff';
+  const FG_DIM   = 'rgba(250,251,255,0.78)';
+  const FG_FAINT = 'rgba(250,251,255,0.55)';
 
   /* section header with full-width dashes */
   const SectionHeader = ({label}) => (
@@ -769,10 +769,10 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
     }}>
       {/* faint theme-color wash so accents harmonize with bg */}
       <div style={{position:'absolute',inset:0,background:c,opacity:0.22,pointerEvents:'none'}}/>
-      {/* paper texture grain (overlay blend for stronger grain on dark) */}
+      {/* paper texture grain on bg (under content) */}
       <div style={{position:'absolute',inset:0,
         backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
-        opacity:0.42,mixBlendMode:'overlay',pointerEvents:'none'}}/>
+        opacity:0.28,mixBlendMode:'overlay',pointerEvents:'none'}}/>
 
       <div style={{position:'relative',zIndex:1}}>
 
@@ -875,6 +875,14 @@ function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dr
           letterSpacing:'.22em',
         }}>JOURNAL BY ⓒnagi</div>
       </div>
+
+      {/* paper texture grain ON TOP of everything — newsprint feel; survives html2canvas blend-mode loss */}
+      <div style={{
+        position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.2,mixBlendMode:'overlay',
+        pointerEvents:'none',zIndex:2,
+      }}/>
     </div>
   );
 }
