@@ -32,9 +32,16 @@ textarea:focus, input:focus, select:focus { outline: none; }
 button { font-family: inherit; }
 select { font-family: inherit; }
 
-/* music track marquee */
-.mq-wrap { flex:1; overflow:hidden; position:relative; height:13px; }
-.mq-inner { display:inline-block; white-space:nowrap; padding-left:100%; animation: mq-scroll 14s linear infinite; }
+/* music track marquee — hover-only scroll */
+.mq-wrap { flex:1; min-width:0; overflow:hidden; display:flex; align-items:center; height:18px; }
+.mq-inner {
+  display:inline-block; white-space:nowrap; line-height:1.5;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis;
+}
+.mq-wrap:hover .mq-inner {
+  max-width:none; overflow:visible; text-overflow:clip;
+  animation: mq-scroll 22s linear infinite;
+}
 @keyframes mq-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 </style>
 </head>
