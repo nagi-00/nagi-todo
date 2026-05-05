@@ -1,0 +1,1914 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>𝐝 : ᴅᴇᴍɪᴀɴ</title>
+<link rel="icon" href="./favi.ico" type="image/x-icon" />
+<style>
+@font-face { font-family:'HJSS'; src:url('./HJSS.ttf') format('truetype'); }
+@font-face { font-family:'Dangam'; src:url('./ChangwonDangamAsac-Bold.ttf') format('truetype'); font-weight:bold; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'HJSS', sans-serif;
+  background: #ebebeb;
+  color: #333;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+
+/* Shared */
+.drag-handle  { cursor: grab; color: #ccc; user-select: none; font-size: .95rem; flex-shrink: 0; }
+.completed    { color: #ccc; text-decoration: line-through; }
+.icon-btn     { background: none; border: none; cursor: pointer; padding: 0; color: #ccc; font-size: .72rem; font-family: inherit; }
+
+
+
+textarea:focus, input:focus, select:focus { outline: none; }
+button { font-family: inherit; }
+select { font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.17.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script type="text/babel">
+
+/* ─── Firebase (demian — twin-todo project) ─────────────── */
+const firebaseConfig = {
+  apiKey: "AIzaSyCXUslLdcG6quhQufws5G3pR9gIN16TIX8",
+  authDomain: "twin-todo.firebaseapp.com",
+  databaseURL: "https://twin-todo-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "twin-todo",
+  storageBucket: "twin-todo.firebasestorage.app",
+  messagingSenderId: "235951523224",
+  appId: "1:235951523224:web:cfcdf227ed32c515b197ed"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ─── Constants ────────────────────────────────────────── */
+const CATS       = ['필연의 시간', '성장의 시간', '자유의 시간'];
+const BULLET     = ['☐', '☑', '☒'];
+const CAT_HUE    = { '필연의 시간': '#8A4545', '성장의 시간': '#434A8E', '자유의 시간': '#4a7c5a' };
+const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
+const DEF_SCHED  = {1:{s:6,e:13},2:{s:6,e:18},3:{s:6,e:13},4:{s:6,e:18},5:{s:6,e:21}};
+const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
+const WEEK_KO    = ['일','월','화','수','목','금','토'];
+
+/* ─── Helpers ───────────────────────────────────────────── */
+function loadSched() {
+  try { return JSON.parse(localStorage.getItem('focusSched')) || DEF_SCHED; }
+  catch { return DEF_SCHED; }
+}
+
+function ytEmbed(raw) {
+  if (!raw?.trim()) return null;
+  try {
+    const u    = new URL(raw.trim());
+    const v    = u.searchParams.get('v');
+    const list = u.searchParams.get('list');
+    const sid  = u.hostname === 'youtu.be' ? u.pathname.slice(1).split('?')[0] : null;
+    const vid  = v || sid;
+    const p    = 'autoplay=1&rel=0&modestbranding=1&enablejsapi=1';
+    if (vid && list) return `https://www.youtube.com/embed/${vid}?list=${list}&${p}`;
+    if (vid)         return `https://www.youtube.com/embed/${vid}?${p}`;
+    if (list)        return `https://www.youtube.com/embed/videoseries?list=${list}&${p}`;
+    return null;
+  } catch { return null; }
+}
+
+/* ─── Micro Style Helpers ───────────────────────────────── */
+const CARD = {
+  background: '#fff',
+  borderRadius: '10px',
+  boxShadow: '0 1px 5px rgba(0,0,0,0.07)',
+  padding: '1.5rem',
+};
+function pill(bg='#f0f0f0', fg='#666', sm=false) {
+  return {
+    background: bg, color: fg,
+    border: 'none', borderRadius: '9999px',
+    padding: sm ? '.28rem .7rem' : '.4rem .95rem',
+    fontSize: sm ? '.72rem' : '.78rem',
+    cursor: 'pointer', fontFamily: 'inherit',
+    letterSpacing: '.03em',
+  };
+}
+function sectionLabel(extra) {
+  return { fontSize: '.6rem', letterSpacing: '.2em', color: '#bbb', marginBottom: '.5rem', display: 'block', ...extra };
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   App
+══════════════════════════════════════════════════════════ */
+function App() {
+  /* state */
+  const [sel,        setSel]       = React.useState(new Date());
+  const [allTodos,   setAllTodos]  = React.useState({});
+  const [accent,     setAccent]    = React.useState('#888');
+  const [dColors,    setDColors]   = React.useState({});
+  const [noteText,   setNoteText]  = React.useState('');
+  const [notes,      setNotes]     = React.useState({});
+  const [editMode,   setEditMode]  = React.useState(false);
+  const [movedKey,   setMovedKey]  = React.useState(null); // {cat,catIdx,dir,t}
+  const [notesList,  setNotesList] = React.useState(false);
+  const [noteEdit,   setNoteEdit]  = React.useState(false);
+  const [inputs,     setInputs]    = React.useState({'필연의 시간':'','성장의 시간':'','자유의 시간':''});
+  const [tab,        setTab]       = React.useState('todo');
+  const [journals,   setJournals]  = React.useState({});
+  const [routines,   setRoutines]  = React.useState([]);
+  const [showRtn,    setShowRtn]   = React.useState(false);
+  const [stickyOpen, setStickyOpen]= React.useState(false);
+
+  const dk      = sel.toLocaleDateString('sv-SE');
+  const items   = allTodos[dk] || [];
+  const journal = journals[dk] || { morning:'', evening:'', mood:null };
+  const color   = dColors[dk] || accent;
+  const dlabel  = sel.toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const todayDk = new Date().toLocaleDateString('sv-SE');
+
+
+  const appRoutines = React.useMemo(() => {
+    const dow = sel.getDay();
+    return routines.filter(r =>
+      r.freq==='daily' ||
+      (r.freq==='weekly' && (r.weekdays ? r.weekdays.includes(dow) : r.weekday===dow))
+    );
+  }, [routines, sel]);
+
+  /* handlers */
+  function gotoToday()    { setSel(new Date()); setNotesList(false); }
+  function prevMonth()    { setSel(p => new Date(p.getFullYear(), p.getMonth()-1, 1)); }
+  function nextMonth()    { setSel(p => new Date(p.getFullYear(), p.getMonth()+1, 1)); }
+  function setIn(c,v)     { setInputs(p=>({...p,[c]:v})); }
+
+  function addTodo(cat) {
+    const t = inputs[cat]; if (!t.trim()) return;
+    db.ref('demian/todos/'+dk).set([...items, {type:'todo',category:cat,text:t.trim(),state:0}]);
+    setIn(cat,'');
+  }
+  function toggleState(i,e) {
+    e.stopPropagation(); if (editMode) return;
+    db.ref('demian/todos/'+dk).set(items.map((it,idx)=>idx===i?{...it,state:(it.state+1)%BULLET.length}:it));
+  }
+  function toggleImportant(i,e) {
+    e.stopPropagation(); if (editMode) return;
+    db.ref('demian/todos/'+dk).set(items.map((it,idx)=>idx===i?{...it,important:!it.important}:it));
+  }
+  function editItem(i) {
+    const nt=prompt('Edit:', items[i].text);
+    if (nt!=null&&nt.trim()) { const c=[...items]; c[i]={...c[i],text:nt.trim()}; db.ref('demian/todos/'+dk).set(c); }
+  }
+  function delItem(i) { db.ref('demian/todos/'+dk).set(items.filter((_,idx)=>idx!==i)); }
+  function applyRtn() {
+    const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0}));
+    db.ref('demian/todos/'+dk).set([...items,...add]);
+  }
+  function applyOneRtn(r) {
+    db.ref('demian/todos/'+dk).set([...items,{type:'todo',category:r.category,text:r.text,state:0}]);
+  }
+  function saveJournal(f,v) { db.ref('demian/journal/'+dk+'/'+f).set(v); }
+
+  function moveItem(cat, catIdx, dir) {
+    const catItems = [...items.filter(it => it.category === cat)];
+    const newIdx = catIdx + dir;
+    if (newIdx < 0 || newIdx >= catItems.length) return;
+    [catItems[catIdx], catItems[newIdx]] = [catItems[newIdx], catItems[catIdx]];
+    let ci = 0;
+    const upd = items.map(it => it.category === cat ? catItems[ci++] : it);
+    setAllTodos(p => ({...p, [dk]: upd}));
+    db.ref('demian/todos/'+dk).set(upd);
+    /* animate the item at its new position */
+    setMovedKey({cat, catIdx:newIdx, dir, t:Date.now()});
+    setTimeout(()=>setMovedKey(null), 300);
+  }
+
+  async function exportImg() {
+    const el=document.getElementById('xcard'); if (!el) return;
+    const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
+    cv.toBlob(async blob=>{
+      if (!blob) return;
+      try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      catch { const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`todo-${dk}.png`;a.click();URL.revokeObjectURL(u); }
+    });
+  }
+
+  /* effects */
+  React.useEffect(()=>{
+    const r=db.ref('demian/todos/'+dk);
+    const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
+    return()=>r.off('value',h);
+  },[dk]);
+
+  React.useEffect(()=>{
+    const r=db.ref('demian/dateColors');
+    const h=r.on('value',s=>setDColors(s.val()||{}));
+    return()=>r.off('value',h);
+  },[]);
+
+  React.useEffect(()=>{
+    const r=db.ref('demian/notes/'+dk);
+    const h=r.on('value',s=>setNoteText(s.val()||''));
+    return()=>r.off('value',h);
+  },[dk]);
+
+  React.useEffect(()=>{
+    const r=db.ref('demian/notes');
+    const h=r.on('value',s=>setNotes(s.val()||{}));
+    return()=>r.off('value',h);
+  },[]);
+
+  React.useEffect(()=>{
+    const r=db.ref('demian/journal/'+dk);
+    const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',evening:'',mood:null}})));
+    return()=>r.off('value',h);
+  },[dk]);
+
+  React.useEffect(()=>{
+    const r=db.ref('demian/routines');
+    const h=r.on('value',s=>{
+      const v=s.val()||{};
+      setRoutines(Object.entries(v).map(([id,x])=>({id,...x})));
+    });
+    return()=>r.off('value',h);
+  },[]);
+
+  React.useEffect(()=>{ const s=localStorage.getItem('accentColor'); if(s) setAccent(s); },[]);
+
+
+  /* ── render ── */
+  return (
+    <div style={{display:'flex',minHeight:'100vh'}}>
+
+
+      {/* ═══ Sidebar ═══ */}
+      <aside style={{
+        position:'fixed',left:0,top:0,bottom:0,width:'14.5rem',
+        background:'#fff',overflow:'auto',zIndex:20,
+        boxShadow:'2px 0 10px rgba(0,0,0,0.05)',
+      }}>
+        <div style={{padding:'1.25rem 1rem 2rem'}}>
+
+          {/* month header */}
+          <div style={{textAlign:'center',marginBottom:'1rem',paddingTop:'.6rem'}}>
+            <div style={{fontSize:'.75rem',color:'#bbb',letterSpacing:'.05em',marginBottom:'.15rem'}}>
+              {sel.toLocaleString('en-US',{year:'numeric'})}
+            </div>
+            <div style={{fontSize:'1.1rem',fontWeight:'bold',marginBottom:'.6rem'}}>
+              {sel.toLocaleString('en-US',{month:'long'})}
+            </div>
+            <div style={{display:'flex',justifyContent:'center',gap:'.25rem'}}>
+              <button onClick={prevMonth}  style={pill('#f5f5f5','#888',true)}>←</button>
+              <button onClick={gotoToday} style={pill('#f5f5f5','#888',true)}>Today</button>
+              <button onClick={nextMonth}  style={pill('#f5f5f5','#888',true)}>→</button>
+            </div>
+          </div>
+
+          <button onClick={()=>setNotesList(v=>!v)} style={{
+            ...pill('#f7f7f7','#aaa',true),
+            width:'100%',marginBottom:'.75rem',borderRadius:'.4rem',textAlign:'center',
+          }}>{notesList?'← back':'Notes'}</button>
+
+          {!notesList ? (
+            /* calendar */
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',fontSize:'.7rem'}}>
+              {['S','M','T','W','T','F','S'].map((d,i)=>(
+                <div key={i} style={{textAlign:'center',padding:'.15rem 0',color:i===0?'#8A4545':i===6?'#434A8E':'#bbb',fontSize:'.6rem'}}>{d}</div>
+              ))}
+              {Array(new Date(sel.getFullYear(),sel.getMonth(),1).getDay()).fill(null).map((_,i)=><div key={i}/>)}
+              {Array.from({length:new Date(sel.getFullYear(),sel.getMonth()+1,0).getDate()},(_,i)=>{
+                const d=new Date(sel.getFullYear(),sel.getMonth(),i+1);
+                const k=d.toLocaleDateString('sv-SE');
+                const isSel=k===dk, isToday=k===todayDk;
+                const c=dColors[k]||accent;
+                return (
+                  <button key={i}
+                    onClick={()=>setSel(d)}
+                    style={{
+                      width:'1.7rem',height:'1.7rem',margin:'0 auto',
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      border:`1.5px solid ${isToday&&!isSel?c:'transparent'}`,
+                      borderRadius:'9999px',
+                      background:isSel?c:'transparent',
+                      color:isSel?'#fff':isToday?c:'#444',
+                      fontWeight:isToday?'bold':'400',
+                      position:'relative',cursor:'pointer',fontSize:'.78rem',
+                    }}>
+                    {i+1}
+                    {allTodos[k]?.length>0&&(
+                      <span style={{position:'absolute',bottom:'2px',width:'4px',height:'4px',borderRadius:'50%',background:isSel?'rgba(255,255,255,.7)':c}}></span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            /* notes list */
+            <div>
+              {Object.entries(notes).sort((a,b)=>b[0].localeCompare(a[0])).map(([d,txt])=>(
+                <div key={d} style={{background:'#f8f8f8',borderRadius:'.5rem',padding:'.65rem .75rem',marginBottom:'.4rem'}}>
+                  <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.2rem'}}>
+                    {new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})}
+                  </div>
+                  <div style={{fontSize:'.82rem',fontWeight:'bold',whiteSpace:'pre-wrap',color:dColors[d]||accent,lineHeight:1.5}}>{txt}</div>
+                  <button className="icon-btn" onClick={()=>db.ref('demian/notes/'+d).remove()} style={{marginTop:'.3rem'}}>Delete</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* ═══ Main ═══ */}
+      <main style={{
+        flex:1,
+        padding:'1rem',
+        marginLeft:'14.5rem',
+      }}>
+        <div style={{maxWidth:'40rem',margin:'0 auto'}}>
+
+          {/* tabs */}
+          <div style={{display:'flex',gap:'.35rem',paddingTop:'2.75rem',marginBottom:'.75rem'}}>
+            {[{k:'todo',l:'ᴛᴏᴅᴏ'},{k:'journal',l:'ᴊᴏᴜʀɴᴀʟ'},{k:'week',l:'ᴡᴇᴇᴋ'}].map(({k,l})=>(
+              <button key={k} onClick={()=>setTab(k)} style={{
+                ...pill(tab===k?color:'#fff',tab===k?'#fff':'#bbb'),
+                boxShadow:tab===k?`0 2px 8px ${color}44`:'0 1px 3px rgba(0,0,0,0.08)',
+                transition:'all .2s',
+              }}>{l}</button>
+            ))}
+          </div>
+
+          {/* ── TODO ── */}
+          {tab==='todo'&&(
+            <>
+              <div style={CARD}>
+                {/* header row */}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem',gap:'.5rem'}}>
+                  <h2 style={{fontSize:'1rem',fontWeight:'bold',lineHeight:1.5,flex:1,color:'#222'}}>{dlabel}</h2>
+                  <input type="color" value={color}
+                    onChange={e=>db.ref('demian/dateColors/'+dk).set(e.target.value)}
+                    style={{width:'1.25rem',height:'1.25rem',border:'none',padding:0,borderRadius:'9999px',cursor:'pointer',flexShrink:0,marginTop:'.25rem'}}
+                  />
+                </div>
+
+                {/* 오늘의 완료율 */}
+                {items.length > 0 && (()=>{
+                  const done = items.filter(it=>it.state===1).length;
+                  const pct  = Math.round(done / items.length * 100);
+                  return (
+                    <div style={{marginBottom:'1rem'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
+                        <span style={{fontSize:'.58rem',letterSpacing:'.1em',color:'#ccc'}}>오늘의 완료율</span>
+                        <span style={{fontSize:'.62rem',fontWeight:'bold',color}}>{pct}%</span>
+                      </div>
+                      <div style={{height:'2.5px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
+                        <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:'9999px',transition:'width .6s ease'}}/>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 오늘의 한마디 */}
+                {(!noteEdit&&noteText.trim()) ? (
+                  <div
+                    style={{fontWeight:'bold',whiteSpace:'pre-wrap',color,lineHeight:1.65,cursor:'text',fontSize:'.9rem',marginBottom:'1rem'}}
+                    onDoubleClick={()=>setNoteEdit(true)}
+                    onContextMenu={e=>{e.preventDefault();setNoteEdit(true);}}
+                  >{noteText}</div>
+                ) : (
+                  <textarea
+                    value={noteText}
+                    onChange={e=>setNoteText(e.target.value)}
+                    onFocus={()=>setNoteEdit(true)}
+                    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();db.ref('demian/notes/'+dk).set(noteText.trim());setNoteEdit(false);}}}
+                    placeholder="오늘의 한마디 (Enter 저장, Shift+Enter 줄바꿈)" rows={2}
+                    style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontWeight:'bold',color,fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.65,marginBottom:'1rem'}}
+                  />
+                )}
+
+                {/* input row */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'.5rem',marginBottom:'1.1rem'}}>
+                  {CATS.map(cat=>(
+                    <textarea key={cat}
+                      value={inputs[cat]}
+                      onChange={e=>setIn(cat,e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo(cat);}}}
+                      placeholder={cat} rows={3}
+                      style={{border:'1px solid #eee',padding:'.4rem .5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.78rem',lineHeight:1.55,color:'#555',background:'#fafafa'}}
+                    />
+                  ))}
+                </div>
+
+                {/* todo lists */}
+                {CATS.map((cat,idx)=>{
+                  const list=items.map((it,gi)=>it.category===cat?{...it,gi}:null).filter(Boolean);
+                  const appliedTexts=new Set(items.map(it=>it.text));
+                  const pendingRtns=appRoutines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
+                  const catColor = CAT_HUE[cat] || color;
+                  return (
+                    <div key={cat} style={{marginBottom:'.7rem'}}>
+                      <span style={sectionLabel({color: catColor + 'bb'})}>{cat}</span>
+                      <div>
+                        {list.map((item, catIdx)=>{
+                          const isMoved = movedKey?.cat===cat && movedKey?.catIdx===catIdx;
+                          return (
+                          <div key={item.gi}
+                            style={{
+                              display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.22rem',
+                              padding:'.05rem .2rem .05rem .1rem', borderRadius:'3px',
+                              backgroundColor: isMoved ? color+'22' : item.important ? color+'33' : 'transparent',
+                              transition: isMoved ? 'none' : 'background-color .65s ease-out',
+                            }}>
+                            {/* up / down order buttons */}
+                            {editMode&&(
+                              <div style={{display:'flex',flexDirection:'column',gap:'2px',flexShrink:0,alignItems:'center'}}>
+                                <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,-1)}
+                                  style={{padding:'1px 3px',display:'flex',color:catIdx===0?'#ddd':'#999'}}>
+                                  <span style={{display:'block',width:0,height:0,
+                                    borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
+                                    borderBottom:'4.5px solid currentColor'}}/>
+                                </button>
+                                <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,1)}
+                                  style={{padding:'1px 3px',display:'flex',color:catIdx===list.length-1?'#ddd':'#999'}}>
+                                  <span style={{display:'block',width:0,height:0,
+                                    borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
+                                    borderTop:'4.5px solid currentColor'}}/>
+                                </button>
+                              </div>
+                            )}
+                            <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
+                            <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}>{item.text}</span>
+                            <button className="icon-btn" onClick={e=>toggleImportant(item.gi,e)}
+                              style={{color:item.important?color:'#ccc',flexShrink:0,fontSize:'.85rem',padding:'0 1px',alignSelf:'baseline'}}>
+                              {item.important?'★':'☆'}
+                            </button>
+                            {editMode&&(
+                              <>
+                                <button className="icon-btn" onClick={()=>editItem(item.gi)}>edit</button>
+                                <button className="icon-btn" onClick={()=>delItem(item.gi)}>✕</button>
+                              </>
+                            )}
+                          </div>
+                        );})}
+                        {list.length===0 && pendingRtns.length===0 && !editMode && <div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
+                      </div>
+                      {/* routine ghost items — OUTSIDE Sortable, clickable to apply */}
+                      {pendingRtns.map((r,i)=>(
+                        <div key={`rtn-${i}`}
+                          onClick={!editMode?()=>applyOneRtn(r):undefined}
+                          title={editMode?undefined:'클릭하면 오늘 목록에 추가돼'}
+                          style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0',
+                            cursor:editMode?'default':'pointer',opacity:.55,
+                          }}>
+                          {editMode&&<span style={{width:'.95rem',flexShrink:0}}/>}
+                          <span style={{fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem'}}>☐</span>
+                          <span style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6}}>{r.text}</span>
+                          <span style={{fontSize:'.58rem',color:'#ccc',flexShrink:0,letterSpacing:'.04em'}}>루틴</span>
+                        </div>
+                      ))}
+                      {idx<CATS.length-1&&(
+                        <div style={{borderTop:`1px solid ${color}22`,margin:'.6rem 0'}}/>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* apply routines banner — only show when none have been applied yet */}
+                {items.length===0&&appRoutines.length>0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:'.3rem'}}>
+                    <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                  </div>
+                )}
+
+                {/* bottom actions */}
+                <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
+                  {items.length>0&&(
+                    <button onClick={exportImg} style={pill(color,'#fff')}>Export</button>
+                  )}
+                  <button onClick={()=>setShowRtn(true)} style={pill('#f5f5f5','#aaa')}>루틴</button>
+                  <div style={{flex:1}}/>
+                  <button onClick={()=>setEditMode(v=>!v)} style={pill(editMode?'#e8e8e8':'#f5f5f5',editMode?'#555':'#bbb')}>
+                    {editMode?'Done':'Edit'}
+                  </button>
+                </div>
+              </div>
+
+              {/* off-screen export card */}
+              <XCard dlabel={dlabel} noteText={noteText} items={items} color={color} routines={appRoutines}/>
+            </>
+          )}
+
+          {/* ── JOURNAL ── */}
+          {tab==='journal'&&(
+            <JournalTab dlabel={dlabel} dk={dk} journal={journal} color={color} onSave={saveJournal}/>
+          )}
+
+          {/* ── WEEK ── */}
+          {tab==='week'&&(
+            <WeekTab dColors={dColors} accent={accent}/>
+          )}
+
+        </div>
+      </main>
+
+      {/* click-outside overlay — closes floating panels */}
+      {stickyOpen&&(
+        <div onClick={()=>setStickyOpen(false)}
+          style={{position:'fixed',inset:0,zIndex:15}}/>
+      )}
+
+      {/* modals & widgets */}
+      {showRtn&&<RoutineModal routines={routines} onClose={()=>setShowRtn(false)}/>}
+      <WeatherWidget color={color}/>
+      <PomodoroWidget color={color}/>
+      <MusicWidget color={color}/>
+      <StickyWidget color={color} open={stickyOpen} onOpen={()=>setStickyOpen(true)} onClose={()=>setStickyOpen(false)}/>
+      <DemianWidget/>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   XCard  (TODO export — receipt style)
+══════════════════════════════════════════════════════════ */
+function XCard({dlabel,noteText,items,color,routines=[]}) {
+  const done=items.filter(it=>it.state===1).length, total=items.length;
+  const appliedTexts=new Set(items.map(it=>it.text));
+
+  const TEXTURES = ['./papertex1.jpg','./papertex2.jpg','./papertex3.png','./papertex4.jpg','./papertex5.png','./papertex6.jpg'];
+  const [tex] = React.useState(() => TEXTURES[Math.floor(Math.random() * TEXTURES.length)]);
+
+  function xBullet(state){ if(state===0)return '·'; if(state===1)return '✓'; return '✗'; }
+
+  /* date·time stamp like 25.04.25  10:08 */
+  const now = new Date();
+  const stamp =
+    String(now.getFullYear()).slice(2)+'.'+
+    String(now.getMonth()+1).padStart(2,'0')+'.'+
+    String(now.getDate()).padStart(2,'0')+'   '+
+    String(now.getHours()).padStart(2,'0')+':'+
+    String(now.getMinutes()).padStart(2,'0');
+
+  /* shorter subtitle (eg "FRIDAY · APR 25 · 2026") */
+  const sub = dlabel.toUpperCase();
+
+  const MONO = "'Courier New', ui-monospace, monospace";
+
+  return (
+    <div id="xcard" style={{
+      position:'fixed', left:'-9999px', top:0,
+      fontFamily:'HJSS, sans-serif',
+      width:'380px',
+      background:'#f3ecd9',
+      backgroundImage:`url('${tex}')`,
+      backgroundSize:'cover',
+      backgroundPosition:'center',
+      padding:'2.4rem 2rem 2.2rem',
+      position:'fixed',
+    }}>
+      {/* warm cream wash for legibility on busy texture */}
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.55)',pointerEvents:'none'}}/>
+
+      <div style={{position:'relative',zIndex:1}}>
+
+        {/* ── Title (Dailylog) ── */}
+        <div style={{
+          fontFamily:'Dangam, serif',
+          fontSize:'3.2rem',
+          color,
+          textAlign:'center',
+          lineHeight:.95,
+          letterSpacing:'-.01em',
+          textShadow:`2px 3px 0 ${color}33, 1px 1px 0 ${color}55`,
+          marginBottom:'.45rem',
+        }}>Dailylog</div>
+
+        {/* ── Subtitle (date) ── */}
+        <div style={{
+          fontFamily:MONO,
+          fontSize:'.66rem',
+          color:'#222',
+          textAlign:'center',
+          letterSpacing:'.18em',
+          marginBottom:'1.6rem',
+        }}>{sub}</div>
+
+        {/* ── Note text ── */}
+        {noteText && (
+          <div style={{
+            fontFamily:MONO,
+            fontSize:'.66rem',
+            color:'#3a3a3a',
+            textAlign:'center',
+            fontStyle:'italic',
+            whiteSpace:'pre-wrap',
+            lineHeight:1.7,
+            margin:'0 .3rem 1.4rem',
+            paddingBottom:'1rem',
+            borderBottom:'1px dashed #99908266',
+          }}>« {noteText} »</div>
+        )}
+
+        {/* ── List ── */}
+        <div style={{fontFamily:MONO,fontSize:'.74rem',color:'#1a1a1a',lineHeight:1.95}}>
+          {CATS.map(cat=>{
+            const list=items.filter(it=>it.category===cat);
+            const pendingRtns=routines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
+            if (!list.length&&!pendingRtns.length) return null;
+            return (
+              <div key={cat} style={{marginBottom:'.95rem'}}>
+                {/* dotted section header */}
+                <div style={{textAlign:'center',color:color,fontSize:'.55rem',letterSpacing:'.22em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
+                  ─── {cat} ───
+                </div>
+                {list.map((it,i)=>(
+                  <div key={i} style={{
+                    display:'flex',gap:'.6rem',alignItems:'flex-start',
+                    color:it.state===1?'#999':'#1a1a1a',
+                    textDecoration:it.state===1?'line-through':'none',
+                    background:it.important?color+'22':'transparent',
+                    padding:it.important?'0 .35rem':'0',
+                    borderRadius:'2px',
+                  }}>
+                    <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
+                    {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
+                    <span style={{flexShrink:0,minWidth:'.7rem',textAlign:'right'}}>{xBullet(it.state)}</span>
+                  </div>
+                ))}
+                {pendingRtns.map((r,i)=>(
+                  <div key={`xr-${i}`} style={{display:'flex',gap:'.6rem',color:'#aaa',alignItems:'flex-start'}}>
+                    <span style={{flex:1,whiteSpace:'pre-wrap'}}>{r.text}</span>
+                    <span style={{flexShrink:0}}>·</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Total ── */}
+        <div style={{
+          marginTop:'1.3rem',
+          paddingTop:'.55rem',
+          borderTop:'1px dashed #999082aa',
+          fontFamily:MONO,
+          fontSize:'.74rem',
+          display:'flex',
+          justifyContent:'space-between',
+          color:'#1a1a1a',
+        }}>
+          <span style={{letterSpacing:'.08em'}}>TOTAL    DONE</span>
+          <span style={{fontWeight:'bold',color}}>{done} / {total}</span>
+        </div>
+
+        {/* ── Stamp ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.66rem',
+          color:'#3a3a3a',
+          marginTop:'1.6rem',
+          letterSpacing:'.14em',
+        }}>{stamp}</div>
+
+        {/* ── Credit footer ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.55rem',
+          color:'#6a6a6a',
+          marginTop:'1.5rem',
+          letterSpacing:'.22em',
+        }}>RECEIPT BY ⓒdemian</div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   BoardingPass  (JOURNAL export — concert ticket style)
+══════════════════════════════════════════════════════════ */
+function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, svgMood, dream}) {
+  const c = color || '#888';
+  const moodObj = SVG_MOODS.find(m => m.key === svgMood);
+  const validG  = (gratitude||[]).filter(g => g.trim());
+
+  /* white text on dark theme-tinted background */
+  const FG       = 'rgba(255,255,255,0.95)';
+  const FG_DIM   = 'rgba(255,255,255,0.55)';
+  const FG_FAINT = 'rgba(255,255,255,0.4)';
+  const ROW      = '1px solid rgba(255,255,255,0.16)';
+
+  /* date + time stamp */
+  const release = dk.replace(/-/g,'.');
+  const dateMD  = release.slice(5);
+  const now = new Date();
+  const timeS = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+' KST';
+
+  /* dark layer + paper texture, both absolute, layered on top of theme color */
+  const overlays = (
+    <>
+      <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',inset:0,
+        backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.14,mixBlendMode:'soft-light',pointerEvents:'none'}}/>
+    </>
+  );
+
+  /* meta row */
+  const Row = ({label, children}) => (
+    <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
+      <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',textTransform:'uppercase',alignSelf:'center'}}>{label}</div>
+      <div style={{flex:1,fontSize:'.7rem',color:FG,lineHeight:1.5}}>{children}</div>
+    </div>
+  );
+
+  /* body section */
+  const Section = ({label, body, italic}) => body.trim() ? (
+    <div style={{marginBottom:'1rem'}}>
+      <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>{label}</div>
+      <div style={{fontSize:'.7rem',color:FG,lineHeight:1.75,whiteSpace:'pre-wrap',fontStyle:italic?'italic':'normal'}}>{body}</div>
+    </div>
+  ) : null;
+
+  /* notch position: between meta block and body */
+  const NOTCH_TOP = 230;
+
+  return (
+    <div id="bpcard" style={{
+      position:'fixed', left:'-9999px', top:0,
+      width:'380px',
+      background:'#fff',
+      padding:'14px 14px 0',
+      fontFamily:'HJSS, sans-serif',
+    }}>
+      {/* ─── ticket body ─── */}
+      <div style={{
+        position:'relative',
+        background:c,
+        borderRadius:'12px 12px 0 0',
+        overflow:'hidden',
+      }}>
+        {overlays}
+
+        {/* content */}
+        <div style={{position:'relative',zIndex:2,padding:'1.4rem 1.4rem 1.6rem'}}>
+
+          {/* tiny header */}
+          <div style={{fontSize:'.46rem',color:FG_FAINT,letterSpacing:'.22em',marginBottom:'1.1rem'}}>JOURNAL TICKET</div>
+
+          {/* TITLE */}
+          <div style={{fontSize:'.46rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.3rem'}}>TITLE</div>
+          <div style={{fontSize:'1.15rem',color:FG,fontWeight:'bold',lineHeight:1.25,marginBottom:'1.3rem'}}>{dlabel}</div>
+
+          {/* divider */}
+          <div style={{borderTop:ROW,marginBottom:'.1rem'}}/>
+
+          {/* meta rows */}
+          <Row label="RELEASE">{release}</Row>
+          <Row label="STARRING">
+            {moodObj ? (
+              <span style={{display:'inline-flex',alignItems:'center',gap:'.45rem',verticalAlign:'middle'}}>
+                <MoodSVG mkey={svgMood} size={14} color={FG}/>
+                <span>{moodObj.label}</span>
+              </span>
+            ) : '—'}
+          </Row>
+
+          {/* DATE + TIME row */}
+          <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
+            <div style={{flex:1,display:'flex'}}>
+              <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>DATE</div>
+              <div style={{fontSize:'.7rem',color:FG}}>{dateMD}</div>
+            </div>
+            <div style={{flex:1,display:'flex'}}>
+              <div style={{flex:'0 0 50px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>TIME</div>
+              <div style={{fontSize:'.7rem',color:FG}}>{timeS}</div>
+            </div>
+          </div>
+
+          {/* body sections */}
+          <div style={{marginTop:'1.5rem'}}>
+            <Section label="MORNING"   body={morning}/>
+            {validG.length>0 && (
+              <div style={{marginBottom:'1rem'}}>
+                <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>GRATITUDE</div>
+                {validG.map((g,i)=>(
+                  <div key={i} style={{display:'flex',gap:'.45rem',fontSize:'.7rem',color:FG,lineHeight:1.7,marginBottom:'.18rem'}}>
+                    <span style={{color:FG_FAINT,flexShrink:0,fontFamily:'monospace',fontSize:'.6rem',marginTop:'.1rem'}}>{i+1}.</span>
+                    <span style={{whiteSpace:'pre-wrap'}}>{g}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Section label="DIARY"   body={diary}/>
+            <Section label="EVENING" body={evening}/>
+            <Section label="DREAM"   body={dream} italic/>
+          </div>
+
+          {/* footer label */}
+          <div style={{fontSize:'.4rem',color:FG_FAINT,letterSpacing:'.22em',textAlign:'center',marginTop:'1.6rem',textTransform:'uppercase'}}>
+            𝐝 : ᴅᴇᴍɪᴀɴ ᴊᴏᴜʀɴᴀʟ
+          </div>
+        </div>
+
+        {/* ─ side notches (tear) ─ */}
+        <div style={{position:'absolute',left:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
+        <div style={{position:'absolute',right:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
+      </div>
+
+      {/* ─── scallop bottom edge ─── */}
+      <div style={{
+        position:'relative',
+        height:'10px',
+        background:c,
+        overflow:'hidden',
+      }}>
+        <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)'}}/>
+        <div style={{position:'absolute',inset:0,
+          backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',
+          opacity:0.14,mixBlendMode:'soft-light'}}/>
+      </div>
+      <div style={{
+        display:'flex',
+        justifyContent:'space-between',
+        padding:'0 4px',
+        marginTop:'-7px',
+        position:'relative',
+        zIndex:2,
+      }}>
+        {Array.from({length:18}).map((_,i)=>(
+          <div key={i} style={{
+            width:'14px',height:'14px',
+            borderRadius:'50%',
+            background:'#fff',
+            flexShrink:0,
+          }}/>
+        ))}
+      </div>
+      {/* spacer below scallop so circles aren't clipped */}
+      <div style={{height:'8px'}}/>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   JournalTab
+══════════════════════════════════════════════════════════ */
+function JournalTab({dlabel, dk, journal, color, onSave}) {
+  const [mEdit,    setMEdit]    = React.useState(false);
+  const [eEdit,    setEEdit]    = React.useState(false);
+  const [mText,    setMText]    = React.useState('');
+  const [eText,    setEText]    = React.useState('');
+  const [gratitude,setGratitude]= React.useState(['','','']);
+  const [diary,    setDiary]    = React.useState('');
+  const [svgMood,  setSvgMood]  = React.useState(null);
+  const [dream,    setDream]    = React.useState('');
+  const [exporting,setExporting]= React.useState(false);
+
+  React.useEffect(()=>setMText(journal.morning||''),  [journal.morning]);
+  React.useEffect(()=>setEText(journal.evening||''),  [journal.evening]);
+
+  React.useEffect(()=>{
+    const r=db.ref('demian/daily/'+dk);
+    const h=r.on('value',s=>{
+      const v=s.val()||{};
+      setGratitude(Array.isArray(v.gratitude)?v.gratitude:['','','']);
+      setDiary(v.diary||'');
+      setSvgMood(v.mood||null);
+      setDream(v.dream||'');
+    });
+    return()=>r.off('value',h);
+  },[dk]);
+
+  function save(f,t,se){ onSave(f,t.trim()); se(false); }
+  function saveGratitude(idx,val){
+    const next=[...gratitude]; next[idx]=val; setGratitude(next);
+    db.ref('demian/daily/'+dk+'/gratitude').set(next);
+  }
+  function saveSvgMood(key){
+    const next=svgMood===key?null:key; setSvgMood(next);
+    db.ref('demian/daily/'+dk+'/mood').set(next);
+  }
+
+  const hasContent=mText.trim()||eText.trim()||gratitude.some(g=>g.trim())||diary.trim()||svgMood||dream.trim();
+
+  async function exportBoarding(){
+    setExporting(true);
+    await new Promise(r=>setTimeout(r,200));
+    const el=document.getElementById('bpcard'); if(!el){setExporting(false);return;}
+    const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
+    setExporting(false);
+    cv.toBlob(async blob=>{
+      if(!blob)return;
+      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      catch{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`journal-${dk}.png`;a.click();URL.revokeObjectURL(u); }
+    });
+  }
+
+  const VIEW={whiteSpace:'pre-wrap',fontSize:'.9rem',color:'#444',lineHeight:1.8,minHeight:'3rem',cursor:'text',paddingBottom:'.25rem'};
+  const TA  ={width:'100%',border:'1px solid #eee',padding:'.5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.8,background:'#fafafa'};
+  const SM  ={...TA,fontSize:'.82rem',lineHeight:1.65};
+  const DIV ={borderTop:`1px solid ${color}20`,margin:'1.25rem 0'};
+  const LBL ={fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block',marginBottom:'.5rem'};
+
+  return (
+    <div style={CARD}>
+
+      {/* header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem'}}>
+        <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
+        {hasContent&&(
+          <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
+        )}
+      </div>
+
+      {/* ── Morning ── */}
+      <span style={LBL}>ᴍᴏʀɴɪɴɢ</span>
+      {(!mEdit&&mText.trim())?(
+        <div style={VIEW} onDoubleClick={()=>setMEdit(true)} onContextMenu={e=>{e.preventDefault();setMEdit(true);}}>{mText}</div>
+      ):(
+        <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
+          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
+      )}
+
+      <div style={DIV}/>
+
+      {/* ── Gratitude ── */}
+      <span style={LBL}>ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
+      {[0,1,2].map(i=>(
+        <div key={i} style={{display:'flex',alignItems:'center',gap:'.35rem',marginBottom:'.35rem'}}>
+          <span style={{fontSize:'.62rem',color,flexShrink:0,fontFamily:'monospace',width:'.8rem',textAlign:'right'}}>{i+1}.</span>
+          <textarea value={gratitude[i]} onChange={e=>saveGratitude(i,e.target.value)}
+            placeholder={`감사한 점 ${i+1}`} rows={1} style={{...SM,resize:'none'}}/>
+        </div>
+      ))}
+
+      <div style={DIV}/>
+
+      {/* ── Diary ── */}
+      <span style={LBL}>ᴅɪᴀʀʏ</span>
+      <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref('demian/daily/'+dk+'/diary').set(e.target.value);}}
+        placeholder="오늘 하루를 짧게 기록해봐." rows={4} style={TA}/>
+
+      <div style={DIV}/>
+
+      {/* ── Mood ── */}
+      <span style={LBL}>ᴍᴏᴏᴅ</span>
+      <div style={{display:'flex',gap:'4px',justifyContent:'space-between'}}>
+        {SVG_MOODS.map(({key,label})=>{
+          const active=svgMood===key;
+          return (
+            <button key={key} onClick={()=>saveSvgMood(key)} title={label} style={{
+              background:'none',border:'none',cursor:'pointer',padding:'5px 4px',
+              display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',
+              opacity:svgMood&&!active?0.2:1,transition:'opacity .15s',
+            }}>
+              <MoodSVG mkey={key} size={20} color={active?color:'#c8c8c8'}/>
+              <span style={{fontSize:'.48rem',color:active?color:'#ccc',letterSpacing:'.03em'}}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={DIV}/>
+
+      {/* ── Evening ── */}
+      <span style={LBL}>ᴇᴠᴇɴɪɴɢ</span>
+      {(!eEdit&&eText.trim())?(
+        <div style={VIEW} onDoubleClick={()=>setEEdit(true)} onContextMenu={e=>{e.preventDefault();setEEdit(true);}}>{eText}</div>
+      ):(
+        <textarea autoFocus={eEdit} value={eText} onChange={e=>setEText(e.target.value)} onFocus={()=>setEEdit(true)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('evening',eText,setEEdit);}}}
+          placeholder="오늘 저녁의 회고를 적어봐. (Enter 저장)" rows={4} style={TA}/>
+      )}
+
+      <div style={DIV}/>
+
+      {/* ── Dream ── */}
+      <span style={LBL}>ᴅʀᴇᴀᴍ</span>
+      <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref('demian/daily/'+dk+'/dream').set(e.target.value);}}
+        placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야." rows={4} style={{...TA,fontStyle:'italic'}}/>
+
+      {exporting&&(
+        <BoardingPass dlabel={dlabel} dk={dk} color={color}
+          morning={mText} evening={eText}
+          gratitude={gratitude} diary={diary} svgMood={svgMood} dream={dream}/>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   WeekTab
+══════════════════════════════════════════════════════════ */
+function WeekTab({dColors,accent}) {
+  const [data,setData]=React.useState(null);
+
+  React.useEffect(()=>{
+    const today=new Date(), dow=today.getDay();
+    const mon=new Date(today); mon.setDate(today.getDate()+(dow===0?-6:1-dow));
+    const days=Array.from({length:7},(_,i)=>{ const d=new Date(mon); d.setDate(mon.getDate()+i); return d; });
+    Promise.all(days.map(async d=>{
+      const k=d.toLocaleDateString('sv-SE');
+      const [t,j,n]=await Promise.all([
+        db.ref('demian/todos/'+k).once('value'),
+        db.ref('demian/journal/'+k).once('value'),
+        db.ref('demian/notes/'+k).once('value'),
+      ]);
+      const todos=t.val()||[];
+      return {date:d,key:k,todos,journal:j.val()||{},note:n.val()||'',total:todos.length,done:todos.filter(it=>it.state===1).length};
+    })).then(setData);
+  },[]);
+
+  if (!data) return <div style={{...CARD,textAlign:'center',padding:'3rem',color:'#ccc',fontSize:'.85rem'}}>Loading...</div>;
+
+  const todayKey=new Date().toLocaleDateString('sv-SE');
+  const tDone=data.reduce((s,d)=>s+d.done,0);
+  const tItems=data.reduce((s,d)=>s+d.total,0);
+  const pct=tItems?Math.round(tDone/tItems*100):0;
+  const catStats=CATS.map(cat=>{ const ci=data.flatMap(d=>d.todos.filter(t=>t.category===cat)); return {cat,total:ci.length,done:ci.filter(t=>t.state===1).length}; });
+
+  return (
+    <div style={CARD}>
+      {/* summary */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:'1.25rem'}}>
+        <div>
+          <span style={sectionLabel({marginBottom:'.2rem'})}>ᴡᴇᴇᴋʟʏ ʀᴇᴠɪᴇᴡ</span>
+          <div style={{fontSize:'.78rem',color:'#bbb'}}>{tDone} / {tItems} completed</div>
+        </div>
+        <div style={{fontSize:'2.4rem',fontWeight:'bold',color:accent,lineHeight:1}}>
+          {pct}<span style={{fontSize:'1rem',color:'#ccc'}}>%</span>
+        </div>
+      </div>
+
+      {/* category bars */}
+      <div style={{display:'flex',gap:'.4rem',marginBottom:'1.35rem'}}>
+        {catStats.map(({cat,total,done})=>{
+          const c=CAT_HUE[cat]||accent, p=total?Math.round(done/total*100):0;
+          return (
+            <div key={cat} style={{flex:1,background:'#f8f8f8',borderRadius:'.5rem',padding:'.7rem .5rem',textAlign:'center'}}>
+              <div style={{fontSize:'.58rem',color:'#bbb',marginBottom:'.25rem',lineHeight:1.4}}>{cat}</div>
+              <div style={{fontSize:'1.05rem',fontWeight:'bold',color:c,marginBottom:'.3rem'}}>{p}%</div>
+              <div style={{height:'2px',background:'#ebebeb',borderRadius:'9999px',overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${p}%`,background:c,borderRadius:'9999px'}}/>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{borderTop:'1px solid #f0f0f0',marginBottom:'1rem'}}/>
+
+      {/* day rows */}
+      {data.map(({date,key,total,done,journal,note})=>{
+        const c=dColors[key]||accent, ratio=total?done/total:0;
+        const isToday=key===todayKey, isFut=key>todayKey;
+        const mood=MOODS.find(m=>m.l===journal.mood);
+        return (
+          <div key={key} style={{
+            padding:'.5rem .65rem',borderRadius:'.4rem',marginBottom:'.3rem',
+            border:`1.5px solid ${isToday?c:'transparent'}`,
+            background:isToday?`${c}07`:'transparent',
+            opacity:isFut?0.32:1,
+          }}>
+            <div style={{display:'flex',alignItems:'center',gap:'.55rem'}}>
+              <div style={{minWidth:'4.2rem',display:'flex',gap:'.3rem',alignItems:'baseline'}}>
+                <span style={{fontSize:'.67rem',color:'#bbb'}}>{date.toLocaleString('en-US',{weekday:'short'})}</span>
+                <span style={{fontSize:'.88rem',fontWeight:isToday?'bold':'500',color:isToday?c:'#333'}}>{date.getDate()}</span>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{height:'2.5px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
+                  <div style={{height:'100%',width:`${ratio*100}%`,background:c,borderRadius:'9999px',transition:'width .5s'}}/>
+                </div>
+              </div>
+              <span style={{fontSize:'.7rem',color:'#bbb',minWidth:'2rem',textAlign:'right'}}>{total?`${done}/${total}`:'—'}</span>
+              <span style={{fontSize:'.95rem',opacity:mood?1:0.12}}>{mood?mood.e:'·'}</span>
+            </div>
+            {note&&!isFut&&(
+              <div style={{fontSize:'.7rem',color:'#bbb',marginTop:'.22rem',paddingLeft:'4.9rem',fontStyle:'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                "{note}"
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   RoutineModal
+══════════════════════════════════════════════════════════ */
+function RoutineModal({routines,onClose}) {
+  const [text,setText]=React.useState('');
+  const [cat,setCat]=React.useState(CATS[0]);
+  const [freq,setFreq]=React.useState('daily');
+  const [wds,setWds]=React.useState([1]); /* multi-day: array of 0-6 */
+
+  function toggleWd(d) {
+    setWds(prev=>prev.includes(d)?prev.filter(x=>x!==d):[...prev,d].sort((a,b)=>a-b));
+  }
+  function add() {
+    if (!text.trim()) return;
+    const r={text:text.trim(),category:cat,freq};
+    if (freq==='weekly') r.weekdays=wds.length?wds:[1];
+    db.ref('demian/routines').push(r); setText('');
+  }
+  function rtnLabel(r) {
+    if (r.freq==='daily') return '매일';
+    /* support both old weekday and new weekdays */
+    const days=(r.weekdays||(r.weekday!=null?[r.weekday]:[])).map(d=>WEEK_KO[d]+'요일').join(', ');
+    return `매주 ${days}`;
+  }
+
+  const inp={border:'1px solid #eee',borderRadius:'.375rem',padding:'.38rem .55rem',fontFamily:'inherit',fontSize:'.82rem',background:'#fff',outline:'none'};
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.22)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:'1rem'}} onClick={onClose}>
+      <div style={{...CARD,width:'100%',maxWidth:'350px',maxHeight:'78vh',overflow:'auto'}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'1rem'}}>
+          <span style={sectionLabel({marginBottom:0})}>ʀᴏᴜᴛɪɴᴇ</span>
+          <button onClick={onClose} className="icon-btn" style={{fontSize:'1rem'}}>✕</button>
+        </div>
+
+        {routines.length===0&&(
+          <div style={{textAlign:'center',color:'#e0e0e0',fontSize:'.85rem',padding:'1rem 0 .5rem'}}>등록된 루틴이 없어.</div>
+        )}
+        {routines.map(r=>(
+          <div key={r.id} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.45rem .55rem',background:'#f8f8f8',borderRadius:'.4rem',marginBottom:'.3rem'}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:'.84rem',color:'#333'}}>{r.text}</div>
+              <div style={{fontSize:'.68rem',color:'#bbb',marginTop:'.1rem'}}>{r.category} · {rtnLabel(r)}</div>
+            </div>
+            <button onClick={()=>db.ref('demian/routines/'+r.id).remove()} className="icon-btn">✕</button>
+          </div>
+        ))}
+
+        {routines.length>0&&<div style={{borderTop:'1px solid #f0f0f0',margin:'.75rem 0'}}/>}
+
+        <span style={sectionLabel()}>새 루틴 추가</span>
+        <input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()} placeholder="할 일 내용"
+          style={{...inp,width:'100%',marginBottom:'.4rem',display:'block'}}/>
+        <div style={{display:'flex',gap:'.4rem',marginBottom:'.4rem'}}>
+          <select value={cat} onChange={e=>setCat(e.target.value)} style={{...inp,flex:2}}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+          <select value={freq} onChange={e=>setFreq(e.target.value)} style={{...inp,flex:1}}>
+            <option value="daily">매일</option>
+            <option value="weekly">매주</option>
+          </select>
+        </div>
+        {freq==='weekly'&&(
+          <div style={{display:'flex',gap:'4px',flexWrap:'wrap',marginBottom:'.4rem'}}>
+            {WEEK_KO.map((l,i)=>(
+              <button key={i} onClick={()=>toggleWd(i)} style={{
+                padding:'.22rem .55rem',borderRadius:'9999px',border:'1px solid',
+                fontSize:'.72rem',cursor:'pointer',fontFamily:'inherit',
+                background:wds.includes(i)?'#222':'#fff',
+                color:wds.includes(i)?'#fff':'#bbb',
+                borderColor:wds.includes(i)?'#222':'#eee',
+              }}>{l}</button>
+            ))}
+          </div>
+        )}
+        <button onClick={add} style={{...pill('#222','#fff'),width:'100%',padding:'.48rem',borderRadius:'.4rem',display:'block'}}>추가</button>
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   WeatherWidget
+══════════════════════════════════════════════════════════ */
+function WeatherWidget({color}) {
+  const ac = color || '#888';
+  const [weather, setWeather] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error,   setError]   = React.useState(false);
+  const [open,    setOpen]    = React.useState(false);
+  const wrapRef = React.useRef(null);
+
+  function wmoEmoji(c) {
+    if (c===0)       return '☀️';
+    if (c<=2)        return '🌤';
+    if (c<=3)        return '☁️';
+    if (c<=49)       return '🌫';
+    if (c<=67)       return '🌧';
+    if (c<=77)       return '❄️';
+    if (c<=84)       return '🌧';
+    if (c<=99)       return '⛈';
+    return '🌡';
+  }
+  function wmoDesc(c) {
+    if (c===0)  return '맑음';
+    if (c<=2)   return '구름 조금';
+    if (c<=3)   return '흐림';
+    if (c<=49)  return '안개';
+    if (c<=67)  return '비';
+    if (c<=77)  return '눈';
+    if (c<=84)  return '소나기';
+    if (c<=99)  return '뇌우';
+    return '—';
+  }
+
+  React.useEffect(()=>{
+    if (!navigator.geolocation) { setError(true); setLoading(false); return; }
+    navigator.geolocation.getCurrentPosition(async ({coords:{latitude,longitude}})=>{
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+        const d   = await res.json();
+        setWeather(d.current_weather);
+      } catch { setError(true); }
+      setLoading(false);
+    }, ()=>{ setError(true); setLoading(false); });
+  },[]);
+
+  React.useEffect(()=>{
+    if (!open) return;
+    function h(e){ if(!wrapRef.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown',h);
+    document.addEventListener('touchstart',h,{passive:true});
+    return()=>{ document.removeEventListener('mousedown',h); document.removeEventListener('touchstart',h); };
+  },[open]);
+
+  const emoji = loading ? '…' : error ? '?' : wmoEmoji(weather?.weathercode??0);
+  const temp  = weather ? `${Math.round(weather.temperature)}°` : '';
+
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'116px',left:'20px',zIndex:1000}}>
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'12px'}}>{emoji}</span>
+        <span style={{fontSize:'10px',color:weather?ac:'#ccc',letterSpacing:'.04em',fontVariantNumeric:'tabular-nums'}}>{temp||'날씨'}</span>
+      </button>
+      {open && weather && (
+        <div style={{
+          position:'absolute',bottom:'42px',left:0,width:'160px',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',border:'1px solid #f0f0f0',
+          padding:'14px 16px 12px',
+        }}>
+          <div style={{fontSize:'2rem',marginBottom:'6px'}}>{wmoEmoji(weather.weathercode)}</div>
+          <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333'}}>{Math.round(weather.temperature)}°</div>
+          <div style={{fontSize:'.72rem',color:'#999',marginTop:'2px'}}>{wmoDesc(weather.weathercode)}</div>
+          <div style={{fontSize:'.65rem',color:'#ccc',marginTop:'3px'}}>풍속 {weather.windspeed} km/h</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   PomodoroWidget
+══════════════════════════════════════════════════════════ */
+function PomodoroWidget({color}) {
+  const ac = color || '#888';
+  const MODE_LABELS = {focus:'집중', short:'쉬기', long:'긴 쉬기'};
+
+  const [open,         setOpen]         = React.useState(false);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [mode,         setMode]         = React.useState('focus');
+  const [running,      setRunning]      = React.useState(false);
+  const [session,      setSession]      = React.useState(0);
+  const [durations,    setDurations]    = React.useState(()=>{
+    try { const s=JSON.parse(localStorage.getItem('pomoDurations')); if(s?.focus) return s; } catch {}
+    return {focus:25,short:5,long:15};
+  });
+  const [secs, setSecs] = React.useState(()=>{
+    try { const s=JSON.parse(localStorage.getItem('pomoDurations')); return (s?.focus||25)*60; } catch {}
+    return 25*60;
+  });
+
+  const wrapRef    = React.useRef(null);
+  const secsRef    = React.useRef(secs);
+  const modeRef    = React.useRef('focus');
+  const sessionRef = React.useRef(0);
+  const dursRef    = React.useRef(durations);
+  const tickRef    = React.useRef(null);
+  React.useEffect(()=>{ secsRef.current=secs; },      [secs]);
+  React.useEffect(()=>{ modeRef.current=mode; },      [mode]);
+  React.useEffect(()=>{ sessionRef.current=session; },[session]);
+  React.useEffect(()=>{ dursRef.current=durations; }, [durations]);
+
+  /* click-outside to close */
+  React.useEffect(()=>{
+    if (!open) return;
+    function handle(e){ if(!wrapRef.current?.contains(e.target)){ setOpen(false); setShowSettings(false); } }
+    document.addEventListener('mousedown',handle);
+    document.addEventListener('touchstart',handle,{passive:true});
+    return()=>{ document.removeEventListener('mousedown',handle); document.removeEventListener('touchstart',handle); };
+  },[open]);
+
+  React.useEffect(()=>{
+    if (running) {
+      tickRef.current=setInterval(()=>{
+        const next=secsRef.current-1;
+        if (next<=0) {
+          clearInterval(tickRef.current); setRunning(false);
+          if (modeRef.current==='focus') {
+            const ns=(sessionRef.current+1)%4; setSession(ns);
+            if (ns===0){ setSecs(dursRef.current.long*60);  setMode('long'); }
+            else       { setSecs(dursRef.current.short*60); setMode('short'); }
+          } else { setSecs(dursRef.current.focus*60); setMode('focus'); }
+        } else { secsRef.current=next; setSecs(next); }
+      },1000);
+    } else { clearInterval(tickRef.current); }
+    return()=>clearInterval(tickRef.current);
+  },[running]);
+
+  function switchMode(m){ setRunning(false); setMode(m); setSecs(durations[m]*60); }
+  function reset(){ setRunning(false); setSecs(durations[mode]*60); }
+  function adjustDur(m,delta){
+    setDurations(d=>{
+      const next={...d,[m]:Math.max(5,Math.min(120,d[m]+delta))};
+      localStorage.setItem('pomoDurations',JSON.stringify(next));
+      if(m===mode){ setRunning(false); setSecs(next[m]*60); }
+      return next;
+    });
+  }
+
+  const mins=Math.floor(secs/60), ss=secs%60;
+  const timeStr=`${String(mins).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  const circum=2*Math.PI*42;
+  const progress=1-secs/(durations[mode]*60);
+  const btnRow={display:'flex',alignItems:'center',justifyContent:'center',width:'22px',height:'22px',
+    borderRadius:'50%',border:'1px solid #e8e8e8',background:'#f8f8f8',cursor:'pointer',
+    fontSize:'13px',color:'#888',fontFamily:'inherit'};
+
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'68px',left:'20px',zIndex:1000}}>
+      {/* pill */}
+      <button onClick={()=>{setOpen(v=>!v);}} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'11px'}}>🍅</span>
+        <span style={{fontSize:'10px',letterSpacing:'.04em',color:running?ac:'#ccc',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
+      </button>
+
+      {open&&(
+        <div style={{
+          position:'absolute',bottom:'42px',left:0,width:'210px',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',border:'1px solid #f0f0f0',
+          padding:'14px 16px 12px',
+        }}>
+          {/* gear button */}
+          <button onClick={e=>{e.stopPropagation();setShowSettings(s=>!s);}} style={{
+            position:'absolute',top:'10px',right:'13px',
+            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#ccc',padding:0,fontFamily:'inherit',
+          }}>⚙ 설정</button>
+
+          {showSettings?(
+            /* Settings view */
+            <div>
+              <div style={{fontWeight:'bold',fontSize:'11px',marginBottom:'.85rem',color:'#555'}}>타이머 설정</div>
+              {Object.entries(MODE_LABELS).map(([m,label])=>(
+                <div key={m} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.6rem'}}>
+                  <span style={{fontSize:'.78rem',color:'#999',width:'52px'}}>{label}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
+                    <button onClick={()=>adjustDur(m,-5)} style={btnRow}>−</button>
+                    <span style={{fontSize:'.82rem',fontWeight:'bold',color:'#333',width:'36px',textAlign:'center',fontVariantNumeric:'tabular-nums'}}>{durations[m]}분</span>
+                    <button onClick={()=>adjustDur(m,+5)} style={btnRow}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ):(
+            /* Timer view */
+            <>
+              {/* mode tabs */}
+              <div style={{display:'flex',gap:'3px',marginBottom:'14px',paddingRight:'48px'}}>
+                {Object.entries(MODE_LABELS).map(([k,l])=>(
+                  <button key={k} onClick={()=>switchMode(k)} style={{
+                    flex:1,border:'none',borderRadius:'6px',padding:'.28rem 0',fontSize:'9px',cursor:'pointer',fontFamily:'inherit',
+                    background:mode===k?ac:'#f5f5f5',color:mode===k?'#fff':'#bbb',
+                  }}>{l}</button>
+                ))}
+              </div>
+
+              {/* circular timer */}
+              <div style={{display:'flex',justifyContent:'center',marginBottom:'12px'}}>
+                <div style={{position:'relative',width:'100px',height:'100px'}}>
+                  <svg width="100" height="100" style={{transform:'rotate(-90deg)',position:'absolute',inset:0}}>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#f0f0f0" strokeWidth="4"/>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke={ac} strokeWidth="4"
+                      strokeDasharray={`${circum}`} strokeDashoffset={`${circum*(1-progress)}`}
+                      strokeLinecap="round" style={{transition:'stroke-dashoffset 0.8s linear'}}/>
+                  </svg>
+                  <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'2px'}}>
+                    <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333',fontVariantNumeric:'tabular-nums',letterSpacing:'0.02em'}}>{timeStr}</div>
+                    <div style={{fontSize:'.5rem',color:'#ccc',letterSpacing:'.16em'}}>{MODE_LABELS[mode].toUpperCase()}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* controls */}
+              <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
+                <button onClick={reset} style={{background:'#f5f5f5',border:'none',borderRadius:'50%',width:'30px',height:'30px',cursor:'pointer',fontSize:'12px',color:'#ccc',display:'flex',alignItems:'center',justifyContent:'center'}}>↺</button>
+                <button onClick={()=>setRunning(r=>!r)} style={{background:ac,border:'none',borderRadius:'50%',width:'40px',height:'40px',cursor:'pointer',color:'#fff',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 3px 10px ${ac}44`}}>{running?'⏸':'▶'}</button>
+              </div>
+
+              {/* session dots */}
+              <div style={{display:'flex',justifyContent:'center',gap:'5px'}}>
+                {[0,1,2,3].map(i=>(
+                  <div key={i} style={{width:'6px',height:'6px',borderRadius:'50%',background:i<session?ac:'#ebebeb',transition:'background .3s'}}/>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   MusicWidget
+══════════════════════════════════════════════════════════ */
+function MusicWidget({color}) {
+  const ac = color || '#888';
+  const [open,    setOpen]    = React.useState(false);
+  const [input,   setInput]   = React.useState('');
+  const [urlBar,  setUrlBar]  = React.useState(false);
+  const [playing, setPlaying] = React.useState(true);
+  const [shuffle, setShuffle] = React.useState(false);
+  const [volume,  setVolume]  = React.useState(80);
+  const wrapRef   = React.useRef(null);
+  const iframeRef = React.useRef(null);
+
+  React.useEffect(()=>{
+    if (!open) return;
+    function handle(e){ if(!wrapRef.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown',handle);
+    document.addEventListener('touchstart',handle,{passive:true});
+    return()=>{ document.removeEventListener('mousedown',handle); document.removeEventListener('touchstart',handle); };
+  },[open]);
+
+  const [playlist,setPlaylist]= React.useState(()=>{
+    try {
+      const fix = u => (u&&!u.includes('enablejsapi')) ? u+'&enablejsapi=1' : u;
+      const saved=JSON.parse(localStorage.getItem('ytplaylist'));
+      if (saved?.length) return saved.map(t=>({...t,embed:fix(t.embed)}));
+      const old=localStorage.getItem('ytembed');
+      return old?[{embed:fix(old)}]:[];
+    } catch { return []; }
+  });
+  const [current, setCurrent] = React.useState(0);
+
+  /* reset playing flag when track changes (autoplay handles actual playback) */
+  React.useEffect(()=>{ setPlaying(true); },[current]);
+
+  const currentEmbed = playlist[current]?.embed || '';
+
+  function ytCmd(func,args=[]) {
+    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({event:'command',func,args}),'*');
+  }
+  function togglePlay() { if(playing){ytCmd('pauseVideo');}else{ytCmd('playVideo');} setPlaying(v=>!v); }
+  function nextTrack() {
+    if(playlist.length<=1) return;
+    if(shuffle){ let n; do{n=Math.floor(Math.random()*playlist.length);}while(n===current&&playlist.length>1); setCurrent(n); }
+    else { setCurrent(c=>(c+1)%playlist.length); }
+  }
+  function prevTrack() { if(playlist.length<=1) return; setCurrent(c=>(c-1+playlist.length)%playlist.length); }
+  function handleVolume(v) { setVolume(v); ytCmd('setVolume',[v]); }
+
+  function addTrack() {
+    const u=ytEmbed(input);
+    if (!u) { alert('유효한 YouTube URL을 넣어줘.'); return; }
+    const next=[...playlist,{embed:u}];
+    setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
+    setCurrent(next.length-1); setUrlBar(false); setInput('');
+  }
+  function removeTrack(i,e) {
+    e.stopPropagation();
+    const next=playlist.filter((_,idx)=>idx!==i);
+    setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
+    setCurrent(c=>c>=next.length?Math.max(0,next.length-1):c);
+  }
+
+  const ctrlBtn = {background:'none',border:'none',cursor:'pointer',padding:'2px 5px',fontFamily:'inherit',lineHeight:1};
+
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'20px',left:'20px',zIndex:1000}}>
+      {/* pill toggle */}
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'12px',color:currentEmbed?ac:'#ccc'}}>♪</span>
+        <span style={{fontSize:'10px',color:'#bbb',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
+      </button>
+
+      {/* panel — always in DOM; moves off-screen when closed so iframe keeps playing */}
+      <div style={{
+        position:'absolute',bottom:'42px',
+        left:open?'0':'-9999px',
+        width:'290px',background:'#fff',borderRadius:'12px',overflow:'hidden',
+        boxShadow:open?'0 8px 28px rgba(0,0,0,0.11)':'none',
+        border:'1px solid #f0f0f0',
+      }}>
+        {/* header */}
+        {open&&(
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px',borderBottom:'1px solid #f7f7f7'}}>
+            <span style={{fontSize:'9px',color:'#bbb',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
+            <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:ac,cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit',fontWeight:'bold'}}>+ 추가</button>
+          </div>
+        )}
+
+        {/* url input */}
+        {open&&urlBar&&(
+          <div style={{display:'flex',gap:'6px',padding:'8px 10px'}}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTrack()}
+              placeholder="YouTube URL (영상·플레이리스트 모두 가능)"
+              style={{flex:1,background:'#f8f8f8',border:'1px solid #eee',borderRadius:'6px',padding:'.3rem .55rem',color:'#555',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
+            />
+            <button onClick={addTrack} style={{background:ac,border:'none',borderRadius:'6px',color:'#fff',cursor:'pointer',fontSize:'11px',padding:'0 .55rem'}}>→</button>
+          </div>
+        )}
+
+        {/* playlist */}
+        {open&&playlist.length>0&&(
+          <div style={{maxHeight:'110px',overflowY:'auto',padding:'4px 10px 4px'}}>
+            {playlist.map((track,i)=>(
+              <div key={i} onClick={()=>setCurrent(i)} style={{
+                display:'flex',alignItems:'center',gap:'6px',
+                padding:'5px 8px',borderRadius:'6px',marginBottom:'2px',
+                background:i===current?ac+'18':'transparent',cursor:'pointer',
+              }}>
+                <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
+                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* controls — prev · play/pause · next · shuffle · volume */}
+        {open&&playlist.length>0&&(
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'4px',padding:'6px 10px 7px',borderTop:'1px solid #f5f5f5'}}>
+            <button onClick={()=>setShuffle(v=>!v)} title="셔플" style={{...ctrlBtn,fontSize:'12px',color:shuffle?ac:'#ccc'}}>⇌</button>
+            <button onClick={prevTrack} title="이전곡" style={{...ctrlBtn,fontSize:'12px',color:'#bbb'}}>⏮</button>
+            <button onClick={togglePlay} title={playing?'일시정지':'재생'} style={{
+              width:'26px',height:'26px',borderRadius:'50%',flexShrink:0,
+              background:ac,border:'none',color:'#fff',cursor:'pointer',fontSize:'10px',
+              display:'flex',alignItems:'center',justifyContent:'center',
+            }}>{playing?'⏸':'▶'}</button>
+            <button onClick={nextTrack} title="다음곡" style={{...ctrlBtn,fontSize:'12px',color:'#bbb'}}>⏭</button>
+            <input type="range" min="0" max="100" value={volume}
+              onChange={e=>handleVolume(Number(e.target.value))}
+              title={`음량 ${volume}%`}
+              style={{width:'50px',accentColor:ac,cursor:'pointer',marginLeft:'2px'}}
+            />
+          </div>
+        )}
+
+        {/* empty state */}
+        {open&&playlist.length===0&&(
+          <div style={{padding:'20px 12px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px'}}>
+            <span style={{fontSize:'20px',opacity:.15}}>♪</span>
+            <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
+            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
+          </div>
+        )}
+
+        {/* iframe — always rendered for background playback */}
+        {currentEmbed?(
+          <div style={{lineHeight:0}}>
+            <iframe ref={iframeRef} src={currentEmbed} width="290" height="163" frameBorder="0"
+              allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
+              style={{display:'block'}}/>
+          </div>
+        ):null}
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   StickyWidget  (floating memo pad — text + image)
+══════════════════════════════════════════════════════════ */
+function StickyWidget({color, open, onOpen, onClose}) {
+  const ac = color || '#888';
+  const [notes,  setNotes] = React.useState(()=>{ try{return JSON.parse(localStorage.getItem('stickies'))||[];}catch{return [];} });
+  const [input,  setInput] = React.useState('');
+  const [pendImg,setPendImg]= React.useState(null);
+  const fileRef  = React.useRef(null);
+
+  /* clipboard image paste */
+  React.useEffect(()=>{
+    if (!open) return;
+    function hp(e){
+      const item=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));
+      if (!item) return;
+      const r=new FileReader(); r.onload=ev=>setPendImg(ev.target.result); r.readAsDataURL(item.getAsFile());
+    }
+    document.addEventListener('paste',hp);
+    return()=>document.removeEventListener('paste',hp);
+  },[open]);
+
+  function persist(next){ setNotes(next); localStorage.setItem('stickies',JSON.stringify(next)); }
+  function addNote(){
+    if (!input.trim()&&!pendImg) return;
+    persist([{id:Date.now(),text:input.trim(),img:pendImg},...notes]);
+    setInput(''); setPendImg(null);
+  }
+  function delNote(id){ persist(notes.filter(n=>n.id!==id)); }
+  function handleFile(e){
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=ev=>setPendImg(ev.target.result); r.readAsDataURL(f);
+    e.target.value='';
+  }
+
+  /* theme-tinted palette */
+  const panelBg  = ac + '0e'; // 거의 흰색에 테마색 살짝
+  const border   = ac + '30';
+  const inputBg  = ac + '08';
+  const inputBdr = ac + '28';
+  const noteBdr  = ac + '22';
+  const labelClr = ac + 'aa';
+  const addBg    = ac + '22';
+
+  return (
+    <div style={{position:'fixed',top:'1rem',right:'1rem',zIndex:900}}>
+      {/* toggle pill */}
+      <button onClick={()=>open?onClose():onOpen()} style={{
+        display:'flex',alignItems:'center',gap:'.3rem',
+        background:open ? ac+'22' : '#fff',
+        border:`1px solid ${open ? ac+'44' : 'transparent'}`,
+        borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.09)',fontFamily:'inherit',
+        transition:'background .15s',
+      }}>
+        <span style={{fontSize:'11px',color:open ? ac : '#bbb'}}>✎</span>
+        <span style={{fontSize:'10px',color:open ? ac+'cc' : '#bbb',letterSpacing:'.1em'}}>ᴍᴇᴍᴏ</span>
+      </button>
+
+      {/* panel — opens downward */}
+      {open&&(
+        <div style={{
+          position:'absolute',top:'calc(100% + 6px)',right:0,
+          width:'264px',maxHeight:'440px',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',
+          border:`1px solid ${border}`,
+          display:'flex',flexDirection:'column',overflow:'hidden',
+        }}>
+          {/* header */}
+          <div style={{padding:'9px 13px 7px',borderBottom:`1px solid ${border}`,flexShrink:0,background:panelBg}}>
+            <span style={{fontSize:'9px',color:labelClr,letterSpacing:'.14em'}}>ᴍᴇᴍᴏ</span>
+          </div>
+
+          {/* input area */}
+          <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:`1px solid ${border}`,background:panelBg}}>
+            <textarea value={input} onChange={e=>setInput(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addNote();}}}
+              placeholder="메모 입력. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
+              style={{width:'100%',background:inputBg,border:`1px solid ${inputBdr}`,borderRadius:'6px',
+                padding:'.38rem .5rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
+                resize:'none',outline:'none',color:'#444',display:'block'}}
+            />
+            {/* pending image preview */}
+            {pendImg&&(
+              <div style={{position:'relative',display:'inline-block',marginTop:'5px'}}>
+                <img src={pendImg} alt="" style={{maxWidth:'100%',maxHeight:'72px',borderRadius:'5px',border:`1px solid ${inputBdr}`,display:'block'}}/>
+                <button onClick={()=>setPendImg(null)} style={{
+                  position:'absolute',top:'-5px',right:'-5px',
+                  background:'#ff7272',border:'none',borderRadius:'50%',
+                  width:'14px',height:'14px',color:'#fff',cursor:'pointer',fontSize:'8px',padding:0,
+                  display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1,
+                }}>✕</button>
+              </div>
+            )}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:'5px'}}>
+              <button onClick={()=>fileRef.current?.click()} style={{background:'none',border:'none',cursor:'pointer',fontSize:'10px',color:labelClr,padding:'1px 3px',fontFamily:'inherit'}}>📎 이미지</button>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
+              <button onClick={addNote} style={{background:addBg,border:`1px solid ${border}`,borderRadius:'6px',cursor:'pointer',fontSize:'10px',padding:'.22rem .65rem',fontFamily:'inherit',color:ac,fontWeight:'bold'}}>추가 →</button>
+            </div>
+          </div>
+
+          {/* notes list */}
+          <div style={{overflowY:'auto',padding:'6px 10px 10px',flex:1}}>
+            {notes.length===0&&(
+              <div style={{textAlign:'center',color:'#ccc',fontSize:'10px',padding:'18px 0'}}>아직 메모가 없어.</div>
+            )}
+            {notes.map(note=>(
+              <div key={note.id} style={{
+                background:'#fff',border:`1px solid ${noteBdr}`,borderRadius:'8px',
+                padding:'8px 28px 8px 10px',marginBottom:'6px',position:'relative',
+              }}>
+                {note.img&&<img src={note.img} alt="" style={{width:'100%',borderRadius:'5px',marginBottom:'5px',display:'block'}}/>}
+                {note.text&&<div style={{fontSize:'10px',color:'#333',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{note.text}</div>}
+                <button onClick={()=>delNote(note.id)} style={{
+                  position:'absolute',top:'6px',right:'7px',background:'none',border:'none',
+                  color:'#ccc',cursor:'pointer',fontSize:'10px',padding:0,lineHeight:1,
+                }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   DemianWidget
+══════════════════════════════════════════════════════════ */
+function DemianWidget() {
+  const [vis,    setVis]    = React.useState(false);
+  const [msg,    setMsg]    = React.useState('');
+  const [online, setOnline] = React.useState(false);
+  const [cfg,    setCfg]    = React.useState(false);
+  const [sched,  setSched]  = React.useState(loadSched);
+  const [edit,   setEdit]   = React.useState(loadSched);
+
+  const isFocus=React.useCallback(()=>{ const n=new Date(),r=sched[n.getDay()]; return r&&n.getHours()>=r.s&&n.getHours()<r.e; },[sched]);
+
+  React.useEffect(()=>{
+    const run=async()=>{
+      const on=isFocus(); setOnline(on);
+      if (on) {
+        try {
+          const res=await fetch("https://raw.githubusercontent.com/nagi-00/nagi-todo/main/demian_focus_messages.json");
+          const d=await res.json();
+          setMsg(d.messages[Math.floor(Math.random()*d.messages.length)]);
+        } catch { setMsg("메시지를 불러오지 못했어."); }
+      }
+    };
+    run(); const t=setInterval(run,60000); return()=>clearInterval(t);
+  },[isFocus]);
+
+  function save() { setSched(edit); localStorage.setItem('focusSched',JSON.stringify(edit)); setCfg(false); }
+  function upd(d,f,v) { const n=parseInt(v,10); if(isNaN(n)||n<0||n>23) return; setEdit(p=>({...p,[d]:{...(p[d]||{s:0,e:0}),[f]:n}})); }
+  function tog(d) { setEdit(p=>{ const n={...p}; n[d]?delete n[d]:n[d]=DEF_SCHED[d]||{s:6,e:18}; return n; }); }
+
+  const numInp={width:'2.9rem',padding:'.2rem',border:'1px solid #eee',borderRadius:'4px',textAlign:'center',fontSize:'10px',fontFamily:'inherit',outline:'none'};
+
+  return (
+    <>
+      <div onClick={()=>{setVis(v=>!v);if(vis)setCfg(false);}} style={{
+        position:'fixed',bottom:'20px',right:'20px',
+        width:'50px',height:'50px',borderRadius:'50%',
+        background:online?'#b8b8b8':'#d8d8d8',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        cursor:'pointer',zIndex:1000,
+        boxShadow:'0 4px 16px rgba(0,0,0,0.14)',
+        transition:'background .3s',
+      }}>
+        <span style={{fontSize:'19px'}}>🖤</span>
+      </div>
+
+      {vis&&(
+        <div style={{
+          position:'fixed',bottom:'80px',right:'20px',width:'265px',
+          background:'#fff',borderRadius:'12px',padding:'15px 17px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',zIndex:999,
+        }}>
+          <button onClick={e=>{e.stopPropagation();cfg?setCfg(false):(setEdit({...sched}),setCfg(true));}} style={{
+            position:'absolute',top:'10px',right:'13px',
+            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#ccc',padding:0,fontFamily:'inherit'
+          }}>⚙ 설정</button>
+
+          {cfg?(
+            <div>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.7rem'}}>위젯 설정</div>
+              <div style={{fontSize:'10px',color:'#ccc',marginBottom:'.5rem'}}>요일별 집중 시간 (24시)</div>
+              {[1,2,3,4,5,6,0].map(d=>(
+                <div key={d} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.38rem'}}>
+                  <button onClick={()=>tog(d)} style={{
+                    width:'1.4rem',height:'.85rem',borderRadius:'9999px',border:'none',cursor:'pointer',padding:0,flexShrink:0,
+                    background:edit[d]?'#444':'#e8e8e8',position:'relative',transition:'background .2s',
+                  }}>
+                    <span style={{position:'absolute',top:'1px',left:edit[d]?'6px':'1px',width:'calc(.85rem - 4px)',height:'calc(.85rem - 4px)',borderRadius:'50%',background:'#fff',transition:'left .2s'}}/>
+                  </button>
+                  <span style={{width:'1.2rem',fontSize:'11px',fontWeight:'600',color:edit[d]?'#333':'#ccc'}}>{DAY_KO[d]}</span>
+                  {edit[d]?(
+                    <>
+                      <input type="number" min="0" max="23" value={edit[d].s} onChange={e=>upd(d,'s',e.target.value)} style={numInp}/>
+                      <span style={{color:'#ddd',fontSize:'9px'}}>–</span>
+                      <input type="number" min="0" max="23" value={edit[d].e} onChange={e=>upd(d,'e',e.target.value)} style={numInp}/>
+                      <span style={{color:'#ccc',fontSize:'9px'}}>시</span>
+                    </>
+                  ):(
+                    <span style={{fontSize:'9px',color:'#ccc'}}>휴일</span>
+                  )}
+                </div>
+              ))}
+              <div style={{display:'flex',gap:'.4rem',marginTop:'.65rem'}}>
+                <button onClick={()=>setCfg(false)} style={{...pill('#f5f5f5','#aaa',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>취소</button>
+                <button onClick={save} style={{...pill('#222','#fff',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>저장</button>
+              </div>
+            </div>
+          ):online?(
+            <>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.35rem',letterSpacing:'.05em'}}>ɴᴀɢɪ</div>
+              <div style={{fontSize:'12px',color:'#555',lineHeight:1.7}}>{msg}</div>
+            </>
+          ):(
+            <>
+              <div style={{textAlign:'center',color:'#aaa',fontSize:'12px',marginBottom:'.45rem'}}>😴 휴식의 시간이야.</div>
+              <div style={{fontSize:'10px',textAlign:'center',color:'#ccc',lineHeight:1.95}}>
+                <div style={{fontWeight:'bold',marginBottom:'.1rem',letterSpacing:'.04em',color:'#bbb'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
+                {Object.entries(sched).map(([d,r])=>(
+                  <div key={d}>{DAY_KO[d]}&nbsp;&nbsp;{String(r.s).padStart(2,'0')}:00 – {String(r.e).padStart(2,'0')}:00</div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+
+/* ── SVG Mood Symbols ── */
+const SVG_MOODS = [
+  { key:'sunny',   label:'맑음'  },
+  { key:'cloudy',  label:'구름'  },
+  { key:'neutral', label:'보통'  },
+  { key:'rainy',   label:'비'    },
+  { key:'stormy',  label:'폭풍'  },
+];
+
+function MoodSVG({mkey, size=20, color='currentColor'}) {
+  const s = {width:size, height:size, display:'block', flexShrink:0};
+  const p = {fill:'none', stroke:color, strokeWidth:1.6, strokeLinecap:'round', strokeLinejoin:'round'};
+  if (mkey==='sunny') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <circle cx="12" cy="12" r="4"/>
+      <line x1="12" y1="2"   x2="12" y2="5"/>
+      <line x1="12" y1="19"  x2="12" y2="22"/>
+      <line x1="2"  y1="12"  x2="5"  y2="12"/>
+      <line x1="19" y1="12"  x2="22" y2="12"/>
+      <line x1="5.6"  y1="5.6"   x2="7.8"  y2="7.8"/>
+      <line x1="16.2" y1="16.2"  x2="18.4" y2="18.4"/>
+      <line x1="5.6"  y1="18.4"  x2="7.8"  y2="16.2"/>
+      <line x1="16.2" y1="7.8"   x2="18.4" y2="5.6"/>
+    </svg>
+  );
+  if (mkey==='cloudy') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <path d="M6 17a5 5 0 1 1 4.9-6 4 4 0 1 1 7.1 4H6z"/>
+    </svg>
+  );
+  if (mkey==='neutral') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <circle cx="12" cy="12" r="8"/>
+    </svg>
+  );
+  if (mkey==='rainy') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <path d="M6 15a5 5 0 1 1 4.9-6 4 4 0 1 1 7.1 4H6z"/>
+      <line x1="8"  y1="19" x2="7"  y2="22"/>
+      <line x1="13" y1="19" x2="12" y2="22"/>
+      <line x1="18" y1="19" x2="17" y2="22"/>
+    </svg>
+  );
+  if (mkey==='stormy') return (
+    <svg viewBox="0 0 24 24" style={s} {...p}>
+      <polyline points="13 2 7 14 12 14 10 22 18 10 13 10 13 2"/>
+    </svg>
+  );
+  return null;
+}
+
+
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
