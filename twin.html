@@ -63,6 +63,8 @@ select { font-family: inherit; }
   .main-content { margin-left: 0 !important; }
   .tab-bar { padding-top: 3.5rem !important; }
   .hamburger-btn { display: block !important; }
+  .widget-bar { display: none; }
+  .widget-bar.open { display: block; }
 }
 </style>
 </head>
@@ -892,9 +894,11 @@ function MainApp({userId, onLogout}) {
       </main>
 
       {showRtn&&<RoutineModal routines={routines} userId={userId} onClose={()=>setShowRtn(false)}/>}
-      <WeatherWidget color={color}/>
-      <PomodoroWidget color={color}/>
-      <MusicWidget color={color} userId={userId}/>
+      <div className={`widget-bar${sidebarOpen?' open':''}`}>
+        <WeatherWidget color={color}/>
+        <PomodoroWidget color={color}/>
+        <MusicWidget color={color} userId={userId}/>
+      </div>
       {userId==='user1'&&<DemianWidget/>}
     </div>
   );
