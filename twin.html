@@ -1251,7 +1251,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     setExporting(false);
     cv.toBlob(async blob=>{
       if(!blob)return;
-      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했습니다.'); }
       catch{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`nightlog-${dk}.png`;a.click();URL.revokeObjectURL(u); }
     });
   }
@@ -1266,7 +1266,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     <div style={CARD}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}}>
         <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
-        <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ print!</button>
+        <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>print!</button>
       </div>
 
       <span style={LBL}>ᴍᴏʀɴɪɴɢ</span>
@@ -1580,7 +1580,7 @@ function UserSharedCard({userId, user, data, isSelf}) {
 
       {isEmpty ? (
         <div style={{textAlign:'center',color:'#d0d0d0',fontSize:'.75rem',padding:'2rem 0'}}>
-          아직 공유하지 않았어.
+          아직 공유하지 않았습니다.
         </div>
       ) : (
         <>
@@ -2046,7 +2046,7 @@ function DemianWidget() {
           const res=await fetch("https://raw.githubusercontent.com/nagi-00/nagi-todo/main/demian_focus_messages.json");
           const d=await res.json();
           setMsg(d.messages[Math.floor(Math.random()*d.messages.length)]);
-        } catch { setMsg("메시지를 불러오지 못했어."); }
+        } catch { setMsg("메시지를 불러오지 못했습니다."); }
       }
     };
     run(); const t=setInterval(run,60000); return()=>clearInterval(t);
@@ -2171,7 +2171,7 @@ function RoutineModal({routines,userId,onClose}) {
         </div>
 
         {routines.length===0&&(
-          <div style={{textAlign:'center',color:'#e0e0e0',fontSize:'.85rem',padding:'1rem 0 .5rem'}}>등록된 루틴이 없어.</div>
+          <div style={{textAlign:'center',color:'#e0e0e0',fontSize:'.85rem',padding:'1rem 0 .5rem'}}>등록된 루틴이 없습니다.</div>
         )}
         {routines.map(r=>(
           <div key={r.id} style={{display:'flex',alignItems:'center',gap:'.5rem',padding:'.45rem .55rem',background:'#f8f8f8',borderRadius:'.4rem',marginBottom:'.3rem'}}>
