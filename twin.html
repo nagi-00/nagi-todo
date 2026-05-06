@@ -460,6 +460,7 @@ function MainApp({userId, onLogout}) {
 
   async function exportImg() {
     const el=document.getElementById('xcard'); if (!el) return;
+    await document.fonts.ready;
     const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
     cv.toBlob(async blob=>{
       if (!blob) return;
@@ -670,8 +671,9 @@ function MainApp({userId, onLogout}) {
 
                 {/* 오늘의 완료율 */}
                 {items.length > 0 && (()=>{
-                  const done = items.filter(it=>it.state===1).length;
-                  const pct  = Math.round(done / items.length * 100);
+                  const vis  = items.filter(it=>!it.hidden);
+                  const done = vis.filter(it=>it.state===1).length;
+                  const pct  = vis.length ? Math.round(done / vis.length * 100) : 0;
                   return (
                     <div style={{marginBottom:'1rem'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
@@ -1250,6 +1252,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
   async function exportBoarding(){
     setExporting(true);
     await new Promise(r=>setTimeout(r,200));
+    await document.fonts.ready;
     const el=document.getElementById('bpcard'); if(!el){setExporting(false);return;}
     const cv=await html2canvas(el,{backgroundColor:'#06070f',scale:2,useCORS:true});
     setExporting(false);
