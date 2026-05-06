@@ -337,6 +337,7 @@ function MainApp({userId, onLogout}) {
   const [inputs,     setInputs]    = React.useState({'필연':'','성장':'','자유':''});
   const [showEdit,   setShowEdit]  = React.useState(false);
   const [editColor,  setEditColor] = React.useState(user.color);
+  const [editName,   setEditName]  = React.useState(user.name);
   const [editPass,   setEditPass]  = React.useState('');
   const [tab,        setTab]       = React.useState('todo');
   const [journals,   setJournals]  = React.useState({});
@@ -405,8 +406,9 @@ function MainApp({userId, onLogout}) {
   }
   function saveEdit() {
     if (!editPass.trim()) { alert('비밀번호를 입력해줘.'); return; }
+    if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
     const newUsers = loadUsers();
-    newUsers[userId] = { ...newUsers[userId], color: editColor, password: editPass.trim() };
+    newUsers[userId] = { ...newUsers[userId], color: editColor, name: editName.trim(), password: editPass.trim() };
     saveUsers(newUsers);
     setShowEdit(false);
     setEditPass('');
@@ -524,6 +526,10 @@ function MainApp({userId, onLogout}) {
             </div>
             {showEdit&&(
               <div style={{marginTop:'.75rem',padding:'.75rem',background:'#f8f8f8',borderRadius:'8px',textAlign:'left'}}>
+                <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.4rem',letterSpacing:'.05em'}}>이름</div>
+                <input type="text" value={editName} onChange={e=>setEditName(e.target.value)}
+                  placeholder="이름"
+                  style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit',marginBottom:'.5rem',boxSizing:'border-box'}}/>
                 <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.4rem',letterSpacing:'.05em'}}>테마 색상</div>
                 <input type="color" value={editColor} onChange={e=>setEditColor(e.target.value)}
                   style={{width:'100%',height:'32px',border:'none',borderRadius:'6px',cursor:'pointer',background:'none',padding:0}}/>
