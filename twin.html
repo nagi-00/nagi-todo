@@ -1196,9 +1196,12 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
   const [mEdit,    setMEdit]    = React.useState(false);
   const [mText,    setMText]    = React.useState('');
   const [gratitude,setGratitude]= React.useState(['','','']);
+  const [gEdit,    setGEdit]    = React.useState([false,false,false]);
   const [diary,    setDiary]    = React.useState('');
+  const [dEdit,    setDEdit]    = React.useState(false);
   const [svgMood,  setSvgMood]  = React.useState(null);
   const [dream,    setDream]    = React.useState('');
+  const [drEdit,   setDrEdit]   = React.useState(false);
   const [exporting,setExporting]= React.useState(false);
 
   React.useEffect(()=>setMText(journal.morning||''), [journal.morning]);
@@ -1253,10 +1256,11 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
 
       <span style={LBL}>ᴍᴏʀɴɪɴɢ</span>
       {(!mEdit&&mText.trim())?(
-        <div style={VIEW} onDoubleClick={()=>setMEdit(true)} onContextMenu={e=>{e.preventDefault();setMEdit(true);}}>{mText}</div>
+        <div style={VIEW} onDoubleClick={()=>setMEdit(true)} onTouchEnd={e=>{e.preventDefault();setMEdit(true);}}>{mText}</div>
       ):(
         <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
+          onBlur={()=>save('morning',mText,setMEdit)}
           placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
       )}
 
@@ -1266,17 +1270,35 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
       {[0,1,2].map(i=>(
         <div key={i} style={{display:'flex',alignItems:'center',gap:'.35rem',marginBottom:'.35rem'}}>
           <span style={{fontSize:'.62rem',color,flexShrink:0,fontFamily:'monospace',width:'.8rem',textAlign:'right'}}>{i+1}.</span>
-          <textarea value={gratitude[i]} onChange={e=>saveGratitude(i,e.target.value)}
-            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
-            placeholder={`감사한 점 ${i+1}`} rows={1} style={{...SM,resize:'none'}}/>
+          {(!gEdit[i]&&gratitude[i].trim())?(
+            <div style={{...VIEW,flex:1,minHeight:'1.6rem'}}
+              onDoubleClick={()=>setGEdit(p=>{const n=[...p];n[i]=true;return n;})}
+              onTouchEnd={e=>{e.preventDefault();setGEdit(p=>{const n=[...p];n[i]=true;return n;});}}
+            >{gratitude[i]}</div>
+          ):(
+            <textarea autoFocus={gEdit[i]} value={gratitude[i]}
+              onChange={e=>saveGratitude(i,e.target.value)}
+              onFocus={()=>setGEdit(p=>{const n=[...p];n[i]=true;return n;})}
+              onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
+              onBlur={()=>setGEdit(p=>{const n=[...p];n[i]=false;return n;})}
+              placeholder={`감사한 점 ${i+1}`} rows={1} style={{...SM,resize:'none',flex:1}}/>
+          )}
         </div>
       ))}
 
       <div style={DIV}/>
 
       <span style={LBL}>ᴅɪᴀʀʏ</span>
-      <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref(`private/${userId}/daily/${dk}/diary`).set(e.target.value);}}
-        placeholder="오늘 하루를 회고하며 기록해봐." rows={6} style={TA}/>
+      {(!dEdit&&diary.trim())?(
+        <div style={VIEW} onDoubleClick={()=>setDEdit(true)} onTouchEnd={e=>{e.preventDefault();setDEdit(true);}}>{diary}</div>
+      ):(
+        <textarea autoFocus={dEdit} value={diary}
+          onChange={e=>{setDiary(e.target.value);db.ref(`private/${userId}/daily/${dk}/diary`).set(e.target.value);}}
+          onFocus={()=>setDEdit(true)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
+          onBlur={()=>setDEdit(false)}
+          placeholder="오늘 하루를 회고하며 기록해봐." rows={6} style={TA}/>
+      )}
 
       <div style={DIV}/>
 
@@ -1300,9 +1322,16 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
       <div style={DIV}/>
 
       <span style={LBL}>ᴅʀᴇᴀᴍ</span>
-      <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref(`private/${userId}/daily/${dk}/dream`).set(e.target.value);}}
-        onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)e.preventDefault();}}
-        placeholder="이루고 싶은 미래를 현재형으로 적어주세요. '나는 이미 ___이다.' " rows={4} style={{...TA,fontStyle:'italic'}}/>
+      {(!drEdit&&dream.trim())?(
+        <div style={{...VIEW,fontStyle:'italic'}} onDoubleClick={()=>setDrEdit(true)} onTouchEnd={e=>{e.preventDefault();setDrEdit(true);}}>{dream}</div>
+      ):(
+        <textarea autoFocus={drEdit} value={dream}
+          onChange={e=>{setDream(e.target.value);db.ref(`private/${userId}/daily/${dk}/dream`).set(e.target.value);}}
+          onFocus={()=>setDrEdit(true)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
+          onBlur={()=>setDrEdit(false)}
+          placeholder="이루고 싶은 미래를 현재형으로 적어주세요. '나는 이미 ___이다.' " rows={4} style={{...TA,fontStyle:'italic'}}/>
+      )}
 
       {exporting&&(
         <BoardingPass dlabel={dlabel} dk={dk} color={color}
