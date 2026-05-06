@@ -818,12 +818,8 @@ function MainApp({userId, onLogout}) {
 
                 {/* bottom actions */}
                 <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
-                  {items.length>0&&(
-                    <>
-                      <button onClick={exportImg} style={pill(color,'#fff')}>print!</button>
-                      <button onClick={shareToday} style={pill(color,'#fff')}>Share</button>
-                    </>
-                  )}
+                  <button onClick={exportImg} style={pill(color,'#fff')}>print!</button>
+                  <button onClick={shareToday} style={pill(color,'#fff')}>Share</button>
                   <button onClick={()=>setShowRtn(true)} style={pill('#f5f5f5','#aaa')}>루틴</button>
                   <div style={{flex:1}}/>
                   {editMode&&items.length>0&&(
