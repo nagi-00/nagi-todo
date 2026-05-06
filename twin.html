@@ -349,10 +349,10 @@ function App() {
    MainApp
 ══════════════════════════════════════════════════════════ */
 function MainApp({userId, onLogout}) {
-  const [USERS] = React.useState(loadUsers);
-  const user = USERS[userId];
+  const [USERS, setUSERS] = React.useState(loadUsers);
+  const user = USERS[userId] || loadUsers()[userId];
   const otherUserId = userId === 'user1' ? 'user2' : 'user1';
-  const otherUser = USERS[otherUserId];
+  const otherUser = USERS[otherUserId] || loadUsers()[otherUserId];
 
   /* state */
   const [sel,        setSel]       = React.useState(new Date());
@@ -453,15 +453,14 @@ function MainApp({userId, onLogout}) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,...copied]);
   }
   function saveEdit() {
-    if (!editPass.trim()) { alert('비밀번호를 입력해주세요.'); return; }
-    if (!editName.trim()) { alert('이름을 입력해주세요.'); return; }
-    const newUsers = loadUsers();
-    newUsers[userId] = { ...newUsers[userId], color: editColor, name: editName.trim(), password: editPass.trim() };
+    if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
+    const newUsers = {...USERS};
+    newUsers[userId] = { ...newUsers[userId], color: editColor, name: editName.trim() };
+    if (editPass.trim()) newUsers[userId].password = editPass.trim();
     saveUsers(newUsers);
     db.ref('settings/users').set(newUsers);
     setShowEdit(false);
     setEditPass('');
-    alert('저장 완료!');
   }
   function applyOneRtn(r) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,{type:'todo',category:r.category,text:r.text,state:0,hidden:false}]);
@@ -504,6 +503,15 @@ function MainApp({userId, onLogout}) {
   }
 
   /* effects */
+  React.useEffect(()=>{
+    const r=db.ref('settings/users');
+    const h=r.on('value',s=>{
+      const v=s.val();
+      if(v){ saveUsers(v); setUSERS(v); }
+    });
+    return()=>r.off('value',h);
+  },[]);
+
   React.useEffect(()=>{
     const r=db.ref(`private/${userId}/todos/${dk}`);
     const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
@@ -600,7 +608,7 @@ function MainApp({userId, onLogout}) {
                       style={{width:'100%',height:'32px',border:'none',borderRadius:'6px',cursor:'pointer',background:'none',padding:0}}/>
                   </>
                 )}
-                <div style={{fontSize:'.65rem',color:'#bbb',margin:'.5rem 0 .4rem',letterSpacing:'.05em'}}>새 비밀번호</div>
+                <div style={{fontSize:'.65rem',color:'#bbb',margin:'.5rem 0 .4rem',letterSpacing:'.05em'}}>새 비밀번호 (변경 시에만 입력)</div>
                 <input type="password" value={editPass} onChange={e=>setEditPass(e.target.value)}
                   placeholder="새 비밀번호"
                   style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit'}}/>
