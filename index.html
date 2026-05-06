@@ -31,6 +31,18 @@ body {
 textarea:focus, input:focus, select:focus { outline: none; }
 button { font-family: inherit; }
 select { font-family: inherit; }
+
+/* music track marquee — hover-only scroll */
+.mq-wrap { flex:1; min-width:0; overflow:hidden; display:flex; align-items:center; height:18px; }
+.mq-inner {
+  display:inline-block; white-space:nowrap; line-height:1.5;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis;
+}
+.mq-wrap:hover .mq-inner {
+  max-width:none; overflow:visible; text-overflow:clip;
+  animation: mq-scroll 22s linear infinite;
+}
+@keyframes mq-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
 </style>
 </head>
 <body>
@@ -62,7 +74,6 @@ const db = firebase.database();
 const CATS       = ['필연의 시간', '성장의 시간', '자유의 시간'];
 const BULLET     = ['☐', '☑', '☒'];
 const CAT_HUE    = { '필연의 시간': '#8A4545', '성장의 시간': '#434A8E', '자유의 시간': '#4a7c5a' };
-const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
 const DEF_SCHED  = {1:{s:6,e:13},2:{s:6,e:18},3:{s:6,e:13},4:{s:6,e:18},5:{s:6,e:21}};
 const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const WEEK_KO    = ['일','월','화','수','목','금','토'];
@@ -71,6 +82,78 @@ const WEEK_KO    = ['일','월','화','수','목','금','토'];
 function loadSched() {
   try { return JSON.parse(localStorage.getItem('focusSched')) || DEF_SCHED; }
   catch { return DEF_SCHED; }
+}
+
+/* HSL conversion helpers */
+function hexToHSL(hex) {
+  if (!hex || typeof hex!=='string') return null;
+  let h = hex.replace('#','');
+  if (h.length===3) h = h.split('').map(x=>x+x).join('');
+  if (h.length!==6) return null;
+  const r = parseInt(h.slice(0,2),16)/255;
+  const g = parseInt(h.slice(2,4),16)/255;
+  const b = parseInt(h.slice(4,6),16)/255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+  let H, S, L = (mx+mn)/2;
+  if (mx===mn) { H=0; S=0; }
+  else {
+    const d = mx-mn;
+    S = L>0.5 ? d/(2-mx-mn) : d/(mx+mn);
+    if (mx===r) H = ((g-b)/d + (g<b?6:0));
+    else if (mx===g) H = ((b-r)/d + 2);
+    else H = ((r-g)/d + 4);
+    H /= 6;
+  }
+  return {h:H, s:S, l:L};
+}
+function hslToHex(H, S, L) {
+  let R,G,B;
+  if (S===0) { R=G=B=L; }
+  else {
+    const hue2 = (p,q,t) => {
+      if (t<0) t+=1; if (t>1) t-=1;
+      if (t<1/6) return p+(q-p)*6*t;
+      if (t<1/2) return q;
+      if (t<2/3) return p+(q-p)*(2/3-t)*6;
+      return p;
+    };
+    const q = L<0.5 ? L*(1+S) : L+S-L*S;
+    const p = 2*L-q;
+    R = hue2(p,q,H+1/3);
+    G = hue2(p,q,H);
+    B = hue2(p,q,H-1/3);
+  }
+  const x = n => Math.round(Math.max(0,Math.min(1,n))*255).toString(16).padStart(2,'0');
+  return '#'+x(R)+x(G)+x(B);
+}
+
+/* dampColor: highlighter-on-newsprint dampening — saturation up, lightness down.
+   Used for theme-colored accents on dark/textured backgrounds. */
+function dampColor(hex, sMul=1.25, lMul=0.7) {
+  const hsl = hexToHSL(hex);
+  if (!hsl) return hex;
+  return hslToHex(hsl.h, Math.min(1, hsl.s*sMul), Math.max(0, hsl.l*lMul));
+}
+
+/* inkOn: returns the theme color adjusted for legibility against a given bg.
+   Same hue, saturation boosted; lightness clamped into a readable band relative
+   to bg luminance. On dark bg → minimum L floor; on light bg → maximum L ceiling. */
+function inkOn(hex, bgHex) {
+  const hsl = hexToHSL(hex);
+  const bg  = hexToHSL(bgHex);
+  if (!hsl) return hex;
+  let {h,s,l} = hsl;
+  s = Math.min(1, s * 1.2); /* always slightly more saturated */
+  if (bg) {
+    if (bg.l < 0.35) {
+      /* dark bg: text needs a brightness floor; cap also so it doesn't go pastel */
+      l = Math.max(0.58, Math.min(0.78, l < 0.58 ? 0.62 : l * 0.92));
+    } else if (bg.l > 0.7) {
+      /* light bg: keep dark — newsprint ink */
+      l = Math.min(0.4, Math.max(0.18, l > 0.5 ? l * 0.55 : l));
+    }
+  }
+  return hslToHex(h, s, l);
 }
 
 function ytEmbed(raw) {
@@ -135,7 +218,7 @@ function App() {
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
-  const journal = journals[dk] || { morning:'', evening:'', mood:null };
+  const journal = journals[dk] || { morning:'', mood:null };
   const color   = dColors[dk] || accent;
   const dlabel  = sel.toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const todayDk = new Date().toLocaleDateString('sv-SE');
@@ -175,6 +258,18 @@ function App() {
   function delItem(i) { db.ref('todos/'+dk).set(items.filter((_,idx)=>idx!==i)); }
   function applyRtn() {
     const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0}));
+    db.ref('todos/'+dk).set([...items,...add]);
+  }
+  async function carryFromPrev() {
+    const prev = new Date(sel); prev.setDate(prev.getDate()-1);
+    const prevDk = prev.toLocaleDateString('sv-SE');
+    const snap = await db.ref('todos/'+prevDk).once('value');
+    const prevItems = snap.val()||[];
+    const crossed = prevItems.filter(it=>it.state===2);
+    if (!crossed.length) { alert('전날 ☒ 항목이 없어.'); return; }
+    const existingTexts = new Set(items.map(it=>it.text));
+    const add = crossed.filter(it=>!existingTexts.has(it.text)).map(it=>({type:'todo',category:it.category,text:it.text,state:0}));
+    if (!add.length) { alert('이미 모두 추가돼 있어.'); return; }
     db.ref('todos/'+dk).set([...items,...add]);
   }
   function applyOneRtn(r) {
@@ -233,7 +328,7 @@ function App() {
 
   React.useEffect(()=>{
     const r=db.ref('journal/'+dk);
-    const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',evening:'',mood:null}})));
+    const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',mood:null}})));
     return()=>r.off('value',h);
   },[dk]);
 
@@ -485,10 +580,13 @@ function App() {
                     </div>
                   );
                 })}
-                {/* apply routines banner — only show when none have been applied yet */}
-                {items.length===0&&appRoutines.length>0&&(
-                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:'.3rem'}}>
-                    <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                {/* import banner — show carry/apply at start of day */}
+                {items.length===0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',gap:'.4rem',marginTop:'.3rem'}}>
+                    <button onClick={carryFromPrev} style={{...pill('#f5f5f5','#888',true)}} title="전날 ☒ 항목 가져오기">☒ 가져오기</button>
+                    {appRoutines.length>0&&(
+                      <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                    )}
                   </div>
                 )}
 
@@ -562,9 +660,6 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
     String(now.getHours()).padStart(2,'0')+':'+
     String(now.getMinutes()).padStart(2,'0');
 
-  /* shorter subtitle (eg "FRIDAY · APR 25 · 2026") */
-  const sub = dlabel.toUpperCase();
-
   const MONO = "'Courier New', ui-monospace, monospace";
 
   return (
@@ -577,10 +672,9 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
       backgroundSize:'cover',
       backgroundPosition:'center',
       padding:'2.4rem 2rem 2.2rem',
-      position:'fixed',
     }}>
-      {/* warm cream wash for legibility on busy texture */}
-      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.55)',pointerEvents:'none'}}/>
+      {/* warm cream wash (very faint) */}
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.22)',pointerEvents:'none',zIndex:0}}/>
 
       <div style={{position:'relative',zIndex:1}}>
 
@@ -592,19 +686,8 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           textAlign:'center',
           lineHeight:.95,
           letterSpacing:'-.01em',
-          textShadow:`2px 3px 0 ${color}33, 1px 1px 0 ${color}55`,
-          marginBottom:'.45rem',
+          marginBottom:'1.4rem',
         }}>Dailylog</div>
-
-        {/* ── Subtitle (date) ── */}
-        <div style={{
-          fontFamily:MONO,
-          fontSize:'.66rem',
-          color:'#222',
-          textAlign:'center',
-          letterSpacing:'.18em',
-          marginBottom:'1.6rem',
-        }}>{sub}</div>
 
         {/* ── Note text ── */}
         {noteText && (
@@ -631,8 +714,10 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
             return (
               <div key={cat} style={{marginBottom:'.95rem'}}>
                 {/* dotted section header */}
-                <div style={{textAlign:'center',color:color,fontSize:'.55rem',letterSpacing:'.22em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
-                  ─── {cat} ───
+                <div style={{display:'flex',alignItems:'center',gap:'.3rem',color:color,fontSize:'.55rem',letterSpacing:'.18em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
+                  <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em'}}>{'─'.repeat(30)}</span>
+                  <span style={{flexShrink:0,letterSpacing:'.22em',padding:'0 .1rem'}}>{cat}</span>
+                  <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em',textAlign:'right'}}>{'─'.repeat(30)}</span>
                 </div>
                 {list.map((it,i)=>(
                   <div key={i} style={{
@@ -641,11 +726,12 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
                     textDecoration:it.state===1?'line-through':'none',
                     background:it.important?color+'22':'transparent',
                     padding:it.important?'0 .35rem':'0',
+                    margin:it.important?'0 -.35rem':'0',
                     borderRadius:'2px',
                   }}>
+                    <span style={{flexShrink:0,minWidth:'.7rem'}}>{xBullet(it.state)}</span>
                     <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
                     {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
-                    <span style={{flexShrink:0,minWidth:'.7rem',textAlign:'right'}}>{xBullet(it.state)}</span>
                   </div>
                 ))}
                 {pendingRtns.map((r,i)=>(
@@ -694,174 +780,183 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           letterSpacing:'.22em',
         }}>RECEIPT BY ⓒnagi</div>
       </div>
+
+      {/* paper texture grain ON TOP of everything — simulates ink-on-paper integration even when html2canvas drops mix-blend-mode */}
+      <div style={{
+        position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.32,mixBlendMode:'multiply',
+        pointerEvents:'none',zIndex:2,
+      }}/>
     </div>
   );
 }
 
 
 /* ══════════════════════════════════════════════════════════
-   BoardingPass  (JOURNAL export — concert ticket style)
+   BoardingPass  (JOURNAL export — nightlog receipt)
 ══════════════════════════════════════════════════════════ */
-function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, svgMood, dream}) {
+function BoardingPass({dlabel, dk, color, morning, gratitude, diary, svgMood, dream}) {
   const c = color || '#888';
+  const BG = '#06070f';
+  const cInk = inkOn(c, BG); /* contrast-corrected highlighter-on-newsprint */
   const moodObj = SVG_MOODS.find(m => m.key === svgMood);
   const validG  = (gratitude||[]).filter(g => g.trim());
 
-  /* white text on dark theme-tinted background */
-  const FG       = 'rgba(255,255,255,0.95)';
-  const FG_DIM   = 'rgba(255,255,255,0.55)';
-  const FG_FAINT = 'rgba(255,255,255,0.4)';
-  const ROW      = '1px solid rgba(255,255,255,0.16)';
+  const TEXTURES = ['./papertex1.jpg','./papertex2.jpg','./papertex3.png','./papertex4.jpg','./papertex5.png','./papertex6.jpg'];
+  const [tex] = React.useState(() => TEXTURES[Math.floor(Math.random() * TEXTURES.length)]);
 
-  /* date + time stamp */
-  const release = dk.replace(/-/g,'.');
-  const dateMD  = release.slice(5);
+  const filled = [morning.trim(), validG.length>0, diary.trim(), svgMood, dream.trim()].filter(Boolean).length;
+
+  /* date·time stamp like 26.04.26  23:08 */
   const now = new Date();
-  const timeS = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+' KST';
+  const stamp =
+    String(now.getFullYear()).slice(2)+'.'+
+    String(now.getMonth()+1).padStart(2,'0')+'.'+
+    String(now.getDate()).padStart(2,'0')+'   '+
+    String(now.getHours()).padStart(2,'0')+':'+
+    String(now.getMinutes()).padStart(2,'0');
 
-  /* dark layer + paper texture, both absolute, layered on top of theme color */
-  const overlays = (
-    <>
-      <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',inset:0,
-        backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',backgroundPosition:'center',
-        opacity:0.14,mixBlendMode:'soft-light',pointerEvents:'none'}}/>
-    </>
-  );
+  const MONO = "'Courier New', ui-monospace, monospace";
 
-  /* meta row */
-  const Row = ({label, children}) => (
-    <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
-      <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',textTransform:'uppercase',alignSelf:'center'}}>{label}</div>
-      <div style={{flex:1,fontSize:'.7rem',color:FG,lineHeight:1.5}}>{children}</div>
+  /* dark palette — high contrast against near-black base */
+  const FG       = '#ffffff';
+  const FG_DIM   = 'rgba(255,255,255,0.72)';
+  const FG_FAINT = 'rgba(255,255,255,0.45)';
+
+  /* section header with full-width dashes */
+  const SectionHeader = ({label}) => (
+    <div style={{display:'flex',alignItems:'center',gap:'.3rem',color:cInk,fontSize:'.55rem',letterSpacing:'.18em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.95}}>
+      <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em'}}>{'─'.repeat(30)}</span>
+      <span style={{flexShrink:0,letterSpacing:'.22em',padding:'0 .1rem'}}>{label}</span>
+      <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em',textAlign:'right'}}>{'─'.repeat(30)}</span>
     </div>
   );
-
-  /* body section */
-  const Section = ({label, body, italic}) => body.trim() ? (
-    <div style={{marginBottom:'1rem'}}>
-      <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>{label}</div>
-      <div style={{fontSize:'.7rem',color:FG,lineHeight:1.75,whiteSpace:'pre-wrap',fontStyle:italic?'italic':'normal'}}>{body}</div>
-    </div>
-  ) : null;
-
-  /* notch position: between meta block and body */
-  const NOTCH_TOP = 230;
 
   return (
     <div id="bpcard" style={{
       position:'fixed', left:'-9999px', top:0,
-      width:'380px',
-      background:'#fff',
-      padding:'14px 14px 0',
       fontFamily:'HJSS, sans-serif',
+      width:'380px',
+      background:BG,
+      padding:'2.4rem 2rem 2.2rem',
     }}>
-      {/* ─── ticket body ─── */}
-      <div style={{
-        position:'relative',
-        background:c,
-        borderRadius:'12px 12px 0 0',
-        overflow:'hidden',
-      }}>
-        {overlays}
+      {/* saturated theme tint — thin so bg stays dark, not mid-gray */}
+      <div style={{position:'absolute',inset:0,background:c,opacity:0.12,pointerEvents:'none'}}/>
+      {/* paper texture grain under content */}
+      <div style={{position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.18,mixBlendMode:'overlay',pointerEvents:'none'}}/>
 
-        {/* content */}
-        <div style={{position:'relative',zIndex:2,padding:'1.4rem 1.4rem 1.6rem'}}>
+      <div style={{position:'relative',zIndex:1}}>
 
-          {/* tiny header */}
-          <div style={{fontSize:'.46rem',color:FG_FAINT,letterSpacing:'.22em',marginBottom:'1.1rem'}}>JOURNAL TICKET</div>
+        {/* ── Title (nightlog) ── */}
+        <div style={{
+          fontFamily:'Dangam, serif',
+          fontSize:'3.2rem',
+          color:cInk,
+          textAlign:'center',
+          lineHeight:.95,
+          letterSpacing:'-.01em',
+          marginBottom:'1.4rem',
+        }}>nightlog</div>
 
-          {/* TITLE */}
-          <div style={{fontSize:'.46rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.3rem'}}>TITLE</div>
-          <div style={{fontSize:'1.15rem',color:FG,fontWeight:'bold',lineHeight:1.25,marginBottom:'1.3rem'}}>{dlabel}</div>
+        {/* ── Sections ── */}
+        <div style={{fontFamily:MONO,fontSize:'.74rem',color:FG,lineHeight:1.95}}>
 
-          {/* divider */}
-          <div style={{borderTop:ROW,marginBottom:'.1rem'}}/>
+          {morning.trim() && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="MORNING"/>
+              <div style={{whiteSpace:'pre-wrap'}}>{morning}</div>
+            </div>
+          )}
 
-          {/* meta rows */}
-          <Row label="RELEASE">{release}</Row>
-          <Row label="STARRING">
-            {moodObj ? (
-              <span style={{display:'inline-flex',alignItems:'center',gap:'.45rem',verticalAlign:'middle'}}>
-                <MoodSVG mkey={svgMood} size={14} color={FG}/>
+          {validG.length>0 && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="GRATITUDE"/>
+              {validG.map((g,i)=>(
+                <div key={i} style={{display:'flex',gap:'.5rem',alignItems:'flex-start'}}>
+                  <span style={{flexShrink:0,color:FG_FAINT,minWidth:'.9rem'}}>{i+1}.</span>
+                  <span style={{flex:1,whiteSpace:'pre-wrap'}}>{g}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {diary.trim() && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="DIARY"/>
+              <div style={{whiteSpace:'pre-wrap'}}>{diary}</div>
+            </div>
+          )}
+
+          {moodObj && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="MOOD"/>
+              <div style={{display:'flex',alignItems:'center',gap:'.5rem'}}>
+                <MoodSVG mkey={svgMood} size={16} color={cInk}/>
                 <span>{moodObj.label}</span>
-              </span>
-            ) : '—'}
-          </Row>
-
-          {/* DATE + TIME row */}
-          <div style={{display:'flex',padding:'10px 0',borderBottom:ROW,position:'relative',zIndex:2}}>
-            <div style={{flex:1,display:'flex'}}>
-              <div style={{flex:'0 0 90px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>DATE</div>
-              <div style={{fontSize:'.7rem',color:FG}}>{dateMD}</div>
-            </div>
-            <div style={{flex:1,display:'flex'}}>
-              <div style={{flex:'0 0 50px',fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',alignSelf:'center'}}>TIME</div>
-              <div style={{fontSize:'.7rem',color:FG}}>{timeS}</div>
-            </div>
-          </div>
-
-          {/* body sections */}
-          <div style={{marginTop:'1.5rem'}}>
-            <Section label="MORNING"   body={morning}/>
-            {validG.length>0 && (
-              <div style={{marginBottom:'1rem'}}>
-                <div style={{fontSize:'.5rem',color:FG_DIM,letterSpacing:'.18em',marginBottom:'.4rem'}}>GRATITUDE</div>
-                {validG.map((g,i)=>(
-                  <div key={i} style={{display:'flex',gap:'.45rem',fontSize:'.7rem',color:FG,lineHeight:1.7,marginBottom:'.18rem'}}>
-                    <span style={{color:FG_FAINT,flexShrink:0,fontFamily:'monospace',fontSize:'.6rem',marginTop:'.1rem'}}>{i+1}.</span>
-                    <span style={{whiteSpace:'pre-wrap'}}>{g}</span>
-                  </div>
-                ))}
               </div>
-            )}
-            <Section label="DIARY"   body={diary}/>
-            <Section label="EVENING" body={evening}/>
-            <Section label="DREAM"   body={dream} italic/>
-          </div>
+            </div>
+          )}
 
-          {/* footer label */}
-          <div style={{fontSize:'.4rem',color:FG_FAINT,letterSpacing:'.22em',textAlign:'center',marginTop:'1.6rem',textTransform:'uppercase'}}>
-            𝐝 : ɴᴀɢɪ ᴊᴏᴜʀɴᴀʟ
-          </div>
+          {dream.trim() && (
+            <div style={{marginBottom:'.95rem'}}>
+              <SectionHeader label="DREAM"/>
+              <div style={{whiteSpace:'pre-wrap',fontStyle:'italic'}}>{dream}</div>
+            </div>
+          )}
+
+          {filled===0 && (
+            <div style={{textAlign:'center',color:FG_FAINT,padding:'1.5rem 0',fontSize:'.7rem'}}>
+              ─ no entries today ─
+            </div>
+          )}
         </div>
 
-        {/* ─ side notches (tear) ─ */}
-        <div style={{position:'absolute',left:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
-        <div style={{position:'absolute',right:'-12px',top:`${NOTCH_TOP}px`,width:'24px',height:'24px',borderRadius:'50%',background:'#fff',zIndex:3}}/>
+        {/* ── Total entries ── */}
+        <div style={{
+          marginTop:'1.3rem',
+          paddingTop:'.55rem',
+          borderTop:`1px dashed ${FG_FAINT}`,
+          fontFamily:MONO,
+          fontSize:'.74rem',
+          display:'flex',
+          justifyContent:'space-between',
+          color:FG,
+        }}>
+          <span style={{letterSpacing:'.08em'}}>TOTAL    ENTRIES</span>
+          <span style={{fontWeight:'bold',color:cInk}}>{filled} / 5</span>
+        </div>
+
+        {/* ── Stamp ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.66rem',
+          color:FG_DIM,
+          marginTop:'1.6rem',
+          letterSpacing:'.14em',
+        }}>{stamp}</div>
+
+        {/* ── Credit footer ── */}
+        <div style={{
+          textAlign:'center',
+          fontFamily:MONO,
+          fontSize:'.55rem',
+          color:FG_FAINT,
+          marginTop:'1.5rem',
+          letterSpacing:'.22em',
+        }}>JOURNAL BY ⓒnagi</div>
       </div>
 
-      {/* ─── scallop bottom edge ─── */}
+      {/* paper texture grain ON TOP — newsprint feel; survives html2canvas blend-mode loss */}
       <div style={{
-        position:'relative',
-        height:'10px',
-        background:c,
-        overflow:'hidden',
-      }}>
-        <div style={{position:'absolute',inset:0,background:'rgba(18,22,32,0.84)'}}/>
-        <div style={{position:'absolute',inset:0,
-          backgroundImage:`url('./papertex6.jpg')`,backgroundSize:'cover',
-          opacity:0.14,mixBlendMode:'soft-light'}}/>
-      </div>
-      <div style={{
-        display:'flex',
-        justifyContent:'space-between',
-        padding:'0 4px',
-        marginTop:'-7px',
-        position:'relative',
-        zIndex:2,
-      }}>
-        {Array.from({length:18}).map((_,i)=>(
-          <div key={i} style={{
-            width:'14px',height:'14px',
-            borderRadius:'50%',
-            background:'#fff',
-            flexShrink:0,
-          }}/>
-        ))}
-      </div>
-      {/* spacer below scallop so circles aren't clipped */}
-      <div style={{height:'8px'}}/>
+        position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.13,mixBlendMode:'overlay',
+        pointerEvents:'none',zIndex:2,
+      }}/>
     </div>
   );
 }
@@ -872,9 +967,7 @@ function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, sv
 ══════════════════════════════════════════════════════════ */
 function JournalTab({dlabel, dk, journal, color, onSave}) {
   const [mEdit,    setMEdit]    = React.useState(false);
-  const [eEdit,    setEEdit]    = React.useState(false);
   const [mText,    setMText]    = React.useState('');
-  const [eText,    setEText]    = React.useState('');
   const [gratitude,setGratitude]= React.useState(['','','']);
   const [diary,    setDiary]    = React.useState('');
   const [svgMood,  setSvgMood]  = React.useState(null);
@@ -882,7 +975,6 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
   const [exporting,setExporting]= React.useState(false);
 
   React.useEffect(()=>setMText(journal.morning||''),  [journal.morning]);
-  React.useEffect(()=>setEText(journal.evening||''),  [journal.evening]);
 
   React.useEffect(()=>{
     const r=db.ref('daily/'+dk);
@@ -905,8 +997,6 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
     const next=svgMood===key?null:key; setSvgMood(next);
     db.ref('daily/'+dk+'/mood').set(next);
   }
-
-  const hasContent=mText.trim()||eText.trim()||gratitude.some(g=>g.trim())||diary.trim()||svgMood||dream.trim();
 
   async function exportBoarding(){
     setExporting(true);
@@ -933,9 +1023,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       {/* header */}
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem'}}>
         <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
-        {hasContent&&(
-          <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
-        )}
+        <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
       </div>
 
       {/* ── Morning ── */}
@@ -945,7 +1033,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       ):(
         <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
-          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
+          placeholder="오늘 아침의 생각을 자유롭게. " rows={4} style={TA}/>
       )}
 
       <div style={DIV}/>
@@ -965,7 +1053,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
       {/* ── Diary ── */}
       <span style={LBL}>ᴅɪᴀʀʏ</span>
       <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref('daily/'+dk+'/diary').set(e.target.value);}}
-        placeholder="오늘 하루를 짧게 기록해봐." rows={4} style={TA}/>
+        placeholder="오늘 하루를 회고하며 기록해봐. " rows={6} style={TA}/>
 
       <div style={DIV}/>
 
@@ -989,18 +1077,6 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
 
       <div style={DIV}/>
 
-      {/* ── Evening ── */}
-      <span style={LBL}>ᴇᴠᴇɴɪɴɢ</span>
-      {(!eEdit&&eText.trim())?(
-        <div style={VIEW} onDoubleClick={()=>setEEdit(true)} onContextMenu={e=>{e.preventDefault();setEEdit(true);}}>{eText}</div>
-      ):(
-        <textarea autoFocus={eEdit} value={eText} onChange={e=>setEText(e.target.value)} onFocus={()=>setEEdit(true)}
-          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('evening',eText,setEEdit);}}}
-          placeholder="오늘 저녁의 회고를 적어봐. (Enter 저장)" rows={4} style={TA}/>
-      )}
-
-      <div style={DIV}/>
-
       {/* ── Dream ── */}
       <span style={LBL}>ᴅʀᴇᴀᴍ</span>
       <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref('daily/'+dk+'/dream').set(e.target.value);}}
@@ -1008,7 +1084,7 @@ function JournalTab({dlabel, dk, journal, color, onSave}) {
 
       {exporting&&(
         <BoardingPass dlabel={dlabel} dk={dk} color={color}
-          morning={mText} evening={eText}
+          morning={mText}
           gratitude={gratitude} diary={diary} svgMood={svgMood} dream={dream}/>
       )}
     </div>
@@ -1078,10 +1154,9 @@ function WeekTab({dColors,accent}) {
       <div style={{borderTop:'1px solid #f0f0f0',marginBottom:'1rem'}}/>
 
       {/* day rows */}
-      {data.map(({date,key,total,done,journal,note})=>{
+      {data.map(({date,key,total,done,note})=>{
         const c=dColors[key]||accent, ratio=total?done/total:0;
         const isToday=key===todayKey, isFut=key>todayKey;
-        const mood=MOODS.find(m=>m.l===journal.mood);
         return (
           <div key={key} style={{
             padding:'.5rem .65rem',borderRadius:'.4rem',marginBottom:'.3rem',
@@ -1100,7 +1175,6 @@ function WeekTab({dColors,accent}) {
                 </div>
               </div>
               <span style={{fontSize:'.7rem',color:'#bbb',minWidth:'2rem',textAlign:'right'}}>{total?`${done}/${total}`:'—'}</span>
-              <span style={{fontSize:'.95rem',opacity:mood?1:0.12}}>{mood?mood.e:'·'}</span>
             </div>
             {note&&!isFut&&(
               <div style={{fontSize:'.7rem',color:'#bbb',marginTop:'.22rem',paddingLeft:'4.9rem',fontStyle:'italic',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
@@ -1208,13 +1282,13 @@ function WeatherWidget({color}) {
 
   function wmoEmoji(c) {
     if (c===0)       return '☀️';
-    if (c<=2)        return '🌤';
+    if (c<=2)        return '🌥️';
     if (c<=3)        return '☁️';
     if (c<=49)       return '🌫';
-    if (c<=67)       return '🌧';
+    if (c<=67)       return '🌧️';
     if (c<=77)       return '❄️';
-    if (c<=84)       return '🌧';
-    if (c<=99)       return '⛈';
+    if (c<=84)       return '☔';
+    if (c<=99)       return '⛈️';
     return '🌡';
   }
   function wmoDesc(c) {
@@ -1286,7 +1360,7 @@ function WeatherWidget({color}) {
 ══════════════════════════════════════════════════════════ */
 function PomodoroWidget({color}) {
   const ac = color || '#888';
-  const MODE_LABELS = {focus:'집중', short:'쉬기', long:'긴 쉬기'};
+  const MODE_LABELS = {focus:'집중', short:'휴식', long:'긴 휴식'};
 
   const [open,         setOpen]         = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
@@ -1499,10 +1573,15 @@ function MusicWidget({color}) {
   function prevTrack() { if(playlist.length<=1) return; setCurrent(c=>(c-1+playlist.length)%playlist.length); }
   function handleVolume(v) { setVolume(v); ytCmd('setVolume',[v]); }
 
-  function addTrack() {
+  async function addTrack() {
     const u=ytEmbed(input);
     if (!u) { alert('유효한 YouTube URL을 넣어줘.'); return; }
-    const next=[...playlist,{embed:u}];
+    let title='';
+    try {
+      const res=await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(input.trim())}&format=json`);
+      if (res.ok) { const d=await res.json(); title=d.title||''; }
+    } catch {}
+    const next=[...playlist,{embed:u,title}];
     setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
     setCurrent(next.length-1); setUrlBar(false); setInput('');
   }
@@ -1558,17 +1637,28 @@ function MusicWidget({color}) {
         {/* playlist */}
         {open&&playlist.length>0&&(
           <div style={{maxHeight:'110px',overflowY:'auto',padding:'4px 10px 4px'}}>
-            {playlist.map((track,i)=>(
+            {playlist.map((track,i)=>{
+              const tname = track.title||`Track ${i+1}`;
+              const long  = tname.length>18;
+              const tcol  = i===current?'#444':'#bbb';
+              return (
               <div key={i} onClick={()=>setCurrent(i)} style={{
                 display:'flex',alignItems:'center',gap:'6px',
                 padding:'5px 8px',borderRadius:'6px',marginBottom:'2px',
                 background:i===current?ac+'18':'transparent',cursor:'pointer',
               }}>
                 <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
-                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                {long ? (
+                  <div className="mq-wrap" title={tname}>
+                    <div className="mq-inner" style={{fontSize:'9px',color:tcol}}>{tname}</div>
+                  </div>
+                ) : (
+                  <span style={{fontSize:'9px',color:tcol,flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{tname}</span>
+                )}
                 <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -1594,7 +1684,7 @@ function MusicWidget({color}) {
         {/* empty state */}
         {open&&playlist.length===0&&(
           <div style={{padding:'20px 12px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px'}}>
-            <span style={{fontSize:'20px',opacity:.15}}>♪</span>
+            <span style={{fontSize:'20px',opacity:.15}}>🎧</span>
             <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
             <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
           </div>
@@ -1693,7 +1783,7 @@ function StickyWidget({color, open, onOpen, onClose}) {
           <div style={{padding:'8px 11px 6px',flexShrink:0,borderBottom:`1px solid ${border}`,background:panelBg}}>
             <textarea value={input} onChange={e=>setInput(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addNote();}}}
-              placeholder="메모 입력. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
+              placeholder="메모를 입력해봐. 이미지는 Ctrl+V 또는 📎 버튼." rows={3}
               style={{width:'100%',background:inputBg,border:`1px solid ${inputBdr}`,borderRadius:'6px',
                 padding:'.38rem .5rem',fontFamily:'inherit',fontSize:'10px',lineHeight:1.65,
                 resize:'none',outline:'none',color:'#444',display:'block'}}
