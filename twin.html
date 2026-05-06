@@ -779,7 +779,7 @@ function MainApp({userId, onLogout}) {
                 })}
                 {items.length===0&&(
                   <div style={{display:'flex',justifyContent:'flex-end',gap:'.35rem',marginTop:'.3rem'}}>
-                    <button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>전날 ×</button>
+                    <button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>전날 일정 가져오기 </button>
                     {appRoutines.length>0&&(
                       <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
                     )}
