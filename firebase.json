@@ -9,6 +9,12 @@
       "demian_focus_messages.json",
       "index.html"
     ],
+    "headers": [
+      {
+        "source": "**/*.ttf",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+      }
+    ],
     "rewrites": [
       { "source": "**", "destination": "/twin.html" }
     ]
