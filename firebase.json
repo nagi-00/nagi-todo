@@ -4,7 +4,6 @@
     "ignore": [
       "firebase.json",
       ".firebaserc",
-      "*.ttf",
       "*.md",
       ".git/**",
       "demian_focus_messages.json",
