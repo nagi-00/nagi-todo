@@ -1920,7 +1920,7 @@ function MusicWidget({color, userId}) {
 
   function addTrack() {
     const u=ytEmbed(input);
-    if (!u) { alert('유효한 YouTube URL을 넣어줘.'); return; }
+    if (!u) { alert('유효한 YouTube URL을 넣어주세요.'); return; }
     const next=[...playlist,{embed:u}];
     setPlaylist(next); localStorage.setItem('ytplaylist_'+(userId||'user1'),JSON.stringify(next));
     setCurrent(next.length-1); setUrlBar(false); setInput('');
@@ -2007,7 +2007,7 @@ function MusicWidget({color, userId}) {
         {open&&playlist.length===0&&(
           <div style={{padding:'20px 12px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px'}}>
             <span style={{fontSize:'20px',opacity:.15}}>♪</span>
-            <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
+            <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해주세요.<br/>음악도, 플레이리스트도 가능합니다.</span>
             <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
           </div>
         )}
@@ -2120,7 +2120,7 @@ function DemianWidget() {
             </>
           ):(
             <>
-              <div style={{textAlign:'center',color:'#aaa',fontSize:'12px',marginBottom:'.45rem'}}>😴 휴식의 시간이야.</div>
+              <div style={{textAlign:'center',color:'#aaa',fontSize:'12px',marginBottom:'.45rem'}}>휴식의 시간이야.</div>
               <div style={{fontSize:'10px',textAlign:'center',color:'#ccc',lineHeight:1.95}}>
                 <div style={{fontWeight:'bold',marginBottom:'.1rem',letterSpacing:'.04em',color:'#bbb'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
                 {Object.entries(sched).map(([d,r])=>(
@@ -2219,5 +2219,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
-
-여기!
