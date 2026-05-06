@@ -889,7 +889,7 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           letterSpacing:'-.01em',
           textShadow:`2px 3px 0 ${color}33, 1px 1px 0 ${color}55`,
           marginBottom:'.45rem',
-        }}>Dailylog</div>
+        }}>daylog</div>
 
         <div style={{
           fontFamily:MONO,
@@ -1244,28 +1244,12 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
   const DIV ={borderTop:`1px solid ${color}20`,margin:'1.25rem 0'};
   const LBL ={fontSize:'.6rem',letterSpacing:'.2em',color:color+'99',display:'block',marginBottom:'.5rem'};
 
-  const SectionBanner = ({label}) => (
-    <div style={{
-      display:'flex',alignItems:'center',gap:'.5rem',
-      margin:'1.4rem 0 1rem',
-    }}>
-      <span style={{
-        fontSize:'.55rem',letterSpacing:'.25em',fontWeight:'bold',
-        color:color,opacity:.7,whiteSpace:'nowrap',
-      }}>{label}</span>
-      <div style={{flex:1,height:'1px',background:`${color}25`}}/>
-    </div>
-  );
-
   return (
     <div style={CARD}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1rem'}}>
         <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
         <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ print!</button>
       </div>
-
-      {/* ── DAYLOG ── */}
-      <SectionBanner label="ᴅᴀʏʟᴏɢ"/>
 
       <span style={LBL}>ᴍᴏʀɴɪɴɢ</span>
       {(!mEdit&&mText.trim())?(
@@ -1276,8 +1260,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
           placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
       )}
 
-      {/* ── NIGHTLOG ── */}
-      <SectionBanner label="ɴɪɢʜᴛʟᴏɢ"/>
+      <div style={DIV}/>
 
       <span style={LBL}>ɢʀᴀᴛɪᴛᴜᴅᴇ</span>
       {[0,1,2].map(i=>(
