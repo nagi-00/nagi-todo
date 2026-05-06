@@ -75,7 +75,7 @@ const db = firebase.database();
 /* ─── Constants ────────────────────────────────────────── */
 const CATS       = ['필연', '성장', '자유'];
 const BULLET     = ['☐', '☑', '☒'];
-const CAT_HUE    = { '필연': '#8A4545', '성장': '#434A8E', '자유': '#4a7c5a' };
+const CAT_HUE    = { '필연': '#8A4545', '성장': '', '자유': '#4a7c5a' };
 const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
 const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const WEEK_KO    = ['일','월','화','수','목','금','토'];
@@ -568,7 +568,7 @@ function MainApp({userId, onLogout}) {
             /* calendar */
             <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',fontSize:'.7rem'}}>
               {['S','M','T','W','T','F','S'].map((d,i)=>(
-                <div key={i} style={{textAlign:'center',padding:'.15rem 0',color:i===0?'#8A4545':i===6?'#434A8E':'#bbb',fontSize:'.6rem'}}>{d}</div>
+                <div key={i} style={{textAlign:'center',padding:'.15rem 0',color:i===0?'#8A4545':i===6?'':'#bbb',fontSize:'.6rem'}}>{d}</div>
               ))}
               {Array(new Date(sel.getFullYear(),sel.getMonth(),1).getDay()).fill(null).map((_,i)=><div key={i}/>)}
               {Array.from({length:new Date(sel.getFullYear(),sel.getMonth()+1,0).getDate()},(_,i)=>{
@@ -1313,7 +1313,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
       <span style={LBL}>ᴅʀᴇᴀᴍ</span>
       <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref(`private/${userId}/daily/${dk}/dream`).set(e.target.value);}}
         onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)e.preventDefault();}}
-        placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야." rows={4} style={{...TA,fontStyle:'italic'}}/>
+        placeholder="이루고 싶은 미래를 현재형으로 적어주세요. '나는 이미 ___이다.' " rows={4} style={{...TA,fontStyle:'italic'}}/>
 
       {exporting&&(
         <BoardingPass dlabel={dlabel} dk={dk} color={color}
