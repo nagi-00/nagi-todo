@@ -36,7 +36,9 @@ select { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #999999 0%, #F1F1F1 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .login-card {
   background: white;
@@ -80,6 +82,7 @@ const CAT_HUE    = { '필연': '#8A4545', '성장': '#434A8E', '자유': '#4a7c5
 const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
 const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const WEEK_KO    = ['일','월','화','수','목','금','토'];
+const DEF_SCHED  = {1:{s:6,e:13},2:{s:6,e:18},3:{s:6,e:13},4:{s:6,e:18},5:{s:6,e:21}};
 
 /* ─── Default User Data (초기값) ─── */
 const DEFAULT_USERS = {
@@ -108,8 +111,24 @@ function loadAdminKey() {
 
 /* ─── Helpers ───────────────────────────────────────────── */
 function loadSched() {
-  try { return JSON.parse(localStorage.getItem('focusSched')) || {}; }
-  catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('focusSched')) || DEF_SCHED; }
+  catch { return DEF_SCHED; }
+}
+
+function ytEmbed(raw) {
+  if (!raw?.trim()) return null;
+  try {
+    const u    = new URL(raw.trim());
+    const v    = u.searchParams.get('v');
+    const list = u.searchParams.get('list');
+    const sid  = u.hostname === 'youtu.be' ? u.pathname.slice(1).split('?')[0] : null;
+    const vid  = v || sid;
+    const p    = 'autoplay=1&rel=0&modestbranding=1&enablejsapi=1';
+    if (vid && list) return `https://www.youtube.com/embed/${vid}?list=${list}&${p}`;
+    if (vid)         return `https://www.youtube.com/embed/${vid}?${p}`;
+    if (list)        return `https://www.youtube.com/embed/videoseries?list=${list}&${p}`;
+    return null;
+  } catch { return null; }
 }
 
 /* ─── Micro Style Helpers ───────────────────────────────── */
@@ -165,12 +184,15 @@ function BulbIcon({visible, size=16, color='currentColor'}) {
 /* ══════════════════════════════════════════════════════════
    LoginScreen
 ══════════════════════════════════════════════════════════ */
+const LOGIN_TEXTURES = ['./papertex1.jpg','./papertex2.jpg','./papertex3.png','./papertex4.jpg','./papertex5.png','./papertex6.jpg'];
+
 function LoginScreen({onLogin}) {
   const [users, setUsers] = React.useState(loadUsers);
   const [selected, setSelected] = React.useState(null);
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [showAdmin, setShowAdmin] = React.useState(false);
+  const [texture] = React.useState(()=>LOGIN_TEXTURES[Math.floor(Math.random()*LOGIN_TEXTURES.length)]);
 
   function handleLogin() {
     if (!selected) { setError('사용자를 선택해주세요.'); return; }
@@ -193,11 +215,11 @@ function LoginScreen({onLogin}) {
   }
 
   if (showAdmin) {
-    return <AdminSettings users={users} onSave={handleAdminSave} onCancel={()=>setShowAdmin(false)}/>;
+    return <AdminSettings users={users} onSave={handleAdminSave} onCancel={()=>setShowAdmin(false)} texture={texture}/>;
   }
 
   return (
-    <div className="login-screen">
+    <div className="login-screen" style={{backgroundImage:`url('${texture}')`}}>
       <div className="login-card">
         <h1 style={{fontSize:'1.8rem',textAlign:'center',marginBottom:'1.5rem',color:'#333',letterSpacing:'-.02em'}}>𝘁𝘄𝗶𝗻-𝘁𝗼𝗱𝗼</h1>
         
@@ -245,7 +267,7 @@ function LoginScreen({onLogin}) {
 /* ══════════════════════════════════════════════════════════
    AdminSettings
 ══════════════════════════════════════════════════════════ */
-function AdminSettings({users, onSave, onCancel}) {
+function AdminSettings({users, onSave, onCancel, texture}) {
   const [adminKey, setAdminKey] = React.useState('');
   const [verified, setVerified] = React.useState(false);
   const [error, setError] = React.useState('');
@@ -292,7 +314,7 @@ function AdminSettings({users, onSave, onCancel}) {
 
   if (!verified) {
     return (
-      <div className="login-screen">
+      <div className="login-screen" style={{backgroundImage:`url('${texture}')`}}>
         <div className="login-card">
           <h2 style={{fontSize:'1.2rem',marginBottom:'1rem',color:'#333'}}>관리자 인증</h2>
           <p style={{fontSize:'.8rem',color:'#999',marginBottom:'1.5rem',lineHeight:1.6}}>
@@ -496,11 +518,10 @@ function MainApp({userId, onLogout}) {
   }
 
   function shareToday() {
-    const visibleTodos = items.filter(it => !it.hidden);
     db.ref(`shared/${userId}/daily/${dk}`).set({
       color,
       note: noteText,
-      todos: visibleTodos,
+      todos: items,
       message: partnerMsg,
       timestamp: Date.now(),
     });
@@ -833,7 +854,7 @@ function MainApp({userId, onLogout}) {
                 <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
                   {items.length>0&&(
                     <>
-                      <button onClick={exportImg} style={pill(color,'#fff')}>Export</button>
+                      <button onClick={exportImg} style={pill(color,'#fff')}>print!</button>
                       <button onClick={shareToday} style={pill(color,'#fff')}>Share</button>
                     </>
                   )}
@@ -868,6 +889,10 @@ function MainApp({userId, onLogout}) {
       </main>
 
       {showRtn&&<RoutineModal routines={routines} userId={userId} onClose={()=>setShowRtn(false)}/>}
+      <WeatherWidget color={color}/>
+      <PomodoroWidget color={color}/>
+      <MusicWidget color={color}/>
+      {userId==='user1'&&<DemianWidget/>}
     </div>
   );
 }
@@ -1072,7 +1097,7 @@ function MoodSVG({mkey, size=20, color='currentColor'}) {
 /* ══════════════════════════════════════════════════════════
    BoardingPass (JOURNAL export)
 ══════════════════════════════════════════════════════════ */
-function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, svgMood, dream}) {
+function BoardingPass({dlabel, dk, color, morning, evening, gratitude, svgMood, dream}) {
   const c = color || '#888';
   const moodObj = SVG_MOODS.find(m => m.key === svgMood);
   const validG  = (gratitude||[]).filter(g => g.trim());
@@ -1170,7 +1195,6 @@ function BoardingPass({dlabel, dk, color, morning, evening, gratitude, diary, sv
                 ))}
               </div>
             )}
-            <Section label="DIARY"   body={diary}/>
             <Section label="EVENING" body={evening}/>
             <Section label="DREAM"   body={dream} italic/>
           </div>
@@ -1227,7 +1251,6 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
   const [mText,    setMText]    = React.useState('');
   const [eText,    setEText]    = React.useState('');
   const [gratitude,setGratitude]= React.useState(['','','']);
-  const [diary,    setDiary]    = React.useState('');
   const [svgMood,  setSvgMood]  = React.useState(null);
   const [dream,    setDream]    = React.useState('');
   const [exporting,setExporting]= React.useState(false);
@@ -1240,7 +1263,6 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     const h=r.on('value',s=>{
       const v=s.val()||{};
       setGratitude(Array.isArray(v.gratitude)?v.gratitude:['','','']);
-      setDiary(v.diary||'');
       setSvgMood(v.mood||null);
       setDream(v.dream||'');
     });
@@ -1257,7 +1279,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     db.ref(`private/${userId}/daily/${dk}/mood`).set(next);
   }
 
-  const hasContent=mText.trim()||eText.trim()||gratitude.some(g=>g.trim())||diary.trim()||svgMood||dream.trim();
+  const hasContent=mText.trim()||eText.trim()||gratitude.some(g=>g.trim())||svgMood||dream.trim();
 
   async function exportBoarding(){
     setExporting(true);
@@ -1282,9 +1304,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     <div style={CARD}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'1.5rem'}}>
         <h2 style={{fontSize:'1rem',fontWeight:'bold',color:'#222'}}>{dlabel}</h2>
-        {hasContent&&(
-          <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ export</button>
-        )}
+        <button onClick={exportBoarding} style={{...pill(color,'#fff',true),padding:'.28rem .7rem',flexShrink:0}}>↗ print!</button>
       </div>
 
       <span style={LBL}>ᴍᴏʀɴɪɴɢ</span>
@@ -1303,15 +1323,10 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
         <div key={i} style={{display:'flex',alignItems:'center',gap:'.35rem',marginBottom:'.35rem'}}>
           <span style={{fontSize:'.62rem',color,flexShrink:0,fontFamily:'monospace',width:'.8rem',textAlign:'right'}}>{i+1}.</span>
           <textarea value={gratitude[i]} onChange={e=>saveGratitude(i,e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)e.preventDefault();}}
             placeholder={`감사한 점 ${i+1}`} rows={1} style={{...SM,resize:'none'}}/>
         </div>
       ))}
-
-      <div style={DIV}/>
-
-      <span style={LBL}>ᴅɪᴀʀʏ</span>
-      <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref(`private/${userId}/daily/${dk}/diary`).set(e.target.value);}}
-        placeholder="오늘 하루를 짧게 기록해주세요." rows={4} style={TA}/>
 
       <div style={DIV}/>
 
@@ -1347,12 +1362,13 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
 
       <span style={LBL}>ᴅʀᴇᴀᴍ</span>
       <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref(`private/${userId}/daily/${dk}/dream`).set(e.target.value);}}
-        placeholder="이루고 싶은 미래를 현재형으로 적어보세요. 나는 이미 ___다." rows={4} style={{...TA,fontStyle:'italic'}}/>
+        onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey)e.preventDefault();}}
+        placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야." rows={4} style={{...TA,fontStyle:'italic'}}/>
 
       {exporting&&(
         <BoardingPass dlabel={dlabel} dk={dk} color={color}
           morning={mText} evening={eText}
-          gratitude={gratitude} diary={diary} svgMood={svgMood} dream={dream}/>
+          gratitude={gratitude} svgMood={svgMood} dream={dream}/>
       )}
     </div>
   );
@@ -1602,12 +1618,14 @@ function UserSharedCard({userId, user, data, isSelf}) {
                     {list.map((it,i)=>(
                       <div key={i} style={{
                         display:'flex',alignItems:'baseline',gap:'.3rem',fontSize:'.8rem',lineHeight:1.6,marginBottom:'.15rem',
-                        color:it.state===1?'#bbb':'#555',
-                        textDecoration:it.state===1?'line-through':'none',
+                        color:it.hidden?'#ccc':(it.state===1?'#bbb':'#555'),
+                        textDecoration:(!it.hidden&&it.state===1)?'line-through':'none',
                       }}>
-                        <span style={{fontFamily:'monospace',fontSize:'.75rem',color:data.color||user.color}}>{BULLET[it.state]}</span>
-                        <span style={{flex:1}}>{it.text}</span>
-                        {it.important&&<span style={{color:data.color||user.color,fontSize:'.7rem'}}>★</span>}
+                        <span style={{fontFamily:'monospace',fontSize:'.75rem',color:it.hidden?'#ddd':(data.color||user.color)}}>{BULLET[it.state]}</span>
+                        <span style={{flex:1,fontStyle:it.hidden?'italic':'normal'}}>
+                          {it.hidden?'비공개 항목입니다.':it.text}
+                        </span>
+                        {it.important&&!it.hidden&&<span style={{color:data.color||user.color,fontSize:'.7rem'}}>★</span>}
                       </div>
                     ))}
                   </div>
@@ -1618,6 +1636,518 @@ function UserSharedCard({userId, user, data, isSelf}) {
         </>
       )}
     </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   WeatherWidget
+══════════════════════════════════════════════════════════ */
+function WeatherWidget({color}) {
+  const ac = color || '#888';
+  const [weather, setWeather] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error,   setError]   = React.useState(false);
+  const [open,    setOpen]    = React.useState(false);
+  const wrapRef = React.useRef(null);
+
+  function wmoEmoji(c) {
+    if (c===0)  return '☀️';
+    if (c<=2)   return '🌤';
+    if (c<=3)   return '☁️';
+    if (c<=49)  return '🌫';
+    if (c<=67)  return '🌧';
+    if (c<=77)  return '❄️';
+    if (c<=84)  return '🌧';
+    if (c<=99)  return '⛈';
+    return '🌡';
+  }
+  function wmoDesc(c) {
+    if (c===0)  return '맑음';
+    if (c<=2)   return '구름 조금';
+    if (c<=3)   return '흐림';
+    if (c<=49)  return '안개';
+    if (c<=67)  return '비';
+    if (c<=77)  return '눈';
+    if (c<=84)  return '소나기';
+    if (c<=99)  return '뇌우';
+    return '—';
+  }
+
+  React.useEffect(()=>{
+    if (!navigator.geolocation) { setError(true); setLoading(false); return; }
+    navigator.geolocation.getCurrentPosition(async ({coords:{latitude,longitude}})=>{
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
+        const d   = await res.json();
+        setWeather(d.current_weather);
+      } catch { setError(true); }
+      setLoading(false);
+    }, ()=>{ setError(true); setLoading(false); });
+  },[]);
+
+  React.useEffect(()=>{
+    if (!open) return;
+    function h(e){ if(!wrapRef.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown',h);
+    document.addEventListener('touchstart',h,{passive:true});
+    return()=>{ document.removeEventListener('mousedown',h); document.removeEventListener('touchstart',h); };
+  },[open]);
+
+  const emoji = loading ? '…' : error ? '?' : wmoEmoji(weather?.weathercode??0);
+  const temp  = weather ? `${Math.round(weather.temperature)}°` : '';
+
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'116px',left:'20px',zIndex:1000}}>
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'12px'}}>{emoji}</span>
+        <span style={{fontSize:'10px',color:weather?ac:'#ccc',letterSpacing:'.04em',fontVariantNumeric:'tabular-nums'}}>{temp||'날씨'}</span>
+      </button>
+      {open && weather && (
+        <div style={{
+          position:'absolute',bottom:'42px',left:0,width:'160px',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',border:'1px solid #f0f0f0',
+          padding:'14px 16px 12px',
+        }}>
+          <div style={{fontSize:'2rem',marginBottom:'6px'}}>{wmoEmoji(weather.weathercode)}</div>
+          <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333'}}>{Math.round(weather.temperature)}°</div>
+          <div style={{fontSize:'.72rem',color:'#999',marginTop:'2px'}}>{wmoDesc(weather.weathercode)}</div>
+          <div style={{fontSize:'.65rem',color:'#ccc',marginTop:'3px'}}>풍속 {weather.windspeed} km/h</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   PomodoroWidget
+══════════════════════════════════════════════════════════ */
+function PomodoroWidget({color}) {
+  const ac = color || '#888';
+  const MODE_LABELS = {focus:'집중', short:'쉬기', long:'긴 쉬기'};
+
+  const [open,         setOpen]         = React.useState(false);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [mode,         setMode]         = React.useState('focus');
+  const [running,      setRunning]      = React.useState(false);
+  const [session,      setSession]      = React.useState(0);
+  const [durations,    setDurations]    = React.useState(()=>{
+    try { const s=JSON.parse(localStorage.getItem('pomoDurations')); if(s?.focus) return s; } catch {}
+    return {focus:25,short:5,long:15};
+  });
+  const [secs, setSecs] = React.useState(()=>{
+    try { const s=JSON.parse(localStorage.getItem('pomoDurations')); return (s?.focus||25)*60; } catch {}
+    return 25*60;
+  });
+
+  const wrapRef    = React.useRef(null);
+  const secsRef    = React.useRef(secs);
+  const modeRef    = React.useRef('focus');
+  const sessionRef = React.useRef(0);
+  const dursRef    = React.useRef(durations);
+  const tickRef    = React.useRef(null);
+  React.useEffect(()=>{ secsRef.current=secs; },      [secs]);
+  React.useEffect(()=>{ modeRef.current=mode; },      [mode]);
+  React.useEffect(()=>{ sessionRef.current=session; },[session]);
+  React.useEffect(()=>{ dursRef.current=durations; }, [durations]);
+
+  React.useEffect(()=>{
+    if (!open) return;
+    function handle(e){ if(!wrapRef.current?.contains(e.target)){ setOpen(false); setShowSettings(false); } }
+    document.addEventListener('mousedown',handle);
+    document.addEventListener('touchstart',handle,{passive:true});
+    return()=>{ document.removeEventListener('mousedown',handle); document.removeEventListener('touchstart',handle); };
+  },[open]);
+
+  React.useEffect(()=>{
+    if (running) {
+      tickRef.current=setInterval(()=>{
+        const next=secsRef.current-1;
+        if (next<=0) {
+          clearInterval(tickRef.current); setRunning(false);
+          if (modeRef.current==='focus') {
+            const ns=(sessionRef.current+1)%4; setSession(ns);
+            if (ns===0){ setSecs(dursRef.current.long*60);  setMode('long'); }
+            else       { setSecs(dursRef.current.short*60); setMode('short'); }
+          } else { setSecs(dursRef.current.focus*60); setMode('focus'); }
+        } else { secsRef.current=next; setSecs(next); }
+      },1000);
+    } else { clearInterval(tickRef.current); }
+    return()=>clearInterval(tickRef.current);
+  },[running]);
+
+  function switchMode(m){ setRunning(false); setMode(m); setSecs(durations[m]*60); }
+  function reset(){ setRunning(false); setSecs(durations[mode]*60); }
+  function adjustDur(m,delta){
+    setDurations(d=>{
+      const next={...d,[m]:Math.max(5,Math.min(120,d[m]+delta))};
+      localStorage.setItem('pomoDurations',JSON.stringify(next));
+      if(m===mode){ setRunning(false); setSecs(next[m]*60); }
+      return next;
+    });
+  }
+
+  const mins=Math.floor(secs/60), ss=secs%60;
+  const timeStr=`${String(mins).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  const circum=2*Math.PI*42;
+  const progress=1-secs/(durations[mode]*60);
+  const btnRow={display:'flex',alignItems:'center',justifyContent:'center',width:'22px',height:'22px',
+    borderRadius:'50%',border:'1px solid #e8e8e8',background:'#f8f8f8',cursor:'pointer',
+    fontSize:'13px',color:'#888',fontFamily:'inherit'};
+
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'68px',left:'20px',zIndex:1000}}>
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'11px'}}>🍅</span>
+        <span style={{fontSize:'10px',letterSpacing:'.04em',color:running?ac:'#ccc',fontVariantNumeric:'tabular-nums'}}>{timeStr}</span>
+      </button>
+
+      {open&&(
+        <div style={{
+          position:'absolute',bottom:'42px',left:0,width:'210px',
+          background:'#fff',borderRadius:'12px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',border:'1px solid #f0f0f0',
+          padding:'14px 16px 12px',
+        }}>
+          <button onClick={e=>{e.stopPropagation();setShowSettings(s=>!s);}} style={{
+            position:'absolute',top:'10px',right:'13px',
+            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#ccc',padding:0,fontFamily:'inherit',
+          }}>⚙ 설정</button>
+
+          {showSettings?(
+            <div>
+              <div style={{fontWeight:'bold',fontSize:'11px',marginBottom:'.85rem',color:'#555'}}>타이머 설정</div>
+              {Object.entries(MODE_LABELS).map(([m,label])=>(
+                <div key={m} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.6rem'}}>
+                  <span style={{fontSize:'.78rem',color:'#999',width:'52px'}}>{label}</span>
+                  <div style={{display:'flex',alignItems:'center',gap:'7px'}}>
+                    <button onClick={()=>adjustDur(m,-5)} style={btnRow}>−</button>
+                    <span style={{fontSize:'.82rem',fontWeight:'bold',color:'#333',width:'36px',textAlign:'center',fontVariantNumeric:'tabular-nums'}}>{durations[m]}분</span>
+                    <button onClick={()=>adjustDur(m,+5)} style={btnRow}>+</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ):(
+            <>
+              <div style={{display:'flex',gap:'3px',marginBottom:'14px',paddingRight:'48px'}}>
+                {Object.entries(MODE_LABELS).map(([k,l])=>(
+                  <button key={k} onClick={()=>switchMode(k)} style={{
+                    flex:1,border:'none',borderRadius:'6px',padding:'.28rem 0',fontSize:'9px',cursor:'pointer',fontFamily:'inherit',
+                    background:mode===k?ac:'#f5f5f5',color:mode===k?'#fff':'#bbb',
+                  }}>{l}</button>
+                ))}
+              </div>
+
+              <div style={{display:'flex',justifyContent:'center',marginBottom:'12px'}}>
+                <div style={{position:'relative',width:'100px',height:'100px'}}>
+                  <svg width="100" height="100" style={{transform:'rotate(-90deg)',position:'absolute',inset:0}}>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="#f0f0f0" strokeWidth="4"/>
+                    <circle cx="50" cy="50" r="42" fill="none" stroke={ac} strokeWidth="4"
+                      strokeDasharray={`${circum}`} strokeDashoffset={`${circum*(1-progress)}`}
+                      strokeLinecap="round" style={{transition:'stroke-dashoffset 0.8s linear'}}/>
+                  </svg>
+                  <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'2px'}}>
+                    <div style={{fontSize:'1.5rem',fontWeight:'bold',color:'#333',fontVariantNumeric:'tabular-nums',letterSpacing:'0.02em'}}>{timeStr}</div>
+                    <div style={{fontSize:'.5rem',color:'#ccc',letterSpacing:'.16em'}}>{MODE_LABELS[mode].toUpperCase()}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:'8px',marginBottom:'10px'}}>
+                <button onClick={reset} style={{background:'#f5f5f5',border:'none',borderRadius:'50%',width:'30px',height:'30px',cursor:'pointer',fontSize:'12px',color:'#ccc',display:'flex',alignItems:'center',justifyContent:'center'}}>↺</button>
+                <button onClick={()=>setRunning(r=>!r)} style={{background:ac,border:'none',borderRadius:'50%',width:'40px',height:'40px',cursor:'pointer',color:'#fff',fontSize:'13px',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:`0 3px 10px ${ac}44`}}>{running?'⏸':'▶'}</button>
+              </div>
+
+              <div style={{display:'flex',justifyContent:'center',gap:'5px'}}>
+                {[0,1,2,3].map(i=>(
+                  <div key={i} style={{width:'6px',height:'6px',borderRadius:'50%',background:i<session?ac:'#ebebeb',transition:'background .3s'}}/>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   MusicWidget
+══════════════════════════════════════════════════════════ */
+function MusicWidget({color}) {
+  const ac = color || '#888';
+  const [open,    setOpen]    = React.useState(false);
+  const [input,   setInput]   = React.useState('');
+  const [urlBar,  setUrlBar]  = React.useState(false);
+  const [playing, setPlaying] = React.useState(true);
+  const [shuffle, setShuffle] = React.useState(false);
+  const [volume,  setVolume]  = React.useState(80);
+  const wrapRef   = React.useRef(null);
+  const iframeRef = React.useRef(null);
+
+  React.useEffect(()=>{
+    if (!open) return;
+    function handle(e){ if(!wrapRef.current?.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown',handle);
+    document.addEventListener('touchstart',handle,{passive:true});
+    return()=>{ document.removeEventListener('mousedown',handle); document.removeEventListener('touchstart',handle); };
+  },[open]);
+
+  const [playlist,setPlaylist]= React.useState(()=>{
+    try {
+      const fix = u => (u&&!u.includes('enablejsapi')) ? u+'&enablejsapi=1' : u;
+      const saved=JSON.parse(localStorage.getItem('ytplaylist'));
+      if (saved?.length) return saved.map(t=>({...t,embed:fix(t.embed)}));
+      const old=localStorage.getItem('ytembed');
+      return old?[{embed:fix(old)}]:[];
+    } catch { return []; }
+  });
+  const [current, setCurrent] = React.useState(0);
+
+  React.useEffect(()=>{ setPlaying(true); },[current]);
+
+  const currentEmbed = playlist[current]?.embed || '';
+
+  function ytCmd(func,args=[]) {
+    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({event:'command',func,args}),'*');
+  }
+  function togglePlay() { if(playing){ytCmd('pauseVideo');}else{ytCmd('playVideo');} setPlaying(v=>!v); }
+  function nextTrack() {
+    if(playlist.length<=1) return;
+    if(shuffle){ let n; do{n=Math.floor(Math.random()*playlist.length);}while(n===current&&playlist.length>1); setCurrent(n); }
+    else { setCurrent(c=>(c+1)%playlist.length); }
+  }
+  function prevTrack() { if(playlist.length<=1) return; setCurrent(c=>(c-1+playlist.length)%playlist.length); }
+  function handleVolume(v) { setVolume(v); ytCmd('setVolume',[v]); }
+
+  function addTrack() {
+    const u=ytEmbed(input);
+    if (!u) { alert('유효한 YouTube URL을 넣어줘.'); return; }
+    const next=[...playlist,{embed:u}];
+    setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
+    setCurrent(next.length-1); setUrlBar(false); setInput('');
+  }
+  function removeTrack(i,e) {
+    e.stopPropagation();
+    const next=playlist.filter((_,idx)=>idx!==i);
+    setPlaylist(next); localStorage.setItem('ytplaylist',JSON.stringify(next));
+    setCurrent(c=>c>=next.length?Math.max(0,next.length-1):c);
+  }
+
+  const ctrlBtn = {background:'none',border:'none',cursor:'pointer',padding:'2px 5px',fontFamily:'inherit',lineHeight:1};
+
+  return (
+    <div ref={wrapRef} style={{position:'fixed',bottom:'20px',left:'20px',zIndex:1000}}>
+      <button onClick={()=>setOpen(v=>!v)} style={{
+        display:'flex',alignItems:'center',gap:'.35rem',
+        background:'#fff',border:'none',borderRadius:'9999px',
+        padding:'.38rem .85rem',cursor:'pointer',
+        boxShadow:'0 2px 10px rgba(0,0,0,0.10)',fontFamily:'inherit',
+      }}>
+        <span style={{fontSize:'12px',color:currentEmbed?ac:'#ccc'}}>♪</span>
+        <span style={{fontSize:'10px',color:'#bbb',letterSpacing:'.1em'}}>ᴍᴜsɪᴄ</span>
+      </button>
+
+      <div style={{
+        position:'absolute',bottom:'42px',
+        left:open?'0':'-9999px',
+        width:'290px',background:'#fff',borderRadius:'12px',overflow:'hidden',
+        boxShadow:open?'0 8px 28px rgba(0,0,0,0.11)':'none',
+        border:'1px solid #f0f0f0',
+      }}>
+        {open&&(
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 13px 8px',borderBottom:'1px solid #f7f7f7'}}>
+            <span style={{fontSize:'9px',color:'#bbb',letterSpacing:'.14em',fontFamily:'inherit'}}>ᴍᴜsɪᴄ</span>
+            <button onClick={()=>setUrlBar(v=>!v)} style={{background:'none',border:'none',color:ac,cursor:'pointer',fontSize:'10px',padding:0,fontFamily:'inherit',fontWeight:'bold'}}>+ 추가</button>
+          </div>
+        )}
+
+        {open&&urlBar&&(
+          <div style={{display:'flex',gap:'6px',padding:'8px 10px'}}>
+            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTrack()}
+              placeholder="YouTube URL (영상·플레이리스트 모두 가능)"
+              style={{flex:1,background:'#f8f8f8',border:'1px solid #eee',borderRadius:'6px',padding:'.3rem .55rem',color:'#555',fontSize:'10px',fontFamily:'inherit',outline:'none'}}
+            />
+            <button onClick={addTrack} style={{background:ac,border:'none',borderRadius:'6px',color:'#fff',cursor:'pointer',fontSize:'11px',padding:'0 .55rem'}}>→</button>
+          </div>
+        )}
+
+        {open&&playlist.length>0&&(
+          <div style={{maxHeight:'110px',overflowY:'auto',padding:'4px 10px 4px'}}>
+            {playlist.map((track,i)=>(
+              <div key={i} onClick={()=>setCurrent(i)} style={{
+                display:'flex',alignItems:'center',gap:'6px',
+                padding:'5px 8px',borderRadius:'6px',marginBottom:'2px',
+                background:i===current?ac+'18':'transparent',cursor:'pointer',
+              }}>
+                <span style={{fontSize:'8px',color:i===current?ac:'#ddd'}}>▶</span>
+                <span style={{fontSize:'9px',color:i===current?'#444':'#bbb',flex:1,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>Track {i+1}</span>
+                <button onClick={e=>removeTrack(i,e)} style={{background:'none',border:'none',color:'#ccc',cursor:'pointer',fontSize:'9px',padding:'0 2px',lineHeight:1}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {open&&playlist.length>0&&(
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'4px',padding:'6px 10px 7px',borderTop:'1px solid #f5f5f5'}}>
+            <button onClick={()=>setShuffle(v=>!v)} title="셔플" style={{...ctrlBtn,fontSize:'12px',color:shuffle?ac:'#ccc'}}>⇌</button>
+            <button onClick={prevTrack} title="이전곡" style={{...ctrlBtn,fontSize:'12px',color:'#bbb'}}>⏮</button>
+            <button onClick={togglePlay} title={playing?'일시정지':'재생'} style={{
+              width:'26px',height:'26px',borderRadius:'50%',flexShrink:0,
+              background:ac,border:'none',color:'#fff',cursor:'pointer',fontSize:'10px',
+              display:'flex',alignItems:'center',justifyContent:'center',
+            }}>{playing?'⏸':'▶'}</button>
+            <button onClick={nextTrack} title="다음곡" style={{...ctrlBtn,fontSize:'12px',color:'#bbb'}}>⏭</button>
+            <input type="range" min="0" max="100" value={volume}
+              onChange={e=>handleVolume(Number(e.target.value))}
+              title={`음량 ${volume}%`}
+              style={{width:'50px',accentColor:ac,cursor:'pointer',marginLeft:'2px'}}
+            />
+          </div>
+        )}
+
+        {open&&playlist.length===0&&(
+          <div style={{padding:'20px 12px 24px',display:'flex',flexDirection:'column',alignItems:'center',gap:'7px'}}>
+            <span style={{fontSize:'20px',opacity:.15}}>♪</span>
+            <span style={{fontSize:'10px',color:'#ccc',textAlign:'center',lineHeight:1.6}}>YouTube URL을 추가해봐.<br/>음악도, 플레이리스트도 돼.</span>
+            <button onClick={()=>setUrlBar(true)} style={{marginTop:'4px',background:'#f5f5f5',border:'none',borderRadius:'6px',color:'#aaa',cursor:'pointer',fontSize:'10px',padding:'.3rem .75rem',fontFamily:'inherit'}}>+ 추가</button>
+          </div>
+        )}
+
+        {currentEmbed?(
+          <div style={{lineHeight:0}}>
+            <iframe ref={iframeRef} src={currentEmbed} width="290" height="163" frameBorder="0"
+              allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen
+              style={{display:'block'}}/>
+          </div>
+        ):null}
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   DemianWidget  (나기 전용)
+══════════════════════════════════════════════════════════ */
+function DemianWidget() {
+  const [vis,    setVis]    = React.useState(false);
+  const [msg,    setMsg]    = React.useState('');
+  const [online, setOnline] = React.useState(false);
+  const [cfg,    setCfg]    = React.useState(false);
+  const [sched,  setSched]  = React.useState(loadSched);
+  const [edit,   setEdit]   = React.useState(loadSched);
+
+  const isFocus=React.useCallback(()=>{ const n=new Date(),r=sched[n.getDay()]; return r&&n.getHours()>=r.s&&n.getHours()<r.e; },[sched]);
+
+  React.useEffect(()=>{
+    const run=async()=>{
+      const on=isFocus(); setOnline(on);
+      if (on) {
+        try {
+          const res=await fetch("https://raw.githubusercontent.com/nagi-00/nagi-todo/main/demian_focus_messages.json");
+          const d=await res.json();
+          setMsg(d.messages[Math.floor(Math.random()*d.messages.length)]);
+        } catch { setMsg("메시지를 불러오지 못했어."); }
+      }
+    };
+    run(); const t=setInterval(run,60000); return()=>clearInterval(t);
+  },[isFocus]);
+
+  function save() { setSched(edit); localStorage.setItem('focusSched',JSON.stringify(edit)); setCfg(false); }
+  function upd(d,f,v) { const n=parseInt(v,10); if(isNaN(n)||n<0||n>23) return; setEdit(p=>({...p,[d]:{...(p[d]||{s:0,e:0}),[f]:n}})); }
+  function tog(d) { setEdit(p=>{ const n={...p}; n[d]?delete n[d]:n[d]=DEF_SCHED[d]||{s:6,e:18}; return n; }); }
+
+  const numInp={width:'2.9rem',padding:'.2rem',border:'1px solid #eee',borderRadius:'4px',textAlign:'center',fontSize:'10px',fontFamily:'inherit',outline:'none'};
+
+  return (
+    <>
+      <div onClick={()=>{setVis(v=>!v);if(vis)setCfg(false);}} style={{
+        position:'fixed',bottom:'20px',right:'20px',
+        width:'50px',height:'50px',borderRadius:'50%',
+        background:online?'#b8b8b8':'#d8d8d8',
+        display:'flex',alignItems:'center',justifyContent:'center',
+        cursor:'pointer',zIndex:1000,
+        boxShadow:'0 4px 16px rgba(0,0,0,0.14)',
+        transition:'background .3s',
+      }}>
+        <span style={{fontSize:'19px'}}>🖤</span>
+      </div>
+
+      {vis&&(
+        <div style={{
+          position:'fixed',bottom:'80px',right:'20px',width:'265px',
+          background:'#fff',borderRadius:'12px',padding:'15px 17px',
+          boxShadow:'0 8px 28px rgba(0,0,0,0.11)',zIndex:999,
+        }}>
+          <button onClick={e=>{e.stopPropagation();cfg?setCfg(false):(setEdit({...sched}),setCfg(true));}} style={{
+            position:'absolute',top:'10px',right:'13px',
+            background:'none',border:'none',cursor:'pointer',fontSize:'.65rem',color:'#ccc',padding:0,fontFamily:'inherit'
+          }}>⚙ 설정</button>
+
+          {cfg?(
+            <div>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.7rem'}}>위젯 설정</div>
+              <div style={{fontSize:'10px',color:'#ccc',marginBottom:'.5rem'}}>요일별 집중 시간 (24시)</div>
+              {[1,2,3,4,5,6,0].map(d=>(
+                <div key={d} style={{display:'flex',alignItems:'center',gap:'.3rem',marginBottom:'.38rem'}}>
+                  <button onClick={()=>tog(d)} style={{
+                    width:'1.4rem',height:'.85rem',borderRadius:'9999px',border:'none',cursor:'pointer',padding:0,flexShrink:0,
+                    background:edit[d]?'#444':'#e8e8e8',position:'relative',transition:'background .2s',
+                  }}>
+                    <span style={{position:'absolute',top:'1px',left:edit[d]?'6px':'1px',width:'calc(.85rem - 4px)',height:'calc(.85rem - 4px)',borderRadius:'50%',background:'#fff',transition:'left .2s'}}/>
+                  </button>
+                  <span style={{width:'1.2rem',fontSize:'11px',fontWeight:'600',color:edit[d]?'#333':'#ccc'}}>{DAY_KO[d]}</span>
+                  {edit[d]?(
+                    <>
+                      <input type="number" min="0" max="23" value={edit[d].s} onChange={e=>upd(d,'s',e.target.value)} style={numInp}/>
+                      <span style={{color:'#ddd',fontSize:'9px'}}>–</span>
+                      <input type="number" min="0" max="23" value={edit[d].e} onChange={e=>upd(d,'e',e.target.value)} style={numInp}/>
+                      <span style={{color:'#ccc',fontSize:'9px'}}>시</span>
+                    </>
+                  ):(
+                    <span style={{fontSize:'9px',color:'#ccc'}}>휴일</span>
+                  )}
+                </div>
+              ))}
+              <div style={{display:'flex',gap:'.4rem',marginTop:'.65rem'}}>
+                <button onClick={()=>setCfg(false)} style={{...pill('#f5f5f5','#aaa',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>취소</button>
+                <button onClick={save} style={{...pill('#222','#fff',true),flex:1,borderRadius:'.375rem',padding:'.35rem'}}>저장</button>
+              </div>
+            </div>
+          ):online?(
+            <>
+              <div style={{fontWeight:'bold',fontSize:'12px',marginBottom:'.35rem',letterSpacing:'.05em'}}>ᴅᴇᴍɪᴀɴ</div>
+              <div style={{fontSize:'12px',color:'#555',lineHeight:1.7}}>{msg}</div>
+            </>
+          ):(
+            <>
+              <div style={{textAlign:'center',color:'#aaa',fontSize:'12px',marginBottom:'.45rem'}}>😴 휴식의 시간이야.</div>
+              <div style={{fontSize:'10px',textAlign:'center',color:'#ccc',lineHeight:1.95}}>
+                <div style={{fontWeight:'bold',marginBottom:'.1rem',letterSpacing:'.04em',color:'#bbb'}}>𝗙𝗼𝗰𝘂𝘀 𝗧𝗶𝗺𝗲</div>
+                {Object.entries(sched).map(([d,r])=>(
+                  <div key={d}>{DAY_KO[d]}&nbsp;&nbsp;{String(r.s).padStart(2,'0')}:00 – {String(r.e).padStart(2,'0')}:00</div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
