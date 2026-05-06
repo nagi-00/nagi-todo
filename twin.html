@@ -523,6 +523,12 @@ function MainApp({userId, onLogout}) {
   },[dk,userId]);
 
   React.useEffect(()=>{
+    const r=db.ref(`shared/${userId}/daily/${dk}/message`);
+    const h=r.on('value',s=>setPartnerMsg(s.val()||''));
+    return()=>r.off('value',h);
+  },[dk,userId]);
+
+  React.useEffect(()=>{
     const r=db.ref(`private/${userId}/notes`);
     const h=r.on('value',s=>setNotes(s.val()||{}));
     return()=>r.off('value',h);
@@ -848,8 +854,10 @@ function MainApp({userId, onLogout}) {
                 {/* 파트너에게 한마디 */}
                 <div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:'1px solid #f5f5f5'}}>
                   <span style={sectionLabel()}>{otherUser.name}에게 한마디</span>
-                  <textarea value={partnerMsg} onChange={e=>setPartnerMsg(e.target.value)}
-                    placeholder="공유 페이지에 표시될 메시지"
+                  <textarea value={partnerMsg}
+                    onChange={e=>{setPartnerMsg(e.target.value);db.ref(`shared/${userId}/daily/${dk}/message`).set(e.target.value);}}
+                    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
+                    placeholder="공유 페이지에 표시될 메시지 (Enter 저장)"
                     rows={2}
                     style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontFamily:'inherit',fontSize:'.82rem',lineHeight:1.6,background:'#fafafa'}}
                   />
