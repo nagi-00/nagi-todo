@@ -1262,7 +1262,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
         <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
           onBlur={()=>save('morning',mText,setMEdit)}
-          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
+          placeholder="하루를 시작하며 떠오르는 생각을 자유롭게 적어주세요. (Enter 저장)" rows={4} style={TA}/>
       )}
 
       <div style={DIV}/>
@@ -1298,7 +1298,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
           onFocus={()=>setDEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
           onBlur={()=>setDEdit(false)}
-          placeholder="오늘 하루를 회고하며 기록해봐." rows={6} style={TA}/>
+          placeholder="하루를 마무리하며 떠오르는 생각을 자유롭게 적어주세요. " rows={6} style={TA}/>
       )}
 
       <div style={DIV}/>
