@@ -343,6 +343,7 @@ function MainApp({userId, onLogout}) {
   const [journals,   setJournals]  = React.useState({});
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
+  const [dismissedRtns, setDismissedRtns] = React.useState(new Set());
   const [partnerMsg, setPartnerMsg]= React.useState('');
 
   // Shared data
@@ -376,21 +377,31 @@ function MainApp({userId, onLogout}) {
   }
   function toggleState(i,e) {
     e.stopPropagation(); if (editMode) return;
-    db.ref(`private/${userId}/todos/${dk}`).set(items.map((it,idx)=>idx===i?{...it,state:(it.state+1)%BULLET.length}:it));
+    const upd=items.map((it,idx)=>idx===i?{...it,state:(it.state+1)%BULLET.length}:it);
+    setAllTodos(p=>({...p,[dk]:upd}));
+    db.ref(`private/${userId}/todos/${dk}`).set(upd);
   }
   function toggleImportant(i,e) {
     e.stopPropagation(); if (editMode) return;
-    db.ref(`private/${userId}/todos/${dk}`).set(items.map((it,idx)=>idx===i?{...it,important:!it.important}:it));
+    const upd=items.map((it,idx)=>idx===i?{...it,important:!it.important}:it);
+    setAllTodos(p=>({...p,[dk]:upd}));
+    db.ref(`private/${userId}/todos/${dk}`).set(upd);
   }
   function toggleHidden(i,e) {
     e.stopPropagation(); if (editMode) return;
-    db.ref(`private/${userId}/todos/${dk}`).set(items.map((it,idx)=>idx===i?{...it,hidden:!it.hidden}:it));
+    const upd=items.map((it,idx)=>idx===i?{...it,hidden:!it.hidden}:it);
+    setAllTodos(p=>({...p,[dk]:upd}));
+    db.ref(`private/${userId}/todos/${dk}`).set(upd);
   }
   function editItem(i) {
     const nt=prompt('Edit:', items[i].text);
     if (nt!=null&&nt.trim()) { const c=[...items]; c[i]={...c[i],text:nt.trim()}; db.ref(`private/${userId}/todos/${dk}`).set(c); }
   }
-  function delItem(i) { db.ref(`private/${userId}/todos/${dk}`).set(items.filter((_,idx)=>idx!==i)); }
+  function delItem(i) {
+    const upd=items.filter((_,idx)=>idx!==i);
+    setAllTodos(p=>({...p,[dk]:upd}));
+    db.ref(`private/${userId}/todos/${dk}`).set(upd);
+  }
   function applyRtn() {
     const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0,hidden:false}));
     db.ref(`private/${userId}/todos/${dk}`).set([...items,...add]);
@@ -457,6 +468,7 @@ function MainApp({userId, onLogout}) {
   React.useEffect(()=>{
     const r=db.ref(`private/${userId}/todos/${dk}`);
     const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
+    setDismissedRtns(new Set());
     return()=>r.off('value',h);
   },[dk,userId]);
 
@@ -654,9 +666,8 @@ function MainApp({userId, onLogout}) {
 
                 {/* 오늘의 완료율 */}
                 {items.length > 0 && (()=>{
-                  const visible = items.filter(it=>!it.hidden);
-                  const done = visible.filter(it=>it.state===1).length;
-                  const pct  = visible.length ? Math.round(done / visible.length * 100) : 0;
+                  const done = items.filter(it=>it.state===1).length;
+                  const pct  = Math.round(done / items.length * 100);
                   return (
                     <div style={{marginBottom:'1rem'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
@@ -705,7 +716,7 @@ function MainApp({userId, onLogout}) {
                 {CATS.map((cat,idx)=>{
                   const list=items.map((it,gi)=>it.category===cat?{...it,gi}:null).filter(Boolean);
                   const appliedTexts=new Set(items.map(it=>it.text));
-                  const pendingRtns=appRoutines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
+                  const pendingRtns=appRoutines.filter(r=>r.category===cat&&!appliedTexts.has(r.text)&&!dismissedRtns.has(r.id));
                   const catColor = CAT_HUE[cat] || color;
                   return (
                     <div key={cat} style={{marginBottom:'.7rem'}}>
@@ -760,15 +771,18 @@ function MainApp({userId, onLogout}) {
                       </div>
                       {pendingRtns.map((r,i)=>(
                         <div key={`rtn-${i}`}
-                          onClick={!editMode?()=>applyOneRtn(r):undefined}
-                          title={editMode?undefined:'클릭 시 오늘의 목록에 추가됩니다.'}
-                          style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0',
-                            cursor:editMode?'default':'pointer',opacity:.55,
-                          }}>
-                          {editMode&&<span style={{width:'.95rem',flexShrink:0}}/>}
-                          <span style={{fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem'}}>☐</span>
-                          <span style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6}}>{r.text}</span>
+                          style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0',opacity:.55}}>
+                          <span style={{fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',cursor:'pointer'}}
+                            onClick={!editMode?()=>applyOneRtn(r):undefined}
+                            title={editMode?undefined:'클릭 시 오늘의 목록에 추가됩니다.'}>☐</span>
+                          <span style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,cursor:editMode?'default':'pointer'}}
+                            onClick={!editMode?()=>applyOneRtn(r):undefined}>
+                            {r.text}
+                          </span>
                           <span style={{fontSize:'.58rem',color:'#ccc',flexShrink:0,letterSpacing:'.04em'}}>루틴</span>
+                          <button className="icon-btn"
+                            onClick={e=>{e.stopPropagation();setDismissedRtns(p=>new Set([...p,r.id]));}}
+                            style={{color:'#ddd',flexShrink:0,padding:'0 1px',fontSize:'.75rem'}}>✕</button>
                         </div>
                       ))}
                       {idx<CATS.length-1&&(
