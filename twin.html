@@ -929,7 +929,7 @@ function MainApp({userId, onLogout}) {
    XCard (TODO export)
 ══════════════════════════════════════════════════════════ */
 function XCard({dlabel,noteText,items,color,routines=[]}) {
-  const done=items.filter(it=>it.state===1&&!it.hidden).length, total=items.filter(it=>!it.hidden).length;
+  const done=items.filter(it=>it.state===1).length, total=items.length;
   const appliedTexts=new Set(items.map(it=>it.text));
 
   const TEXTURES = ['./papertex1.jpg','./papertex2.jpg','./papertex3.png','./papertex4.jpg','./papertex5.png','./papertex6.jpg'];
@@ -945,7 +945,6 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
     String(now.getHours()).padStart(2,'0')+':'+
     String(now.getMinutes()).padStart(2,'0');
 
-  const sub = dlabel.toUpperCase();
   const MONO = "'Courier New', ui-monospace, monospace";
 
   return (
@@ -959,7 +958,7 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
       backgroundPosition:'center',
       padding:'2.4rem 2rem 2.2rem',
     }}>
-      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.55)',pointerEvents:'none'}}/>
+      <div style={{position:'absolute',inset:0,background:'rgba(252,247,233,0.22)',pointerEvents:'none',zIndex:0}}/>
 
       <div style={{position:'relative',zIndex:1}}>
         <div style={{
@@ -969,18 +968,8 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           textAlign:'center',
           lineHeight:.95,
           letterSpacing:'-.01em',
-          textShadow:`2px 3px 0 ${color}33, 1px 1px 0 ${color}55`,
-          marginBottom:'.45rem',
+          marginBottom:'1.4rem',
         }}>daylog</div>
-
-        <div style={{
-          fontFamily:MONO,
-          fontSize:'.66rem',
-          color:'#222',
-          textAlign:'center',
-          letterSpacing:'.18em',
-          marginBottom:'1.6rem',
-        }}>{sub}</div>
 
         {noteText && (
           <div style={{
@@ -999,13 +988,15 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
 
         <div style={{fontFamily:MONO,fontSize:'.74rem',color:'#1a1a1a',lineHeight:1.95}}>
           {CATS.map(cat=>{
-            const list=items.filter(it=>it.category===cat&&!it.hidden);
+            const list=items.filter(it=>it.category===cat);
             const pendingRtns=routines.filter(r=>r.category===cat&&!appliedTexts.has(r.text));
             if (!list.length&&!pendingRtns.length) return null;
             return (
               <div key={cat} style={{marginBottom:'.95rem'}}>
-                <div style={{textAlign:'center',color,fontSize:'.55rem',letterSpacing:'.22em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
-                  ─── {cat} ───
+                <div style={{display:'flex',alignItems:'center',gap:'.3rem',color,fontSize:'.55rem',letterSpacing:'.18em',marginBottom:'.4rem',textTransform:'uppercase',opacity:.85}}>
+                  <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em'}}>{'─'.repeat(30)}</span>
+                  <span style={{flexShrink:0,letterSpacing:'.22em',padding:'0 .1rem'}}>{cat}</span>
+                  <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em',textAlign:'right'}}>{'─'.repeat(30)}</span>
                 </div>
                 {list.map((it,i)=>(
                   <div key={i} style={{
@@ -1014,17 +1005,18 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
                     textDecoration:it.state===1?'line-through':'none',
                     background:it.important?color+'22':'transparent',
                     padding:it.important?'0 .35rem':'0',
+                    margin:it.important?'0 -.35rem':'0',
                     borderRadius:'2px',
                   }}>
+                    <span style={{flexShrink:0,minWidth:'.7rem'}}>{xBullet(it.state)}</span>
                     <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
                     {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
-                    <span style={{flexShrink:0,minWidth:'.7rem',textAlign:'right'}}>{xBullet(it.state)}</span>
                   </div>
                 ))}
                 {pendingRtns.map((r,i)=>(
                   <div key={`xr-${i}`} style={{display:'flex',gap:'.6rem',color:'#aaa',alignItems:'flex-start'}}>
+                    <span style={{flexShrink:0,minWidth:'.7rem'}}>·</span>
                     <span style={{flex:1,whiteSpace:'pre-wrap'}}>{r.text}</span>
-                    <span style={{flexShrink:0}}>·</span>
                   </div>
                 ))}
               </div>
@@ -1062,8 +1054,15 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
           color:'#6a6a6a',
           marginTop:'1.5rem',
           letterSpacing:'.22em',
-        }}>TODOLIST BY ⓒnagi</div>
+        }}>RECEIPT BY ⓒtwin</div>
       </div>
+
+      <div style={{
+        position:'absolute',inset:0,
+        backgroundImage:`url('${tex}')`,backgroundSize:'cover',backgroundPosition:'center',
+        opacity:0.32,mixBlendMode:'multiply',
+        pointerEvents:'none',zIndex:2,
+      }}/>
     </div>
   );
 }
