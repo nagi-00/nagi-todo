@@ -499,6 +499,15 @@ function MainApp({userId, onLogout}) {
     const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0,hidden:false}));
     db.ref(`private/${userId}/todos/${dk}`).set([...items,...add]);
   }
+  async function copyYesterday() {
+    const prev = new Date(sel); prev.setDate(prev.getDate()-1);
+    const yk = prev.toLocaleDateString('sv-SE');
+    const snap = await db.ref(`private/${userId}/todos/${yk}`).once('value');
+    const prevItems = snap.val();
+    if (!prevItems?.length) { alert('전날 할 일이 없어.'); return; }
+    const copied = prevItems.map(it=>({...it, state:0, hidden:false}));
+    db.ref(`private/${userId}/todos/${dk}`).set([...items,...copied]);
+  }
   function applyOneRtn(r) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,{type:'todo',category:r.category,text:r.text,state:0,hidden:false}]);
   }
@@ -834,9 +843,12 @@ function MainApp({userId, onLogout}) {
                     </div>
                   );
                 })}
-                {items.length===0&&appRoutines.length>0&&(
-                  <div style={{display:'flex',justifyContent:'flex-end',marginTop:'.3rem'}}>
-                    <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                {items.length===0&&(
+                  <div style={{display:'flex',justifyContent:'flex-end',gap:'.35rem',marginTop:'.3rem'}}>
+                    <button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>전날 ×</button>
+                    {appRoutines.length>0&&(
+                      <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                    )}
                   </div>
                 )}
 
