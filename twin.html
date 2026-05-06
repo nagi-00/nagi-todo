@@ -2,8 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<title>𝐝 : twin</title>
-<link rel="icon" href="./favi.ico" type="image/x-icon" />
+<title>𝘁𝘄𝗶𝗻-𝘁𝗼𝗱𝗼</title>
+<link rel="icon" href="./cal.ico" type="image/x-icon" />
 <style>
 @font-face { font-family:'HJSS'; src:url('./HJSS.ttf') format('truetype'); }
 @font-face { font-family:'Dangam'; src:url('./ChangwonDangamAsac-Bold.ttf') format('truetype'); font-weight:bold; }
@@ -83,8 +83,8 @@ const WEEK_KO    = ['일','월','화','수','목','금','토'];
 
 /* ─── Default User Data (초기값) ─── */
 const DEFAULT_USERS = {
-  user1: { name: '나기', color: '#8A4545', password: 'nagi2026' },
-  user2: { name: '파트너', color: '#434A8E', password: 'partner2026' },
+  user1: { name: '사용자1', color: '#2D2D2D', password: 'nagi2026' },
+  user2: { name: '사용자2', color: '#999999', password: 'partner2026' },
 };
 const DEFAULT_ADMIN_KEY = 'twin-admin-2026';
 
@@ -177,7 +177,7 @@ function LoginScreen({onLogin}) {
     if (users[selected].password === password) {
       onLogin(selected);
     } else {
-      setError('비밀번호가 틀렸어요.');
+      setError('비밀번호를 다시 입력해주세요.');
       setPassword('');
     }
   }
@@ -189,7 +189,7 @@ function LoginScreen({onLogin}) {
     setShowAdmin(false);
     setError('');
     setSelected(null);
-    alert('설정이 저장되었습니다!');
+    alert('설정이 저장되었습니다.');
   }
 
   if (showAdmin) {
@@ -261,7 +261,7 @@ function AdminSettings({users, onSave, onCancel}) {
       setVerified(true);
       setError('');
     } else {
-      setError('관리자 키가 틀렸습니다.');
+      setError('관리자 키를 다시 입력해주세요.');
       setAdminKey('');
     }
   }
@@ -321,7 +321,7 @@ function AdminSettings({users, onSave, onCancel}) {
           <div style={{marginTop:'1.5rem',paddingTop:'1rem',borderTop:'1px solid #f0f0f0'}}>
             <p style={{fontSize:'.7rem',color:'#bbb',lineHeight:1.6}}>
               <strong>초기 관리자 키:</strong> {DEFAULT_ADMIN_KEY}<br/>
-              처음 사용하시는 경우 위 키를 입력하세요.
+              처음 사용하시는 경우 위 키를 입력해주세요.
             </p>
           </div>
         </div>
@@ -358,7 +358,7 @@ function AdminSettings({users, onSave, onCancel}) {
           <input type="password" value={newAdminKey} onChange={e=>setNewAdminKey(e.target.value)}
             placeholder="관리자 키 (변경 가능)" style={inputStyle}/>
           <p style={{fontSize:'.7rem',color:'#bbb',lineHeight:1.6}}>
-            다음에 설정 변경 시 사용할 키입니다. 잊어버리지 마세요!
+            다음에 설정 변경 시 사용할 키입니다. 잊어버리지 마세요.
           </p>
         </div>
 
@@ -512,7 +512,7 @@ function MainApp({userId, onLogout}) {
     const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
     cv.toBlob(async blob=>{
       if (!blob) return;
-      try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했어.'); }
+      try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했습니다.'); }
       catch { const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`todo-${dk}.png`;a.click();URL.revokeObjectURL(u); }
     });
   }
@@ -797,7 +797,7 @@ function MainApp({userId, onLogout}) {
                       {pendingRtns.map((r,i)=>(
                         <div key={`rtn-${i}`}
                           onClick={!editMode?()=>applyOneRtn(r):undefined}
-                          title={editMode?undefined:'클릭하면 오늘 목록에 추가돼'}
+                          title={editMode?undefined:'클릭 시 오늘의 목록에 추가됩니다.'}
                           style={{display:'flex',alignItems:'baseline',gap:'.4rem',marginBottom:'.22rem',padding:'.05rem 0',
                             cursor:editMode?'default':'pointer',opacity:.55,
                           }}>
@@ -1293,7 +1293,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
       ):(
         <textarea autoFocus={mEdit} value={mText} onChange={e=>setMText(e.target.value)} onFocus={()=>setMEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('morning',mText,setMEdit);}}}
-          placeholder="오늘 아침의 생각을 자유롭게. (Enter 저장)" rows={4} style={TA}/>
+          placeholder="오늘 아침의 생각을 자유롭게 적어주세요. (Enter 저장)" rows={4} style={TA}/>
       )}
 
       <div style={DIV}/>
@@ -1311,7 +1311,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
 
       <span style={LBL}>ᴅɪᴀʀʏ</span>
       <textarea value={diary} onChange={e=>{setDiary(e.target.value);db.ref(`private/${userId}/daily/${dk}/diary`).set(e.target.value);}}
-        placeholder="오늘 하루를 짧게 기록해봐." rows={4} style={TA}/>
+        placeholder="오늘 하루를 짧게 기록해주세요." rows={4} style={TA}/>
 
       <div style={DIV}/>
 
@@ -1340,14 +1340,14 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
       ):(
         <textarea autoFocus={eEdit} value={eText} onChange={e=>setEText(e.target.value)} onFocus={()=>setEEdit(true)}
           onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();save('evening',eText,setEEdit);}}}
-          placeholder="오늘 저녁의 회고를 적어봐. (Enter 저장)" rows={4} style={TA}/>
+          placeholder="오늘 저녁의 회고를 적어주세요. (Enter 저장)" rows={4} style={TA}/>
       )}
 
       <div style={DIV}/>
 
       <span style={LBL}>ᴅʀᴇᴀᴍ</span>
       <textarea value={dream} onChange={e=>{setDream(e.target.value);db.ref(`private/${userId}/daily/${dk}/dream`).set(e.target.value);}}
-        placeholder="이루고 싶은 미래를 현재형으로 적어봐. 나는 이미 ___이야." rows={4} style={{...TA,fontStyle:'italic'}}/>
+        placeholder="이루고 싶은 미래를 현재형으로 적어보세요. 나는 이미 ___다." rows={4} style={{...TA,fontStyle:'italic'}}/>
 
       {exporting&&(
         <BoardingPass dlabel={dlabel} dk={dk} color={color}
