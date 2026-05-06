@@ -654,8 +654,9 @@ function MainApp({userId, onLogout}) {
 
                 {/* 오늘의 완료율 */}
                 {items.length > 0 && (()=>{
-                  const done = items.filter(it=>it.state===1).length;
-                  const pct  = Math.round(done / items.length * 100);
+                  const visible = items.filter(it=>!it.hidden);
+                  const done = visible.filter(it=>it.state===1).length;
+                  const pct  = visible.length ? Math.round(done / visible.length * 100) : 0;
                   return (
                     <div style={{marginBottom:'1rem'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
