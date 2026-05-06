@@ -74,9 +74,9 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 /* ─── Constants ────────────────────────────────────────── */
-const CATS       = ['필연의 시간', '성장의 시간', '자유의 시간'];
+const CATS       = ['필연', '성장', '자유'];
 const BULLET     = ['☐', '☑', '☒'];
-const CAT_HUE    = { '필연의 시간': '#8A4545', '성장의 시간': '#434A8E', '자유의 시간': '#4a7c5a' };
+const CAT_HUE    = { '필연': '#8A4545', '성장': '#434A8E', '자유': '#4a7c5a' };
 const MOODS      = [{ e:'😻',l:'행복'},{ e:'😺',l:'보통'},{ e:'😿',l:'슬픔'},{ e:'😾',l:'화남'},{ e:'✨',l:'설렘'}];
 const DAY_KO     = {0:'일',1:'월',2:'화',3:'수',4:'목',5:'금',6:'토'};
 const WEEK_KO    = ['일','월','화','수','목','금','토'];
@@ -420,7 +420,7 @@ function MainApp({userId, onLogout}) {
   const [movedKey,   setMovedKey]  = React.useState(null);
   const [notesList,  setNotesList] = React.useState(false);
   const [noteEdit,   setNoteEdit]  = React.useState(false);
-  const [inputs,     setInputs]    = React.useState({'필연의 시간':'','성장의 시간':'','자유의 시간':''});
+  const [inputs,     setInputs]    = React.useState({'필연':'','성장':'','자유':''});
   const [tab,        setTab]       = React.useState('todo');
   const [journals,   setJournals]  = React.useState({});
   const [routines,   setRoutines]  = React.useState([]);
