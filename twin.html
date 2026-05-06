@@ -453,15 +453,15 @@ function MainApp({userId, onLogout}) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,...copied]);
   }
   function saveEdit() {
-    if (!editPass.trim()) { alert('비밀번호를 입력해줘.'); return; }
-    if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
+    if (!editPass.trim()) { alert('비밀번호를 입력해주세요.'); return; }
+    if (!editName.trim()) { alert('이름을 입력해주세요.'); return; }
     const newUsers = loadUsers();
     newUsers[userId] = { ...newUsers[userId], color: editColor, name: editName.trim(), password: editPass.trim() };
     saveUsers(newUsers);
     db.ref('settings/users').set(newUsers);
     setShowEdit(false);
     setEditPass('');
-    alert('저장됐어.');
+    alert('저장 되었습니다.');
   }
   function applyOneRtn(r) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,{type:'todo',category:r.category,text:r.text,state:0,hidden:false}]);
