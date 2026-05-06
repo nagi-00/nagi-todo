@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>𝘁𝘄𝗶𝗻-𝘁𝗼𝗱𝗼</title>
 <link rel="icon" href="./cal.ico" type="image/x-icon" />
 <style>
@@ -44,6 +45,24 @@ select { font-family: inherit; }
   box-shadow: 0 10px 40px rgba(0,0,0,0.1);
   width: 90%;
   max-width: 320px;
+}
+/* Mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 15;
+}
+.hamburger-btn { display: none !important; }
+@media (max-width: 700px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    z-index: 20;
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .main-content { margin-left: 0 !important; }
+  .tab-bar { padding-top: 3.5rem !important; }
+  .hamburger-btn { display: block !important; }
 }
 </style>
 </head>
@@ -242,6 +261,16 @@ function LoginScreen({onLogin}) {
   const [error, setError] = React.useState('');
   const [loginGrad] = React.useState(()=>localStorage.getItem('twin-login-grad')||'#f5f7fa');
 
+  React.useEffect(()=>{
+    db.ref('settings/users').once('value').then(snap=>{
+      const fbUsers=snap.val();
+      if(fbUsers){
+        saveUsers(fbUsers);
+        setUsers(fbUsers);
+      }
+    });
+  },[]);
+
   function handleLogin() {
     if (!selected) { setError('사용자를 선택해주세요.'); return; }
     if (users[selected].password === password) {
@@ -340,6 +369,7 @@ function MainApp({userId, onLogout}) {
   const [editName,   setEditName]  = React.useState(user.name);
   const [editPass,   setEditPass]  = React.useState('');
   const [tab,        setTab]       = React.useState('todo');
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [journals,   setJournals]  = React.useState({});
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
@@ -420,14 +450,15 @@ function MainApp({userId, onLogout}) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,...copied]);
   }
   function saveEdit() {
-    if (!editPass.trim()) { alert('비밀번호를 입력해주세요.'); return; }
-    if (!editName.trim()) { alert('이름을 입력해주세요.'); return; }
+    if (!editPass.trim()) { alert('비밀번호를 입력해줘.'); return; }
+    if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
     const newUsers = loadUsers();
     newUsers[userId] = { ...newUsers[userId], color: editColor, name: editName.trim(), password: editPass.trim() };
     saveUsers(newUsers);
+    db.ref('settings/users').set(newUsers);
     setShowEdit(false);
     setEditPass('');
-    alert('저장 완료! 다음 로그인부터 적용됩니다.');
+    alert('저장됐어.');
   }
   function applyOneRtn(r) {
     db.ref(`private/${userId}/todos/${dk}`).set([...items,{type:'todo',category:r.category,text:r.text,state:0,hidden:false}]);
@@ -523,9 +554,10 @@ function MainApp({userId, onLogout}) {
   /* ── render ── */
   return (
     <div style={{display:'flex',minHeight:'100vh'}}>
+      <div className={`sidebar-overlay${sidebarOpen?' open':''}`} onClick={()=>setSidebarOpen(false)}/>
 
       {/* ═══ Sidebar ═══ */}
-      <aside style={{
+      <aside className={`sidebar${sidebarOpen?' open':''}`} style={{
         position:'fixed',left:0,top:0,bottom:0,width:'14.5rem',
         background:'#fff',overflow:'auto',zIndex:20,
         boxShadow:'2px 0 10px rgba(0,0,0,0.05)',
@@ -638,7 +670,7 @@ function MainApp({userId, onLogout}) {
       </aside>
 
       {/* ═══ Main ═══ */}
-      <main style={{
+      <main className="main-content" style={{
         flex:1,
         padding:'1rem',
         marginLeft:'14.5rem',
@@ -646,9 +678,14 @@ function MainApp({userId, onLogout}) {
         <div style={{maxWidth:'40rem',margin:'0 auto'}}>
 
           {/* tabs */}
-          <div style={{display:'flex',gap:'.35rem',paddingTop:'2.75rem',marginBottom:'.75rem'}}>
+          <div className="tab-bar" style={{display:'flex',gap:'.35rem',paddingTop:'2.75rem',marginBottom:'.75rem',flexWrap:'wrap'}}>
+            <button className="hamburger-btn" onClick={()=>setSidebarOpen(v=>!v)} style={{
+              position:'fixed',top:'.75rem',left:'.75rem',zIndex:25,
+              background:'#fff',border:'none',borderRadius:'8px',padding:'.45rem .6rem',
+              boxShadow:'0 2px 8px rgba(0,0,0,0.12)',cursor:'pointer',fontSize:'1.1rem',lineHeight:1,
+            }}>☰</button>
             {[{k:'todo',l:'ᴛᴏᴅᴏ'},{k:'journal',l:'ᴊᴏᴜʀɴᴀʟ'},{k:'week',l:'ᴡᴇᴇᴋ'},{k:'shared',l:'sʜᴀʀᴇᴅ'}].map(({k,l})=>(
-              <button key={k} onClick={()=>setTab(k)} style={{
+              <button key={k} onClick={()=>{setTab(k);setSidebarOpen(false);}} style={{
                 ...pill(tab===k?color:'#fff',tab===k?'#fff':'#bbb'),
                 boxShadow:tab===k?`0 2px 8px ${color}44`:'0 1px 3px rgba(0,0,0,0.08)',
                 transition:'all .2s',
