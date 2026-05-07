@@ -261,20 +261,20 @@ function LoginScreen({onLogin}) {
   const [selected, setSelected] = React.useState(null);
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
+  const [fbReady, setFbReady] = React.useState(false);
   const [loginGrad] = React.useState(()=>localStorage.getItem('twin-login-grad')||'#f5f7fa');
 
   React.useEffect(()=>{
     db.ref('settings/users').once('value').then(snap=>{
       const fbUsers=snap.val();
-      if(fbUsers){
-        saveUsers(fbUsers);
-        setUsers(fbUsers);
-      }
-    });
+      if(fbUsers){ saveUsers(fbUsers); setUsers(fbUsers); }
+      setFbReady(true);
+    }).catch(()=>setFbReady(true));
   },[]);
 
   function handleLogin() {
     if (!selected) { setError('사용자를 선택해주세요.'); return; }
+    if (!fbReady) { setError('잠시만 기다려줘...'); return; }
     if (users[selected].password === password) {
       onLogin(selected);
     } else {
@@ -308,10 +308,11 @@ function LoginScreen({onLogin}) {
               placeholder="비밀번호" autoFocus
               style={{width:'100%',padding:'.65rem .75rem',border:'1px solid #ddd',borderRadius:'8px',fontSize:'.85rem',marginBottom:'.75rem'}}
             />
-            <button onClick={handleLogin} style={{
+            <button onClick={handleLogin} disabled={!fbReady} style={{
               width:'100%',padding:'.75rem',borderRadius:'8px',border:'none',
-              background:users[selected].color,color:'white',fontSize:'.85rem',fontWeight:'bold',cursor:'pointer',
-            }}>입장하기</button>
+              background:fbReady?users[selected].color:'#ccc',color:'white',fontSize:'.85rem',fontWeight:'bold',
+              cursor:fbReady?'pointer':'not-allowed',transition:'background .2s',
+            }}>{fbReady?'입장하기':'...'}</button>
           </>
         )}
 
@@ -454,11 +455,11 @@ function MainApp({userId, onLogout}) {
   }
   function saveEdit() {
     if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
-    const newUsers = {...USERS};
-    newUsers[userId] = { ...newUsers[userId], color: editColor, name: editName.trim() };
-    if (editPass.trim()) newUsers[userId].password = editPass.trim();
+    const updated = { ...USERS[userId], color: editColor, name: editName.trim() };
+    if (editPass.trim()) updated.password = editPass.trim();
+    const newUsers = { ...USERS, [userId]: updated };
     saveUsers(newUsers);
-    db.ref('settings/users').set(newUsers);
+    db.ref(`settings/users/${userId}`).set(updated);
     setShowEdit(false);
     setEditPass('');
   }
