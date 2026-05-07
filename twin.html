@@ -492,8 +492,8 @@ function MainApp({userId, onLogout}) {
     alert('공유 완료!');
   }
 
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   function saveOrOpenBlob(blob, filename) {
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const u = URL.createObjectURL(blob);
     if (isMobile) {
       window.open(u, '_blank');
@@ -509,6 +509,7 @@ function MainApp({userId, onLogout}) {
     const cv=await html2canvas(el,{backgroundColor:'#fff',scale:2,useCORS:true});
     cv.toBlob(async blob=>{
       if (!blob) return;
+      if (isMobile) { saveOrOpenBlob(blob, `todo-${dk}.png`); return; }
       try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했습니다.'); }
       catch { saveOrOpenBlob(blob, `todo-${dk}.png`); }
     });
@@ -1343,6 +1344,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     setExporting(false);
     cv.toBlob(async blob=>{
       if(!blob)return;
+      if(isMobile){ saveOrOpenBlob(blob, `nightlog-${dk}.png`); return; }
       try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했습니다.'); }
       catch{ saveOrOpenBlob(blob, `nightlog-${dk}.png`); }
     });
