@@ -492,6 +492,17 @@ function MainApp({userId, onLogout}) {
     alert('공유 완료!');
   }
 
+  function saveOrOpenBlob(blob, filename) {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const u = URL.createObjectURL(blob);
+    if (isMobile) {
+      window.open(u, '_blank');
+      setTimeout(()=>URL.revokeObjectURL(u), 10000);
+    } else {
+      const a = document.createElement('a'); a.href=u; a.download=filename; a.click();
+      URL.revokeObjectURL(u);
+    }
+  }
   async function exportImg() {
     const el=document.getElementById('xcard'); if (!el) return;
     await document.fonts.ready;
@@ -499,7 +510,7 @@ function MainApp({userId, onLogout}) {
     cv.toBlob(async blob=>{
       if (!blob) return;
       try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했습니다.'); }
-      catch { const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`todo-${dk}.png`;a.click();URL.revokeObjectURL(u); }
+      catch { saveOrOpenBlob(blob, `todo-${dk}.png`); }
     });
   }
 
@@ -1333,7 +1344,7 @@ function JournalTab({dlabel, dk, journal, color, userId}) {
     cv.toBlob(async blob=>{
       if(!blob)return;
       try{ await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); alert('클립보드에 복사했습니다.'); }
-      catch{ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u;a.download=`nightlog-${dk}.png`;a.click();URL.revokeObjectURL(u); }
+      catch{ saveOrOpenBlob(blob, `nightlog-${dk}.png`); }
     });
   }
 
