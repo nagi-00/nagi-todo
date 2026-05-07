@@ -853,14 +853,19 @@ function MainApp({userId, onLogout}) {
                     </div>
                   );
                 })}
-                {items.length===0&&(
-                  <div style={{display:'flex',justifyContent:'flex-end',gap:'.35rem',marginTop:'.3rem'}}>
-                    <button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>☒ 적용</button>
-                    {appRoutines.length>0&&(
-                      <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
-                    )}
-                  </div>
-                )}
+                {(()=>{
+                  const appliedTexts=new Set(items.map(it=>it.text));
+                  const hasUnappliedRtns=appRoutines.length>0&&appRoutines.some(r=>!appliedTexts.has(r.text));
+                  if(items.length>0&&!hasUnappliedRtns) return null;
+                  return(
+                    <div style={{display:'flex',justifyContent:'flex-end',gap:'.35rem',marginTop:'.3rem'}}>
+                      <button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>☒ 적용</button>
+                      {hasUnappliedRtns&&(
+                        <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* 파트너에게 한마디 */}
                 <div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:'1px solid #f5f5f5'}}>
