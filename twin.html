@@ -240,8 +240,9 @@ function BulbIcon({visible, size=16, color='currentColor'}) {
    LoginScreen  (로그인 / 회원가입)
 ══════════════════════════════════════════════════════════ */
 function LoginScreen({onLogin}) {
-  const [tab,      setTab]      = React.useState('login');  // 'login' | 'signup'
+  const [tab,      setTab]      = React.useState('login');
   const [userId,   setUserId]   = React.useState('');
+  const [dispName, setDispName] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [color,    setColor]    = React.useState('#2D2D2D');
   const [error,    setError]    = React.useState('');
@@ -250,7 +251,8 @@ function LoginScreen({onLogin}) {
   const inp = {width:'100%',padding:'.65rem .75rem',border:'1px solid #ddd',borderRadius:'8px',
                fontSize:'.85rem',marginBottom:'.65rem',boxSizing:'border-box',outline:'none'};
 
-  function sanitize(v){ return v.trim().toLowerCase().replace(/[^a-z0-9_]/g,''); }
+  // Firebase key: 한글·영문·숫자·_ 허용, 공백 제거
+  function sanitize(v){ return v.trim().replace(/[.#$[\]/]/g,''); }
 
   async function handleLogin() {
     const id = sanitize(userId);
@@ -269,13 +271,13 @@ function LoginScreen({onLogin}) {
 
   async function handleSignup() {
     const id = sanitize(userId);
-    if (!id) { setError('아이디는 영문 소문자·숫자·_만 가능해.'); return; }
+    if (!id) { setError('아이디를 입력해줘.'); return; }
     if (password.length < 4) { setError('비밀번호는 4자 이상이어야 해.'); return; }
     setLoading(true); setError('');
     try {
       const snap = await db.ref(`users/${id}/profile`).once('value');
       if (snap.exists()) { setError('이미 사용 중인 아이디야.'); setLoading(false); return; }
-      const profile = { name: id, color, password };
+      const profile = { name: dispName.trim() || id, color, password };
       await db.ref(`users/${id}/profile`).set(profile);
       saveSession({ userId: id });
       onLogin(id, profile);
@@ -283,7 +285,7 @@ function LoginScreen({onLogin}) {
     setLoading(false);
   }
 
-  const switchTab = (t) => { setTab(t); setError(''); setUserId(''); setPassword(''); };
+  const switchTab = (t) => { setTab(t); setError(''); setUserId(''); setPassword(''); setDispName(''); };
 
   return (
     <div className="login-screen" style={{background:'linear-gradient(135deg,#f5f7fa 0%,#f8f8f8 100%)'}}>
@@ -301,9 +303,17 @@ function LoginScreen({onLogin}) {
         </div>
 
         <input type="text" value={userId} onChange={e=>{setUserId(e.target.value);setError('');}}
-          onKeyDown={e=>e.key==='Enter'&&document.getElementById('auth-pw').focus()}
-          placeholder={tab==='login'?'아이디':'아이디 (영문·숫자·_)'}
+          onKeyDown={e=>e.key==='Enter'&&(tab==='signup'?document.getElementById('auth-disp').focus():document.getElementById('auth-pw').focus())}
+          placeholder="아이디"
           autoFocus autoComplete="username" style={inp}/>
+
+        {tab==='signup'&&(
+          <input id="auth-disp" type="text" value={dispName}
+            onChange={e=>{setDispName(e.target.value);setError('');}}
+            onKeyDown={e=>e.key==='Enter'&&document.getElementById('auth-pw').focus()}
+            placeholder="표시 이름 (한글 가능, 비워두면 아이디 사용)"
+            autoComplete="off" style={inp}/>
+        )}
 
         <input id="auth-pw" type="password" value={password}
           onChange={e=>{setPassword(e.target.value);setError('');}}
