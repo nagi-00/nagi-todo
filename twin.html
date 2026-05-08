@@ -413,6 +413,7 @@ function MainApp({userId, onLogout}) {
   const [copiedYday,  setCopiedYday]  = React.useState(false);
   const [partnerMsg, setPartnerMsg]= React.useState('');
   const [msgEdit,    setMsgEdit]   = React.useState(false);
+  const [myShared,   setMyShared]  = React.useState(null);
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -562,6 +563,13 @@ function MainApp({userId, onLogout}) {
     });
     return()=>r.off('value',h);
   },[myProfile.partnerId, userId]);
+
+  // My own shared snapshot (only updated when I press Share)
+  React.useEffect(()=>{
+    const r=db.ref(`users/${userId}/shared/${dk}`);
+    const h=r.on('value',s=>setMyShared(s.val()));
+    return()=>r.off('value',h);
+  },[userId, dk]);
 
   // Partner's data for today
   React.useEffect(()=>{
@@ -980,7 +988,7 @@ function MainApp({userId, onLogout}) {
 
           {/* ── SHARED ── */}
           {tab==='shared'&&(
-            <SharedTab dk={dk} myUser={myProfile} myTodos={items} myNote={noteText} myMsg={partnerMsg}
+            <SharedTab dk={dk} myUser={myProfile} myShared={myShared} myMsg={partnerMsg}
               partner={partner} partnerData={partnerData}/>
           )}
 
@@ -1607,7 +1615,7 @@ function WeekTab({dColors,accent,userId,allTodos}) {
 /* ══════════════════════════════════════════════════════════
    SharedTab
 ══════════════════════════════════════════════════════════ */
-function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
+function SharedTab({dk, myUser, myShared, myMsg, partner, partnerData}) {
   if (!partner) {
     return (
       <div style={{...CARD, textAlign:'center', padding:'3rem 1.5rem', color:'#bbb'}}>
@@ -1626,6 +1634,10 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
   const partnerNote   = partnerShared?.note  || '';
   const partnerColor  = partnerShared?.color || partner.color;
 
+  const myTodos = myShared?.todos || [];
+  const myNote  = myShared?.note  || '';
+  const myColor = myShared?.color || myUser.color;
+
   const myVisTodos = myTodos.filter(it=>!it.hidden);
   const partnerVisTodos = partnerTodos.filter(it=>!it.hidden);
 
@@ -1643,8 +1655,8 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
       </h2>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
-        <UserSharedCard user={myUser} todos={myTodos} note={myNote} isSelf/>
-        <UserSharedCard user={{...partner, color:partnerColor}} todos={partnerTodos} note={partnerNote} isSelf={false}/>
+        <UserSharedCard user={{...myUser, color:myColor}} todos={myTodos} note={myNote} isSelf notShared={!myShared}/>
+        <UserSharedCard user={{...partner, color:partnerColor}} todos={partnerTodos} note={partnerNote} isSelf={false} notShared={!partnerShared}/>
       </div>
 
       {(myMsg || partnerMsg) && (
@@ -1652,17 +1664,17 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
           <span style={sectionLabel()}>서로에게 한마디</span>
           {myMsg && (
             <div style={{marginBottom:'.5rem',fontSize:'.85rem',lineHeight:1.7}}>
-              <span style={{color:myUser.color,fontWeight:'bold'}}>{myUser.name}</span>
+              <span style={{color:myColor,fontWeight:'bold'}}>{myUser.name}</span>
               <span style={{color:'#bbb',margin:'0 .3rem'}}>→</span>
-              <span style={{color:partner.color,fontWeight:'bold'}}>{partner.name}</span>
+              <span style={{color:partnerColor,fontWeight:'bold'}}>{partner.name}</span>
               <span style={{color:'#999',marginLeft:'.3rem'}}>: {myMsg}</span>
             </div>
           )}
           {partnerMsg && (
             <div style={{fontSize:'.85rem',lineHeight:1.7}}>
-              <span style={{color:partner.color,fontWeight:'bold'}}>{partner.name}</span>
+              <span style={{color:partnerColor,fontWeight:'bold'}}>{partner.name}</span>
               <span style={{color:'#bbb',margin:'0 .3rem'}}>→</span>
-              <span style={{color:myUser.color,fontWeight:'bold'}}>{myUser.name}</span>
+              <span style={{color:myColor,fontWeight:'bold'}}>{myUser.name}</span>
               <span style={{color:'#999',marginLeft:'.3rem'}}>: {partnerMsg}</span>
             </div>
           )}
@@ -1672,7 +1684,7 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
       {(myVisTodos.length > 0 || partnerVisTodos.length > 0) && (
         <div style={{marginTop:'1.5rem',paddingTop:'1.5rem',borderTop:'1px solid #f0f0f0'}}>
           <span style={sectionLabel()}>오늘의 달성도</span>
-          {[{u:myUser,done:myDone,total:myVisTodos.length,pct:myPct},{u:{...partner,color:partnerColor},done:ptDone,total:partnerVisTodos.length,pct:ptPct}].map(({u,done,total,pct},i)=>(
+          {[{u:{...myUser,color:myColor},done:myDone,total:myVisTodos.length,pct:myPct},{u:{...partner,color:partnerColor},done:ptDone,total:partnerVisTodos.length,pct:ptPct}].map(({u,done,total,pct},i)=>(
             <div key={i} style={{marginBottom:i===0?'.75rem':0}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
                 <span style={{fontSize:'.75rem',color:u.color,fontWeight:'bold'}}>{u.name}</span>
@@ -1689,12 +1701,12 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
   );
 }
 
-function UserSharedCard({user, todos, note, isSelf}) {
+function UserSharedCard({user, todos, note, isSelf, notShared}) {
   const isEmpty = !note && !todos?.length;
 
   return (
     <div style={{
-      background:isEmpty?'#f8f8f8':'white',
+      background:(notShared||isEmpty)?'#f8f8f8':'white',
       border:`1.5px solid ${user.color}33`,
       borderRadius:'8px',
       padding:'1rem',
@@ -1704,7 +1716,11 @@ function UserSharedCard({user, todos, note, isSelf}) {
         {isSelf&&<span style={{fontSize:'.6rem',color:'#bbb',letterSpacing:'.08em'}}>ME</span>}
       </div>
 
-      {isEmpty ? (
+      {notShared ? (
+        <div style={{textAlign:'center',color:'#d0d0d0',fontSize:'.75rem',padding:'2rem 0'}}>
+          {isSelf ? 'Share 버튼을 눌러\n공유해 보세요.' : '아직 공유하지 않았어요.'}
+        </div>
+      ) : isEmpty ? (
         <div style={{textAlign:'center',color:'#d0d0d0',fontSize:'.75rem',padding:'2rem 0'}}>
           아직 내용이 없습니다.
         </div>
