@@ -414,6 +414,7 @@ function MainApp({userId, onLogout}) {
   const [partnerMsg, setPartnerMsg]= React.useState('');
   const [msgEdit,    setMsgEdit]   = React.useState(false);
   const [myShared,   setMyShared]  = React.useState(null);
+  const [memoOpen,   setMemoOpen]  = React.useState(null);
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -456,6 +457,11 @@ function MainApp({userId, onLogout}) {
   function toggleHidden(i,e) {
     e.stopPropagation(); if (editMode) return;
     const upd=items.map((it,idx)=>idx===i?{...it,hidden:!it.hidden}:it);
+    setAllTodos(p=>({...p,[dk]:upd}));
+    db.ref(`users/${userId}/todos/${dk}`).set(upd);
+  }
+  function updateMemo(i, text) {
+    const upd=items.map((it,idx)=>idx===i?{...it,memo:text}:it);
     setAllTodos(p=>({...p,[dk]:upd}));
     db.ref(`users/${userId}/todos/${dk}`).set(upd);
   }
@@ -592,6 +598,7 @@ function MainApp({userId, onLogout}) {
     const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
     setDismissedRtns(new Set());
     setCopiedYday(false);
+    setMemoOpen(null);
     return()=>r.off('value',h);
   },[dk,userId]);
 
@@ -850,47 +857,80 @@ function MainApp({userId, onLogout}) {
                       <div>
                         {list.map((item, catIdx)=>{
                           const isMoved = movedKey?.cat===cat && movedKey?.catIdx===catIdx;
+                          const memoIsOpen = memoOpen === item.gi;
                           return (
-                          <div key={item.gi}
-                            style={{
-                              display:'flex', alignItems:'center', gap:'.4rem', marginBottom:'.22rem',
-                              padding:'.05rem .2rem .05rem .1rem', borderRadius:'3px',
-                              backgroundColor: isMoved ? color+'22' : item.important ? color+'33' : 'transparent',
-                              opacity: item.hidden ? 0.4 : 1,
-                              transition: isMoved ? 'none' : 'background-color .65s ease-out, opacity .2s',
-                            }}>
-                            {editMode&&(
-                              <div style={{display:'flex',flexDirection:'column',gap:'2px',flexShrink:0,alignItems:'center'}}>
-                                <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,-1)}
-                                  style={{padding:'1px 3px',display:'flex',color:catIdx===0?'#ddd':'#999'}}>
-                                  <span style={{display:'block',width:0,height:0,
-                                    borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
-                                    borderBottom:'4.5px solid currentColor'}}/>
-                                </button>
-                                <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,1)}
-                                  style={{padding:'1px 3px',display:'flex',color:catIdx===list.length-1?'#ddd':'#999'}}>
-                                  <span style={{display:'block',width:0,height:0,
-                                    borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
-                                    borderTop:'4.5px solid currentColor'}}/>
-                                </button>
+                          <div key={item.gi} style={{marginBottom: item.memo&&!memoIsOpen ? '.35rem' : '.22rem'}}>
+                            <div
+                              style={{
+                                display:'flex', alignItems:'center', gap:'.4rem',
+                                padding:'.05rem .2rem .05rem .1rem', borderRadius:'3px',
+                                backgroundColor: isMoved ? color+'22' : item.important ? color+'33' : 'transparent',
+                                opacity: item.hidden ? 0.4 : 1,
+                                transition: isMoved ? 'none' : 'background-color .65s ease-out, opacity .2s',
+                              }}>
+                              {editMode&&(
+                                <div style={{display:'flex',flexDirection:'column',gap:'2px',flexShrink:0,alignItems:'center'}}>
+                                  <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,-1)}
+                                    style={{padding:'1px 3px',display:'flex',color:catIdx===0?'#ddd':'#999'}}>
+                                    <span style={{display:'block',width:0,height:0,
+                                      borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
+                                      borderBottom:'4.5px solid currentColor'}}/>
+                                  </button>
+                                  <button className="icon-btn" onClick={()=>moveItem(cat,catIdx,1)}
+                                    style={{padding:'1px 3px',display:'flex',color:catIdx===list.length-1?'#ddd':'#999'}}>
+                                    <span style={{display:'block',width:0,height:0,
+                                      borderLeft:'3.5px solid transparent',borderRight:'3.5px solid transparent',
+                                      borderTop:'4.5px solid currentColor'}}/>
+                                  </button>
+                                </div>
+                              )}
+                              <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
+                              <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}>{item.text}</span>
+                              <button className="icon-btn" onClick={()=>setMemoOpen(memoIsOpen?null:item.gi)}
+                                style={{flexShrink:0,padding:'0 2px',fontSize:'.7rem',alignSelf:'baseline',
+                                  color:item.memo?color:'#d8d8d8',letterSpacing:'-.03em'}}>
+                                {item.memo&&!memoIsOpen?'✎·':' ✎'}
+                              </button>
+                              <button className="icon-btn" onClick={e=>toggleImportant(item.gi,e)}
+                                style={{color:item.important?color:'#ccc',flexShrink:0,fontSize:'.85rem',padding:'0 1px',alignSelf:'baseline'}}>
+                                {item.important?'★':'☆'}
+                              </button>
+                              <button className="icon-btn" onClick={e=>toggleHidden(item.gi,e)}
+                                style={{flexShrink:0,padding:'0 1px',alignSelf:'baseline'}}>
+                                <BulbIcon visible={!item.hidden} size={15} color={item.hidden?'#ddd':color}/>
+                              </button>
+                              {editMode&&(
+                                <>
+                                  <button className="icon-btn" onClick={()=>editItem(item.gi)}>edit</button>
+                                  <button className="icon-btn" onClick={()=>delItem(item.gi)}>✕</button>
+                                </>
+                              )}
+                            </div>
+                            {memoIsOpen ? (
+                              <textarea
+                                autoFocus
+                                value={item.memo||''}
+                                onChange={e=>updateMemo(item.gi,e.target.value)}
+                                onBlur={()=>{ if(!item.memo)setMemoOpen(null); }}
+                                onKeyDown={e=>{ if(e.key==='Escape'){setMemoOpen(null);e.preventDefault();} }}
+                                placeholder="메모를 입력하세요…"
+                                rows={2}
+                                style={{
+                                  display:'block',width:'100%',marginTop:'.2rem',
+                                  paddingLeft:'1.5rem',
+                                  border:'none',borderBottom:`1px solid ${color}44`,
+                                  background:'transparent',resize:'none',
+                                  fontFamily:'inherit',fontSize:'.78rem',lineHeight:1.6,
+                                  color:'#666',outline:'none',
+                                }}
+                              />
+                            ) : item.memo ? (
+                              <div onClick={()=>setMemoOpen(item.gi)}
+                                style={{paddingLeft:'1.5rem',fontSize:'.75rem',color:'#aaa',lineHeight:1.5,
+                                  whiteSpace:'pre-wrap',cursor:'text',marginTop:'.1rem'}}>
+                                {item.memo}
                               </div>
-                            )}
-                            <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
-                            <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}>{item.text}</span>
-                            <button className="icon-btn" onClick={e=>toggleImportant(item.gi,e)}
-                              style={{color:item.important?color:'#ccc',flexShrink:0,fontSize:'.85rem',padding:'0 1px',alignSelf:'baseline'}}>
-                              {item.important?'★':'☆'}
-                            </button>
-                            <button className="icon-btn" onClick={e=>toggleHidden(item.gi,e)}
-                              style={{flexShrink:0,padding:'0 1px',alignSelf:'baseline'}}>
-                              <BulbIcon visible={!item.hidden} size={15} color={item.hidden?'#ddd':color}/>
-                            </button>
-                            {editMode&&(
-                              <>
-                                <button className="icon-btn" onClick={()=>editItem(item.gi)}>edit</button>
-                                <button className="icon-btn" onClick={()=>delItem(item.gi)}>✕</button>
-                              </>
-                            )}
+                            ) : null}
                           </div>
                         );})}
                         {list.length===0 && pendingRtns.length===0 && !editMode && <div style={{fontSize:'.75rem',color:'#e8e8e8',padding:'.1rem 0'}}>—</div>}
