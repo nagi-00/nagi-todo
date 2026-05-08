@@ -110,6 +110,19 @@ function loadSession() {
 function saveSession(data) { localStorage.setItem('twin-session', JSON.stringify(data)); }
 function clearSession() { localStorage.removeItem('twin-session'); }
 
+/* ─── Mobile helpers (module-level so all components can access) ─── */
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+function saveOrOpenBlob(blob, filename) {
+  const u = URL.createObjectURL(blob);
+  if (isMobile) {
+    window.open(u, '_blank');
+    setTimeout(()=>URL.revokeObjectURL(u), 10000);
+  } else {
+    const a = document.createElement('a'); a.href=u; a.download=filename; a.click();
+    URL.revokeObjectURL(u);
+  }
+}
+
 /* ─── Helpers ───────────────────────────────────────────── */
 function loadSched() {
   try { return JSON.parse(localStorage.getItem('focusSched')) || DEF_SCHED; }
@@ -397,6 +410,7 @@ function MainApp({userId, onLogout}) {
   const [routines,   setRoutines]  = React.useState([]);
   const [showRtn,    setShowRtn]   = React.useState(false);
   const [dismissedRtns, setDismissedRtns] = React.useState(new Set());
+  const [copiedYday,  setCopiedYday]  = React.useState(false);
   const [partnerMsg, setPartnerMsg]= React.useState('');
   const [msgEdit,    setMsgEdit]   = React.useState(false);
 
@@ -469,6 +483,7 @@ function MainApp({userId, onLogout}) {
     if (!failed.length) { alert('전날 ☒ 항목이 없습니다.'); return; }
     const copied = failed.map(it=>({...it, state:0, hidden:false}));
     db.ref(`users/${userId}/todos/${dk}`).set([...items,...copied]);
+    setCopiedYday(true);
   }
   function saveEdit() {
     if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
@@ -511,17 +526,6 @@ function MainApp({userId, onLogout}) {
     alert('공유 완료!');
   }
 
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  function saveOrOpenBlob(blob, filename) {
-    const u = URL.createObjectURL(blob);
-    if (isMobile) {
-      window.open(u, '_blank');
-      setTimeout(()=>URL.revokeObjectURL(u), 10000);
-    } else {
-      const a = document.createElement('a'); a.href=u; a.download=filename; a.click();
-      URL.revokeObjectURL(u);
-    }
-  }
   async function exportImg() {
     const el=document.getElementById('xcard'); if (!el) return;
     await document.fonts.ready;
@@ -571,8 +575,6 @@ function MainApp({userId, onLogout}) {
       listeners.push([r,h]);
     };
     sub(`users/${partner.id}/shared/${dk}`, 'shared');
-    sub(`users/${partner.id}/todos/${dk}`, 'todos');
-    sub(`users/${partner.id}/notes/${dk}`, 'note');
     sub(`users/${partner.id}/message/${dk}`, 'message');
     return()=>listeners.forEach(([r,h])=>r.off('value',h));
   },[partner?.id, dk]);
@@ -581,6 +583,7 @@ function MainApp({userId, onLogout}) {
     const r=db.ref(`users/${userId}/todos/${dk}`);
     const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
     setDismissedRtns(new Set());
+    setCopiedYday(false);
     return()=>r.off('value',h);
   },[dk,userId]);
 
@@ -909,10 +912,11 @@ function MainApp({userId, onLogout}) {
                 {(()=>{
                   const appliedTexts=new Set(items.map(it=>it.text));
                   const hasUnappliedRtns=appRoutines.length>0&&appRoutines.some(r=>!appliedTexts.has(r.text));
-                  if(items.length>0&&!hasUnappliedRtns) return null;
+                  const showCopy = !copiedYday && items.length===0;
+                  if(!showCopy&&!hasUnappliedRtns) return null;
                   return(
                     <div style={{display:'flex',justifyContent:'flex-end',gap:'.35rem',marginTop:'.3rem'}}>
-                      <button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>☒ 적용</button>
+                      {showCopy&&<button onClick={copyYesterday} style={{...pill('#f0f0f0','#888',true)}}>☒ 적용</button>}
                       {hasUnappliedRtns&&(
                         <button onClick={applyRtn} style={{...pill(color,'#fff',true)}}>루틴 적용</button>
                       )}
@@ -989,7 +993,7 @@ function MainApp({userId, onLogout}) {
         <PomodoroWidget color={color}/>
         <MusicWidget color={color} userId={userId}/>
       </div>
-      {userId==='user1'&&<DemianWidget/>}
+      <DemianWidget/>
     </div>
   );
 }
@@ -1617,7 +1621,11 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
     );
   }
 
-  const partnerTodos = partnerData?.todos || [];
+  const partnerShared = partnerData?.shared;
+  const partnerTodos  = partnerShared?.todos || [];
+  const partnerNote   = partnerShared?.note  || '';
+  const partnerColor  = partnerShared?.color || partner.color;
+
   const myVisTodos = myTodos.filter(it=>!it.hidden);
   const partnerVisTodos = partnerTodos.filter(it=>!it.hidden);
 
@@ -1636,7 +1644,7 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
         <UserSharedCard user={myUser} todos={myTodos} note={myNote} isSelf/>
-        <UserSharedCard user={partner} todos={partnerTodos} note={partnerData?.note} isSelf={false}/>
+        <UserSharedCard user={{...partner, color:partnerColor}} todos={partnerTodos} note={partnerNote} isSelf={false}/>
       </div>
 
       {(myMsg || partnerMsg) && (
@@ -1664,7 +1672,7 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
       {(myVisTodos.length > 0 || partnerVisTodos.length > 0) && (
         <div style={{marginTop:'1.5rem',paddingTop:'1.5rem',borderTop:'1px solid #f0f0f0'}}>
           <span style={sectionLabel()}>오늘의 달성도</span>
-          {[{u:myUser,done:myDone,total:myVisTodos.length,pct:myPct},{u:partner,done:ptDone,total:partnerVisTodos.length,pct:ptPct}].map(({u,done,total,pct},i)=>(
+          {[{u:myUser,done:myDone,total:myVisTodos.length,pct:myPct},{u:{...partner,color:partnerColor},done:ptDone,total:partnerVisTodos.length,pct:ptPct}].map(({u,done,total,pct},i)=>(
             <div key={i} style={{marginBottom:i===0?'.75rem':0}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
                 <span style={{fontSize:'.75rem',color:u.color,fontWeight:'bold'}}>{u.name}</span>
