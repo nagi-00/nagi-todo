@@ -912,7 +912,7 @@ function MainApp({userId, onLogout}) {
                                 value={item.memo||''}
                                 onChange={e=>updateMemo(item.gi,e.target.value)}
                                 onBlur={()=>{ if(!item.memo)setMemoOpen(null); }}
-                                onKeyDown={e=>{ if(e.key==='Escape'){setMemoOpen(null);e.preventDefault();} }}
+                                onKeyDown={e=>{ if(e.key==='Escape'||(e.key==='Enter'&&!e.shiftKey)){setMemoOpen(null);e.preventDefault();} }}
                                 placeholder="메모를 입력하세요…"
                                 rows={2}
                                 style={{
@@ -1121,18 +1121,26 @@ function XCard({dlabel,noteText,items,color,routines=[]}) {
                   <span style={{flex:1,overflow:'hidden',whiteSpace:'nowrap',letterSpacing:'-.05em',textAlign:'right'}}>{'─'.repeat(30)}</span>
                 </div>
                 {list.map((it,i)=>(
-                  <div key={i} style={{
-                    display:'flex',gap:'.6rem',alignItems:'flex-start',
-                    color:it.state===1?'#999':'#1a1a1a',
-                    textDecoration:it.state===1?'line-through':'none',
-                    background:it.important?color+'22':'transparent',
-                    padding:it.important?'0 .35rem':'0',
-                    margin:it.important?'0 -.35rem':'0',
-                    borderRadius:'2px',
-                  }}>
-                    <span style={{flexShrink:0,minWidth:'.7rem'}}>{xBullet(it.state)}</span>
-                    <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
-                    {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
+                  <div key={i} style={{marginBottom:it.memo?'.3rem':0}}>
+                    <div style={{
+                      display:'flex',gap:'.6rem',alignItems:'flex-start',
+                      color:it.state===1?'#999':'#1a1a1a',
+                      textDecoration:it.state===1?'line-through':'none',
+                      background:it.important?color+'22':'transparent',
+                      padding:it.important?'0 .35rem':'0',
+                      margin:it.important?'0 -.35rem':'0',
+                      borderRadius:'2px',
+                    }}>
+                      <span style={{flexShrink:0,minWidth:'.7rem'}}>{xBullet(it.state)}</span>
+                      <span style={{flex:1,whiteSpace:'pre-wrap'}}>{it.text}</span>
+                      {it.important&&<span style={{color,flexShrink:0,fontSize:'.7rem',marginTop:'.05rem'}}>★</span>}
+                    </div>
+                    {it.memo&&(
+                      <div style={{paddingLeft:'1.3rem',fontSize:'.62rem',color:'#888',fontStyle:'italic',
+                        lineHeight:1.5,whiteSpace:'pre-wrap',marginTop:'-.1rem'}}>
+                        └ {it.memo}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {pendingRtns.map((r,i)=>(
@@ -1781,16 +1789,24 @@ function UserSharedCard({user, todos, note, isSelf, notShared}) {
                   <div key={cat} style={{marginBottom:'.5rem'}}>
                     <div style={{fontSize:'.58rem',letterSpacing:'.15em',color:(CAT_HUE[cat]||'#999')+'aa',marginBottom:'.25rem'}}>{cat}</div>
                     {list.map((it,i)=>(
-                      <div key={i} style={{
-                        display:'flex',alignItems:'baseline',gap:'.3rem',fontSize:'.8rem',lineHeight:1.6,marginBottom:'.15rem',
-                        color:it.hidden?'#ccc':(it.state===1?'#bbb':'#555'),
-                        textDecoration:(!it.hidden&&it.state===1)?'line-through':'none',
-                      }}>
-                        <span style={{fontFamily:'monospace',fontSize:'.75rem',color:it.hidden?'#ddd':user.color}}>{BULLET[it.state]}</span>
-                        <span style={{flex:1,fontStyle:it.hidden?'italic':'normal'}}>
-                          {it.hidden?'비공개 항목입니다.':it.text}
-                        </span>
-                        {it.important&&!it.hidden&&<span style={{color:user.color,fontSize:'.7rem'}}>★</span>}
+                      <div key={i} style={{marginBottom:it.memo&&!it.hidden?'.25rem':'.15rem'}}>
+                        <div style={{
+                          display:'flex',alignItems:'baseline',gap:'.3rem',fontSize:'.8rem',lineHeight:1.6,
+                          color:it.hidden?'#ccc':(it.state===1?'#bbb':'#555'),
+                          textDecoration:(!it.hidden&&it.state===1)?'line-through':'none',
+                        }}>
+                          <span style={{fontFamily:'monospace',fontSize:'.75rem',color:it.hidden?'#ddd':user.color}}>{BULLET[it.state]}</span>
+                          <span style={{flex:1,fontStyle:it.hidden?'italic':'normal'}}>
+                            {it.hidden?'비공개 항목입니다.':it.text}
+                          </span>
+                          {it.important&&!it.hidden&&<span style={{color:user.color,fontSize:'.7rem'}}>★</span>}
+                        </div>
+                        {it.memo&&!it.hidden&&(
+                          <div style={{paddingLeft:'1.1rem',fontSize:'.68rem',color:'#bbb',fontStyle:'italic',
+                            lineHeight:1.4,whiteSpace:'pre-wrap'}}>
+                            └ {it.memo}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
