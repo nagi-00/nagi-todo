@@ -258,7 +258,7 @@ function BulbIcon({visible, size=16, color='currentColor'}) {
 ══════════════════════════════════════════════════════════ */
 function LoginScreen({onLogin}) {
   const [users, setUsers] = React.useState(loadUsers);
-  const [selected, setSelected] = React.useState(null);
+  const [nameInput, setNameInput] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [fbReady, setFbReady] = React.useState(false);
@@ -268,9 +268,7 @@ function LoginScreen({onLogin}) {
     db.ref('settings/users').once('value').then(snap=>{
       const fbUsers = snap.val() || {};
       const localUsers = loadUsers();
-      // Firebase wins per-user, but local fills any user Firebase doesn't have
       const merged = { ...DEFAULT_USERS, ...localUsers, ...fbUsers };
-      // Upload any user missing from Firebase so other devices can sync
       Object.entries(merged).forEach(([id, data])=>{
         if (!fbUsers[id]) db.ref(`settings/users/${id}`).set(data);
       });
@@ -280,48 +278,41 @@ function LoginScreen({onLogin}) {
   },[]);
 
   function handleLogin() {
-    if (!selected) { setError('사용자를 선택해주세요.'); return; }
     if (!fbReady) { setError('잠시만 기다려줘...'); return; }
-    if (users[selected].password === password) {
-      onLogin(selected);
+    const trimmed = nameInput.trim();
+    const match = Object.entries(users).find(([,u])=>u.name===trimmed);
+    if (!match) { setError('이름을 확인해줘.'); return; }
+    const [id, u] = match;
+    if (u.password === password) {
+      onLogin(id);
     } else {
-      setError('비밀번호를 다시 입력해주세요.');
+      setError('비밀번호를 다시 입력해줘.');
       setPassword('');
     }
   }
+
+  const inputStyle = {width:'100%',padding:'.65rem .75rem',border:'1px solid #ddd',borderRadius:'8px',fontSize:'.85rem',marginBottom:'.75rem',boxSizing:'border-box'};
 
   return (
     <div className="login-screen" style={{background:`linear-gradient(135deg, ${loginGrad} 0%, #f8f8f8 100%)`}}>
       <div className="login-card">
         <h1 style={{fontSize:'1.8rem',textAlign:'center',marginBottom:'1.5rem',color:'#333',letterSpacing:'-.02em'}}>🖤 𝘁𝘄𝗶𝗻-𝘁𝗼𝗱𝗼 🤍</h1>
 
-        <div style={{display:'flex',gap:'.5rem',marginBottom:'1.5rem'}}>
-          {Object.entries(users).map(([id,u])=>(
-            <button key={id} onClick={()=>{setSelected(id);setError('');}} style={{
-              flex:1, padding:'.75rem',borderRadius:'8px',border:'2px solid',
-              borderColor:selected===id?u.color:'#e8e8e8',
-              background:selected===id?(u.color+'15'):'white',
-              color:selected===id?u.color:'#999',
-              fontSize:'.85rem',fontWeight:selected===id?'bold':'normal',
-              cursor:'pointer',transition:'all .2s',
-            }}>{u.name}</button>
-          ))}
-        </div>
-
-        {selected&&(
-          <>
-            <input type="password" value={password} onChange={e=>setPassword(e.target.value)}
-              onKeyDown={e=>e.key==='Enter'&&handleLogin()}
-              placeholder="비밀번호" autoFocus
-              style={{width:'100%',padding:'.65rem .75rem',border:'1px solid #ddd',borderRadius:'8px',fontSize:'.85rem',marginBottom:'.75rem'}}
-            />
-            <button onClick={handleLogin} disabled={!fbReady} style={{
-              width:'100%',padding:'.75rem',borderRadius:'8px',border:'none',
-              background:fbReady?users[selected].color:'#ccc',color:'white',fontSize:'.85rem',fontWeight:'bold',
-              cursor:fbReady?'pointer':'not-allowed',transition:'background .2s',
-            }}>{fbReady?'입장하기':'...'}</button>
-          </>
-        )}
+        <input type="text" value={nameInput} onChange={e=>{setNameInput(e.target.value);setError('');}}
+          onKeyDown={e=>e.key==='Enter'&&document.getElementById('login-pw').focus()}
+          placeholder="이름" autoFocus autoComplete="username"
+          style={inputStyle}
+        />
+        <input id="login-pw" type="password" value={password} onChange={e=>{setPassword(e.target.value);setError('');}}
+          onKeyDown={e=>e.key==='Enter'&&handleLogin()}
+          placeholder="비밀번호" autoComplete="current-password"
+          style={inputStyle}
+        />
+        <button onClick={handleLogin} disabled={!fbReady} style={{
+          width:'100%',padding:'.75rem',borderRadius:'8px',border:'none',
+          background:fbReady?'#2D2D2D':'#ccc',color:'white',fontSize:'.85rem',fontWeight:'bold',
+          cursor:fbReady?'pointer':'not-allowed',transition:'background .2s',
+        }}>{fbReady?'입장하기':'...'}</button>
 
         {error&&<div style={{marginTop:'.75rem',fontSize:'.75rem',color:'#e74c3c',textAlign:'center'}}>{error}</div>}
       </div>
