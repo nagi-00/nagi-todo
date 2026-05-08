@@ -665,7 +665,7 @@ function MainApp({userId, onLogout}) {
                   placeholder="파트너 아이디"
                   style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit',marginBottom:'.5rem',boxSizing:'border-box'}}/>
                 {partner&&<div style={{fontSize:'.68rem',color:'#4a7c5a',marginBottom:'.4rem'}}>✓ {partner.name}님과 연동 중</div>}
-                {myProfile.partnerId&&!partner&&<div style={{fontSize:'.68rem',color:'#e08000',marginBottom:'.4rem'}}>⏳ 상대방의 수락 대기 중</div>}
+                {myProfile.partnerId&&!partner&&<div style={{fontSize:'.68rem',color:'#e08000',marginBottom:'.4rem'}}>상대방의 수락 대기 중...</div>}
                 <button onClick={saveEdit} style={{...pill(color,'#fff',true),width:'100%',borderRadius:'6px'}}>저장</button>
               </div>
             )}
@@ -1607,11 +1607,11 @@ function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
   if (!partner) {
     return (
       <div style={{...CARD, textAlign:'center', padding:'3rem 1.5rem', color:'#bbb'}}>
-        <div style={{fontSize:'1.5rem', marginBottom:'1rem'}}>🔗</div>
-        <div style={{fontSize:'.9rem', marginBottom:'.5rem', color:'#999'}}>파트너가 연결되지 않았어요</div>
+        <div style={{fontSize:'1.5rem', marginBottom:'1rem'}}>🖤🤍</div>
+        <div style={{fontSize:'.9rem', marginBottom:'.5rem', color:'#999'}}>파트너가 연결되지 않았어요.</div>
         <div style={{fontSize:'.78rem', lineHeight:1.6}}>
           설정에서 파트너 아이디를 입력하고,<br/>
-          상대방도 내 아이디를 입력하면 연동돼요
+          상대방도 내 아이디를 입력하면 연동됩니다.
         </div>
       </div>
     );
