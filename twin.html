@@ -993,7 +993,7 @@ function MainApp({userId, onLogout}) {
         <PomodoroWidget color={color}/>
         <MusicWidget color={color} userId={userId}/>
       </div>
-      <DemianWidget/>
+      {userId==='nagi'&&<DemianWidget/>}
     </div>
   );
 }
