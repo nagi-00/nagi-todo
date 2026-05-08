@@ -266,8 +266,15 @@ function LoginScreen({onLogin}) {
 
   React.useEffect(()=>{
     db.ref('settings/users').once('value').then(snap=>{
-      const fbUsers=snap.val();
-      if(fbUsers){ saveUsers(fbUsers); setUsers(fbUsers); }
+      const fbUsers = snap.val() || {};
+      const localUsers = loadUsers();
+      // Firebase wins per-user, but local fills any user Firebase doesn't have
+      const merged = { ...DEFAULT_USERS, ...localUsers, ...fbUsers };
+      // Upload any user missing from Firebase so other devices can sync
+      Object.entries(merged).forEach(([id, data])=>{
+        if (!fbUsers[id]) db.ref(`settings/users/${id}`).set(data);
+      });
+      saveUsers(merged); setUsers(merged);
       setFbReady(true);
     }).catch(()=>setFbReady(true));
   },[]);
@@ -520,7 +527,10 @@ function MainApp({userId, onLogout}) {
     const r=db.ref('settings/users');
     const h=r.on('value',s=>{
       const v=s.val();
-      if(v){ saveUsers(v); setUSERS(v); }
+      if(v){
+        const merged={...DEFAULT_USERS,...loadUsers(),...v};
+        saveUsers(merged); setUSERS(merged);
+      }
     });
     return()=>r.off('value',h);
   },[]);
