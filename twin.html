@@ -462,11 +462,13 @@ function MainApp({userId, onLogout}) {
   }
   function saveEdit() {
     if (!editName.trim()) { alert('이름을 입력해줘.'); return; }
-    const updated = { ...USERS[userId], color: editColor, name: editName.trim() };
+    const updated = { ...myProfile, color: editColor, name: editName.trim() };
     if (editPass.trim()) updated.password = editPass.trim();
-    const newUsers = { ...USERS, [userId]: updated };
-    saveUsers(newUsers);
-    db.ref(`settings/users/${userId}`).set(updated);
+    if (editPartner.trim()) updated.partnerId = editPartner.trim();
+    else delete updated.partnerId;
+    db.ref(`users/${userId}/profile`).set(updated);
+    setMyProfile(updated);
+    setAccent(updated.color);
     setShowEdit(false);
     setEditPass('');
   }
@@ -489,7 +491,7 @@ function MainApp({userId, onLogout}) {
   }
 
   function shareToday() {
-    db.ref(`shared/${userId}/daily/${dk}`).set({
+    db.ref(`users/${userId}/shared/${dk}`).set({
       color,
       note: noteText,
       todos: items,
@@ -523,17 +525,47 @@ function MainApp({userId, onLogout}) {
   }
 
   /* effects */
+
+  // Load my profile
   React.useEffect(()=>{
-    const r=db.ref('settings/users');
+    const r=db.ref(`users/${userId}/profile`);
     const h=r.on('value',s=>{
       const v=s.val();
-      if(v){
-        const merged={...DEFAULT_USERS,...loadUsers(),...v};
-        saveUsers(merged); setUSERS(merged);
-      }
+      if(v){ setMyProfile(v); setAccent(v.color); setEditName(v.name); setEditColor(v.color); setEditPartner(v.partnerId||''); }
     });
     return()=>r.off('value',h);
-  },[]);
+  },[userId]);
+
+  // Partner detection: my partnerId → check mutual
+  React.useEffect(()=>{
+    const partnerId = myProfile.partnerId;
+    if (!partnerId) { setPartner(null); return; }
+    const r=db.ref(`users/${partnerId}/profile`);
+    const h=r.on('value',s=>{
+      const v=s.val();
+      if(v && v.partnerId===userId){ setPartner({id:partnerId,...v}); }
+      else { setPartner(null); }
+    });
+    return()=>r.off('value',h);
+  },[myProfile.partnerId, userId]);
+
+  // Partner's data for today
+  React.useEffect(()=>{
+    if (!partner) { setPartnerData(null); return; }
+    const listeners = [];
+    const state = {};
+    const update = () => setPartnerData({...state});
+    const sub = (path, key) => {
+      const r=db.ref(path);
+      const h=r.on('value',s=>{ state[key]=s.val(); update(); });
+      listeners.push([r,h]);
+    };
+    sub(`users/${partner.id}/shared/${dk}`, 'shared');
+    sub(`users/${partner.id}/todos/${dk}`, 'todos');
+    sub(`users/${partner.id}/notes/${dk}`, 'note');
+    sub(`users/${partner.id}/message/${dk}`, 'message');
+    return()=>listeners.forEach(([r,h])=>r.off('value',h));
+  },[partner?.id, dk]);
 
   React.useEffect(()=>{
     const r=db.ref(`users/${userId}/todos/${dk}`);
@@ -549,47 +581,38 @@ function MainApp({userId, onLogout}) {
   },[userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`private/${userId}/notes/${dk}`);
+    const r=db.ref(`users/${userId}/notes/${dk}`);
     const h=r.on('value',s=>setNoteText(s.val()||''));
     return()=>r.off('value',h);
   },[dk,userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`shared/${userId}/daily/${dk}/message`);
+    const r=db.ref(`users/${userId}/message/${dk}`);
     const h=r.on('value',s=>setPartnerMsg(s.val()||''));
     setMsgEdit(false);
     return()=>r.off('value',h);
   },[dk,userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`private/${userId}/notes`);
+    const r=db.ref(`users/${userId}/notes`);
     const h=r.on('value',s=>setNotes(s.val()||{}));
     return()=>r.off('value',h);
   },[userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`private/${userId}/journal/${dk}`);
+    const r=db.ref(`users/${userId}/journal/${dk}`);
     const h=r.on('value',s=>setJournals(p=>({...p,[dk]:s.val()||{morning:'',evening:'',mood:null}})));
     return()=>r.off('value',h);
   },[dk,userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`private/${userId}/routines`);
+    const r=db.ref(`users/${userId}/routines`);
     const h=r.on('value',s=>{
       const v=s.val()||{};
       setRoutines(Object.entries(v).map(([id,x])=>({id,...x})));
     });
     return()=>r.off('value',h);
   },[userId]);
-
-  // Shared data listener
-  React.useEffect(()=>{
-    const r1=db.ref(`shared/user1/daily/${dk}`);
-    const r2=db.ref(`shared/user2/daily/${dk}`);
-    const h1=r1.on('value',s=>setSharedData(p=>({...p,user1:s.val()})));
-    const h2=r2.on('value',s=>setSharedData(p=>({...p,user2:s.val()})));
-    return()=>{ r1.off('value',h1); r2.off('value',h2); };
-  },[dk]);
 
 
   /* ── render ── */
@@ -616,26 +639,24 @@ function MainApp({userId, onLogout}) {
             </div>
             {showEdit&&(
               <div style={{marginTop:'.75rem',padding:'.75rem',background:'#f8f8f8',borderRadius:'8px',textAlign:'left'}}>
-                <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.4rem',letterSpacing:'.05em'}}>이름</div>
+                <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.4rem',letterSpacing:'.05em'}}>표시 이름</div>
                 <input type="text" value={editName} onChange={e=>setEditName(e.target.value)}
                   placeholder="이름"
                   style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit',marginBottom:'.5rem',boxSizing:'border-box'}}/>
                 <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.4rem',letterSpacing:'.05em'}}>테마 색상</div>
                 <input type="color" value={editColor} onChange={e=>setEditColor(e.target.value)}
                   style={{width:'100%',height:'32px',border:'none',borderRadius:'6px',cursor:'pointer',background:'none',padding:0}}/>
-                {userId==='user1'&&(
-                  <>
-                    <div style={{fontSize:'.65rem',color:'#bbb',margin:'.5rem 0 .4rem',letterSpacing:'.05em'}}>로그인 배경 색상</div>
-                    <input type="color" value={localStorage.getItem('twin-login-grad')||'#f5f7fa'}
-                      onChange={e=>localStorage.setItem('twin-login-grad',e.target.value)}
-                      style={{width:'100%',height:'32px',border:'none',borderRadius:'6px',cursor:'pointer',background:'none',padding:0}}/>
-                  </>
-                )}
                 <div style={{fontSize:'.65rem',color:'#bbb',margin:'.5rem 0 .4rem',letterSpacing:'.05em'}}>새 비밀번호 (변경 시에만 입력)</div>
                 <input type="password" value={editPass} onChange={e=>setEditPass(e.target.value)}
                   placeholder="새 비밀번호"
-                  style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit'}}/>
-                <button onClick={saveEdit} style={{...pill(color,'#fff',true),width:'100%',marginTop:'.5rem',borderRadius:'6px'}}>저장</button>
+                  style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit',marginBottom:'.5rem',boxSizing:'border-box'}}/>
+                <div style={{fontSize:'.65rem',color:'#bbb',marginBottom:'.4rem',letterSpacing:'.05em'}}>파트너 아이디 (상호 설정 시 연동)</div>
+                <input type="text" value={editPartner} onChange={e=>setEditPartner(e.target.value.trim().toLowerCase())}
+                  placeholder="파트너 아이디"
+                  style={{width:'100%',padding:'.4rem .5rem',border:'1px solid #eee',borderRadius:'6px',fontSize:'.8rem',fontFamily:'inherit',marginBottom:'.5rem',boxSizing:'border-box'}}/>
+                {partner&&<div style={{fontSize:'.68rem',color:'#4a7c5a',marginBottom:'.4rem'}}>✓ {partner.name}님과 연동 중</div>}
+                {myProfile.partnerId&&!partner&&<div style={{fontSize:'.68rem',color:'#e08000',marginBottom:'.4rem'}}>⏳ 상대방의 수락 대기 중</div>}
+                <button onClick={saveEdit} style={{...pill(color,'#fff',true),width:'100%',borderRadius:'6px'}}>저장</button>
               </div>
             )}
           </div>
@@ -702,7 +723,7 @@ function MainApp({userId, onLogout}) {
                     {new Date(d).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric'})}
                   </div>
                   <div style={{fontSize:'.82rem',fontWeight:'bold',whiteSpace:'pre-wrap',color:dColors[d]||accent,lineHeight:1.5}}>{txt}</div>
-                  <button className="icon-btn" onClick={()=>db.ref(`private/${userId}/notes/${d}`).remove()} style={{marginTop:'.3rem'}}>Delete</button>
+                  <button className="icon-btn" onClick={()=>db.ref(`users/${userId}/notes/${d}`).remove()} style={{marginTop:'.3rem'}}>Delete</button>
                 </div>
               ))}
             </div>
@@ -777,7 +798,7 @@ function MainApp({userId, onLogout}) {
                     value={noteText}
                     onChange={e=>setNoteText(e.target.value)}
                     onFocus={()=>setNoteEdit(true)}
-                    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();db.ref(`private/${userId}/notes/${dk}`).set(noteText.trim());setNoteEdit(false);}}}
+                    onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();db.ref(`users/${userId}/notes/${dk}`).set(noteText.trim());setNoteEdit(false);}}}
                     placeholder="오늘의 한마디 (Enter 저장, Shift+Enter 줄바꿈)" rows={2}
                     style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontWeight:'bold',color,fontFamily:'inherit',fontSize:'.9rem',lineHeight:1.65,marginBottom:'1rem'}}
                   />
@@ -890,8 +911,9 @@ function MainApp({userId, onLogout}) {
                 })()}
 
                 {/* 파트너에게 한마디 */}
+                {partner&&(
                 <div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:'1px solid #f5f5f5'}}>
-                  <span style={sectionLabel()}>{otherUser.name}에게 한마디</span>
+                  <span style={sectionLabel()}>{partner.name}에게 한마디</span>
                   {(!msgEdit&&partnerMsg.trim())?(
                     <div style={{whiteSpace:'pre-wrap',fontSize:'.82rem',color:'#555',lineHeight:1.6,cursor:'text',padding:'.1rem 0'}}
                       onDoubleClick={()=>setMsgEdit(true)}
@@ -900,16 +922,17 @@ function MainApp({userId, onLogout}) {
                     </div>
                   ):(
                     <textarea autoFocus={msgEdit} value={partnerMsg}
-                      onChange={e=>{setPartnerMsg(e.target.value);db.ref(`shared/${userId}/daily/${dk}/message`).set(e.target.value);}}
+                      onChange={e=>{setPartnerMsg(e.target.value);db.ref(`users/${userId}/message/${dk}`).set(e.target.value);}}
                       onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
                       onBlur={()=>setMsgEdit(false)}
                       onFocus={()=>setMsgEdit(true)}
-                      placeholder="공유 페이지에 표시될 메시지 (Enter 저장)"
+                      placeholder="파트너에게 보낼 메시지 (Enter 저장)"
                       rows={2}
                       style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontFamily:'inherit',fontSize:'.82rem',lineHeight:1.6,background:'#fafafa'}}
                     />
                   )}
                 </div>
+                )}
 
                 {/* bottom actions */}
                 <div style={{display:'flex',gap:'.4rem',marginTop:'.85rem',paddingTop:'.85rem',borderTop:'1px solid #f5f5f5'}}>
@@ -943,7 +966,8 @@ function MainApp({userId, onLogout}) {
 
           {/* ── SHARED ── */}
           {tab==='shared'&&(
-            <SharedTab dk={dk} data={sharedData} currentUserId={userId} USERS={USERS}/>
+            <SharedTab dk={dk} myUser={myProfile} myTodos={items} myNote={noteText} myMsg={partnerMsg}
+              partner={partner} partnerData={partnerData}/>
           )}
 
         </div>
@@ -1477,9 +1501,9 @@ function WeekTab({dColors,accent,userId,allTodos}) {
     Promise.all(days.map(async d=>{
       const k=d.toLocaleDateString('sv-SE');
       const [t,j,n]=await Promise.all([
-        db.ref(`private/${userId}/todos/${k}`).once('value'),
-        db.ref(`private/${userId}/journal/${k}`).once('value'),
-        db.ref(`private/${userId}/notes/${k}`).once('value'),
+        db.ref(`users/${userId}/todos/${k}`).once('value'),
+        db.ref(`users/${userId}/journal/${k}`).once('value'),
+        db.ref(`users/${userId}/notes/${k}`).once('value'),
       ]);
       const todos=t.val()||[];
       return {date:d,key:k,todos,journal:j.val()||{},note:n.val()||'',total:todos.length,done:todos.filter(it=>it.state===1).length};
@@ -1487,7 +1511,7 @@ function WeekTab({dColors,accent,userId,allTodos}) {
   },[userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`private/${userId}/notes`);
+    const r=db.ref(`users/${userId}/notes`);
     const h=r.on('value',s=>setNotes(s.val()||{}));
     return()=>r.off('value',h);
   },[userId]);
@@ -1569,22 +1593,30 @@ function WeekTab({dColors,accent,userId,allTodos}) {
 /* ══════════════════════════════════════════════════════════
    SharedTab
 ══════════════════════════════════════════════════════════ */
-function SharedTab({dk, data, currentUserId, USERS}) {
-  const myData = data[currentUserId];
-  const otherUserId = currentUserId === 'user1' ? 'user2' : 'user1';
-  const otherData = data[otherUserId];
+function SharedTab({dk, myUser, myTodos, myNote, myMsg, partner, partnerData}) {
+  if (!partner) {
+    return (
+      <div style={{...CARD, textAlign:'center', padding:'3rem 1.5rem', color:'#bbb'}}>
+        <div style={{fontSize:'1.5rem', marginBottom:'1rem'}}>🔗</div>
+        <div style={{fontSize:'.9rem', marginBottom:'.5rem', color:'#999'}}>파트너가 연결되지 않았어요</div>
+        <div style={{fontSize:'.78rem', lineHeight:1.6}}>
+          설정에서 파트너 아이디를 입력하고,<br/>
+          상대방도 내 아이디를 입력하면 연동돼요
+        </div>
+      </div>
+    );
+  }
 
-  const myUser = USERS[currentUserId];
-  const otherUser = USERS[otherUserId];
+  const partnerTodos = partnerData?.todos || [];
+  const myVisTodos = myTodos.filter(it=>!it.hidden);
+  const partnerVisTodos = partnerTodos.filter(it=>!it.hidden);
 
-  // Calculate progress
-  const myTotal = myData?.todos?.length || 0;
-  const myDone = myData?.todos?.filter(it=>it.state===1).length || 0;
-  const myPct = myTotal ? Math.round(myDone/myTotal*100) : 0;
+  const myDone = myVisTodos.filter(it=>it.state===1).length;
+  const myPct  = myVisTodos.length ? Math.round(myDone/myVisTodos.length*100) : 0;
+  const ptDone = partnerVisTodos.filter(it=>it.state===1).length;
+  const ptPct  = partnerVisTodos.length ? Math.round(ptDone/partnerVisTodos.length*100) : 0;
 
-  const otherTotal = otherData?.todos?.length || 0;
-  const otherDone = otherData?.todos?.filter(it=>it.state===1).length || 0;
-  const otherPct = otherTotal ? Math.round(otherDone/otherTotal*100) : 0;
+  const partnerMsg = partnerData?.message || '';
 
   return (
     <div style={CARD}>
@@ -1593,111 +1625,83 @@ function SharedTab({dk, data, currentUserId, USERS}) {
       </h2>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
-        {/* My Data */}
-        <UserSharedCard userId={currentUserId} user={myUser} data={myData} isSelf/>
-
-        {/* Other User Data */}
-        <UserSharedCard userId={otherUserId} user={otherUser} data={otherData}/>
+        <UserSharedCard user={myUser} todos={myTodos} note={myNote} isSelf/>
+        <UserSharedCard user={partner} todos={partnerTodos} note={partnerData?.note} isSelf={false}/>
       </div>
 
-      {/* Messages */}
-      {(myData?.message || otherData?.message) && (
+      {(myMsg || partnerMsg) && (
         <div style={{marginTop:'1.5rem',paddingTop:'1.5rem',borderTop:'1px solid #f0f0f0'}}>
           <span style={sectionLabel()}>서로에게 한마디</span>
-          {myData?.message && (
+          {myMsg && (
             <div style={{marginBottom:'.5rem',fontSize:'.85rem',lineHeight:1.7}}>
               <span style={{color:myUser.color,fontWeight:'bold'}}>{myUser.name}</span>
               <span style={{color:'#bbb',margin:'0 .3rem'}}>→</span>
-              <span style={{color:otherUser.color,fontWeight:'bold'}}>{otherUser.name}</span>
-              <span style={{color:'#999',marginLeft:'.3rem'}}>: {myData.message}</span>
+              <span style={{color:partner.color,fontWeight:'bold'}}>{partner.name}</span>
+              <span style={{color:'#999',marginLeft:'.3rem'}}>: {myMsg}</span>
             </div>
           )}
-          {otherData?.message && (
+          {partnerMsg && (
             <div style={{fontSize:'.85rem',lineHeight:1.7}}>
-              <span style={{color:otherUser.color,fontWeight:'bold'}}>{otherUser.name}</span>
+              <span style={{color:partner.color,fontWeight:'bold'}}>{partner.name}</span>
               <span style={{color:'#bbb',margin:'0 .3rem'}}>→</span>
               <span style={{color:myUser.color,fontWeight:'bold'}}>{myUser.name}</span>
-              <span style={{color:'#999',marginLeft:'.3rem'}}>: {otherData.message}</span>
+              <span style={{color:'#999',marginLeft:'.3rem'}}>: {partnerMsg}</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Progress Bars */}
-      {(myTotal > 0 || otherTotal > 0) && (
+      {(myVisTodos.length > 0 || partnerVisTodos.length > 0) && (
         <div style={{marginTop:'1.5rem',paddingTop:'1.5rem',borderTop:'1px solid #f0f0f0'}}>
           <span style={sectionLabel()}>오늘의 달성도</span>
-          
-          {/* My Progress */}
-          <div style={{marginBottom:'.75rem'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
-              <span style={{fontSize:'.75rem',color:myUser.color,fontWeight:'bold'}}>{myUser.name}</span>
-              <span style={{fontSize:'.7rem',color:'#bbb'}}>{myDone} / {myTotal}</span>
+          {[{u:myUser,done:myDone,total:myVisTodos.length,pct:myPct},{u:partner,done:ptDone,total:partnerVisTodos.length,pct:ptPct}].map(({u,done,total,pct},i)=>(
+            <div key={i} style={{marginBottom:i===0?'.75rem':0}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
+                <span style={{fontSize:'.75rem',color:u.color,fontWeight:'bold'}}>{u.name}</span>
+                <span style={{fontSize:'.7rem',color:'#bbb'}}>{done} / {total}</span>
+              </div>
+              <div style={{height:'6px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
+                <div style={{height:'100%',width:`${pct}%`,background:u.color,borderRadius:'9999px',transition:'width .5s ease'}}/>
+              </div>
             </div>
-            <div style={{height:'6px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
-              <div style={{
-                height:'100%',
-                width:`${myPct}%`,
-                background:myData?.color||myUser.color,
-                borderRadius:'9999px',
-                transition:'width .5s ease',
-              }}/>
-            </div>
-          </div>
-
-          {/* Other Progress */}
-          <div>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.25rem'}}>
-              <span style={{fontSize:'.75rem',color:otherUser.color,fontWeight:'bold'}}>{otherUser.name}</span>
-              <span style={{fontSize:'.7rem',color:'#bbb'}}>{otherDone} / {otherTotal}</span>
-            </div>
-            <div style={{height:'6px',background:'#f0f0f0',borderRadius:'9999px',overflow:'hidden'}}>
-              <div style={{
-                height:'100%',
-                width:`${otherPct}%`,
-                background:otherData?.color||otherUser.color,
-                borderRadius:'9999px',
-                transition:'width .5s ease',
-              }}/>
-            </div>
-          </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function UserSharedCard({userId, user, data, isSelf}) {
-  const isEmpty = !data || (!data.note && !data.todos?.length);
+function UserSharedCard({user, todos, note, isSelf}) {
+  const isEmpty = !note && !todos?.length;
 
   return (
     <div style={{
       background:isEmpty?'#f8f8f8':'white',
-      border:`1.5px solid ${data?.color||user.color}33`,
+      border:`1.5px solid ${user.color}33`,
       borderRadius:'8px',
       padding:'1rem',
     }}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'.75rem'}}>
-        <span style={{fontSize:'.85rem',fontWeight:'bold',color:data?.color||user.color}}>{user.name}</span>
+        <span style={{fontSize:'.85rem',fontWeight:'bold',color:user.color}}>{user.name}</span>
         {isSelf&&<span style={{fontSize:'.6rem',color:'#bbb',letterSpacing:'.08em'}}>ME</span>}
       </div>
 
       {isEmpty ? (
         <div style={{textAlign:'center',color:'#d0d0d0',fontSize:'.75rem',padding:'2rem 0'}}>
-          아직 공유하지 않았습니다.
+          아직 내용이 없습니다.
         </div>
       ) : (
         <>
-          {data.note && (
-            <div style={{fontSize:'.82rem',fontWeight:'bold',color:data.color||user.color,lineHeight:1.6,marginBottom:'.75rem',whiteSpace:'pre-wrap'}}>
-              {data.note}
+          {note && (
+            <div style={{fontSize:'.82rem',fontWeight:'bold',color:user.color,lineHeight:1.6,marginBottom:'.75rem',whiteSpace:'pre-wrap'}}>
+              {note}
             </div>
           )}
 
-          {data.todos?.length > 0 && (
+          {todos?.length > 0 && (
             <div>
               {CATS.map(cat=>{
-                const list=data.todos.filter(it=>it.category===cat);
+                const list=todos.filter(it=>it.category===cat);
                 if (!list.length) return null;
                 return (
                   <div key={cat} style={{marginBottom:'.5rem'}}>
@@ -1708,11 +1712,11 @@ function UserSharedCard({userId, user, data, isSelf}) {
                         color:it.hidden?'#ccc':(it.state===1?'#bbb':'#555'),
                         textDecoration:(!it.hidden&&it.state===1)?'line-through':'none',
                       }}>
-                        <span style={{fontFamily:'monospace',fontSize:'.75rem',color:it.hidden?'#ddd':(data.color||user.color)}}>{BULLET[it.state]}</span>
+                        <span style={{fontFamily:'monospace',fontSize:'.75rem',color:it.hidden?'#ddd':user.color}}>{BULLET[it.state]}</span>
                         <span style={{flex:1,fontStyle:it.hidden?'italic':'normal'}}>
                           {it.hidden?'비공개 항목입니다.':it.text}
                         </span>
-                        {it.important&&!it.hidden&&<span style={{color:data.color||user.color,fontSize:'.7rem'}}>★</span>}
+                        {it.important&&!it.hidden&&<span style={{color:user.color,fontSize:'.7rem'}}>★</span>}
                       </div>
                     ))}
                   </div>
@@ -2256,7 +2260,7 @@ function RoutineModal({routines,userId,onClose}) {
     if (!text.trim()) return;
     const r={text:text.trim(),category:cat,freq};
     if (freq==='weekly') r.weekdays=wds.length?wds:[1];
-    db.ref(`private/${userId}/routines`).push(r); setText('');
+    db.ref(`users/${userId}/routines`).push(r); setText('');
   }
   function rtnLabel(r) {
     if (r.freq==='daily') return '매일';
@@ -2283,7 +2287,7 @@ function RoutineModal({routines,userId,onClose}) {
               <div style={{fontSize:'.84rem',color:'#333'}}>{r.text}</div>
               <div style={{fontSize:'.68rem',color:'#bbb',marginTop:'.1rem'}}>{r.category} · {rtnLabel(r)}</div>
             </div>
-            <button onClick={()=>db.ref(`private/${userId}/routines/${r.id}`).remove()} className="icon-btn">✕</button>
+            <button onClick={()=>db.ref(`users/${userId}/routines/${r.id}`).remove()} className="icon-btn">✕</button>
           </div>
         ))}
 
