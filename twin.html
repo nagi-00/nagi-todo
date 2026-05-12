@@ -123,6 +123,37 @@ function saveOrOpenBlob(blob, filename) {
   }
 }
 
+/* ─── Text formatting helpers ───────────────────────────── */
+function renderFormatted(text) {
+  if (!text) return null;
+  const re = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|~~[^~\n]+~~)/g;
+  const result = []; let last = 0, ki = 0, m;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) result.push(<React.Fragment key={ki++}>{text.slice(last, m.index)}</React.Fragment>);
+    const s = m[0];
+    if (s.startsWith('**')) result.push(<strong key={ki++} style={{fontWeight:'bold'}}>{s.slice(2,-2)}</strong>);
+    else if (s.startsWith('*')) result.push(<em key={ki++}>{s.slice(1,-1)}</em>);
+    else if (s.startsWith('~~')) result.push(<del key={ki++}>{s.slice(2,-2)}</del>);
+    last = m.index + s.length;
+  }
+  if (last < text.length) result.push(<React.Fragment key={ki++}>{text.slice(last)}</React.Fragment>);
+  return result.length ? result : text;
+}
+function applyFormat(e, value, setter) {
+  if (!(e.ctrlKey||e.metaKey)) return;
+  const ta = e.target;
+  const s = ta.selectionStart, en = ta.selectionEnd;
+  let wrap;
+  if (e.key==='b'||e.key==='B') wrap='**';
+  else if (e.key==='i'||e.key==='I') wrap='*';
+  else if (e.key==='s'||e.key==='S') wrap='~~';
+  else return;
+  e.preventDefault();
+  const next = value.slice(0,s)+wrap+value.slice(s,en)+wrap+value.slice(en);
+  setter(next);
+  requestAnimationFrame(()=>{ ta.selectionStart=s+wrap.length; ta.selectionEnd=en+wrap.length; });
+}
+
 /* ─── Helpers ───────────────────────────────────────────── */
 function loadSched() {
   try { return JSON.parse(localStorage.getItem('focusSched')) || DEF_SCHED; }
@@ -416,6 +447,8 @@ function MainApp({userId, onLogout}) {
   const [msgInput,    setMsgInput]   = React.useState('');
   const [myShared,    setMyShared]   = React.useState(null);
   const [memoOpen,    setMemoOpen]   = React.useState(null);
+  const [editingIdx,  setEditingIdx] = React.useState(null);
+  const [editingText, setEditingText]= React.useState('');
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -466,9 +499,14 @@ function MainApp({userId, onLogout}) {
     setAllTodos(p=>({...p,[dk]:upd}));
     db.ref(`users/${userId}/todos/${dk}`).set(upd);
   }
-  function editItem(i) {
-    const nt=prompt('Edit:', items[i].text);
-    if (nt!=null&&nt.trim()) { const c=[...items]; c[i]={...c[i],text:nt.trim()}; db.ref(`users/${userId}/todos/${dk}`).set(c); }
+  function editItem(i) { setEditingIdx(i); setEditingText(items[i].text); }
+  function saveEditItem(i) {
+    if (editingText.trim()) {
+      const c=[...items]; c[i]={...c[i],text:editingText.trim()};
+      setAllTodos(p=>({...p,[dk]:c}));
+      db.ref(`users/${userId}/todos/${dk}`).set(c);
+    }
+    setEditingIdx(null); setEditingText('');
   }
   function delItem(i) {
     const deleted=items[i];
@@ -849,7 +887,7 @@ function MainApp({userId, onLogout}) {
                     <textarea key={cat}
                       value={inputs[cat]}
                       onChange={e=>setIn(cat,e.target.value)}
-                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo(cat);}}}
+                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addTodo(cat);return;}applyFormat(e,inputs[cat],v=>setIn(cat,v));}}
                       placeholder={cat} rows={3}
                       style={{border:'1px solid #eee',padding:'.4rem .5rem',borderRadius:'.4rem',resize:'vertical',fontFamily:'inherit',fontSize:'.78rem',lineHeight:1.55,color:'#555',background:'#fafafa'}}
                     />
@@ -896,7 +934,24 @@ function MainApp({userId, onLogout}) {
                                 </div>
                               )}
                               <span onClick={e=>toggleState(item.gi,e)} style={{cursor:'pointer',fontFamily:'monospace',color,flexShrink:0,fontSize:'.9rem',alignSelf:'baseline'}}>{BULLET[item.state]}</span>
-                              <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}>{item.text}</span>
+                              {editingIdx===item.gi ? (
+                                <textarea autoFocus value={editingText}
+                                  onChange={e=>setEditingText(e.target.value)}
+                                  onKeyDown={e=>{
+                                    if(e.key==='Escape'){setEditingIdx(null);setEditingText('');return;}
+                                    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveEditItem(item.gi);return;}
+                                    applyFormat(e,editingText,setEditingText);
+                                  }}
+                                  onBlur={()=>saveEditItem(item.gi)}
+                                  rows={2}
+                                  style={{flex:1,resize:'none',border:'none',borderBottom:`1px solid ${color}55`,background:'transparent',fontFamily:'inherit',fontSize:'.88rem',lineHeight:1.6,outline:'none',padding:0,color:'#1a1a1a'}}
+                                />
+                              ) : (
+                                <span className={item.state===1?'completed':''} style={{flex:1,whiteSpace:'pre-wrap',fontSize:'.88rem',lineHeight:1.6,alignSelf:'baseline'}}
+                                  onDoubleClick={()=>editItem(item.gi)}>
+                                  {renderFormatted(item.text)}
+                                </span>
+                              )}
                               <button className="icon-btn" onClick={()=>setMemoOpen(memoIsOpen?null:item.gi)}
                                 style={{flexShrink:0,padding:'0 2px',fontSize:'.7rem',alignSelf:'baseline',
                                   color:item.memo?color:'#d8d8d8',letterSpacing:'-.03em'}}>
@@ -1008,7 +1063,7 @@ function MainApp({userId, onLogout}) {
                       style={{flex:1,border:'1px solid #eee',padding:'.38rem .5rem',borderRadius:'.4rem',fontFamily:'inherit',fontSize:'.82rem',background:'#fafafa',outline:'none'}}
                     />
                     <button onClick={addMessage}
-                      style={{flexShrink:0,background:color,color:'#fff',border:'none',borderRadius:'.4rem',padding:'.38rem .6rem',fontSize:'.85rem',cursor:'pointer'}}>⏱</button>
+                      style={{flexShrink:0,background:color,color:'#fff',border:'none',borderRadius:'9999px',padding:'.38rem .75rem',fontSize:'.85rem',cursor:'pointer'}}>⏱</button>
                   </div>
                 </div>
                 )}
@@ -1814,7 +1869,7 @@ function UserSharedCard({user, todos, note, isSelf, notShared}) {
                         }}>
                           <span style={{fontFamily:'monospace',fontSize:'.75rem',color:it.hidden?'#ddd':user.color}}>{BULLET[it.state]}</span>
                           <span style={{flex:1,fontStyle:it.hidden?'italic':'normal'}}>
-                            {it.hidden?'비공개 항목입니다.':it.text}
+                            {it.hidden?'비공개 항목입니다.':renderFormatted(it.text)}
                           </span>
                           {it.important&&!it.hidden&&<span style={{color:user.color,fontSize:'.7rem'}}>★</span>}
                         </div>
