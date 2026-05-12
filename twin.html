@@ -411,10 +411,11 @@ function MainApp({userId, onLogout}) {
   const [showRtn,    setShowRtn]   = React.useState(false);
   const [dismissedRtns, setDismissedRtns] = React.useState(new Set());
   const [copiedYday,  setCopiedYday]  = React.useState(false);
-  const [partnerMsg, setPartnerMsg]= React.useState('');
-  const [msgEdit,    setMsgEdit]   = React.useState(false);
-  const [myShared,   setMyShared]  = React.useState(null);
-  const [memoOpen,   setMemoOpen]  = React.useState(null);
+  const [appliedRtns, setAppliedRtns] = React.useState(false);
+  const [messageLog,  setMessageLog] = React.useState([]);
+  const [msgInput,    setMsgInput]   = React.useState('');
+  const [myShared,    setMyShared]   = React.useState(null);
+  const [memoOpen,    setMemoOpen]   = React.useState(null);
 
   const dk      = sel.toLocaleDateString('sv-SE');
   const items   = allTodos[dk] || [];
@@ -480,6 +481,16 @@ function MainApp({userId, onLogout}) {
   function applyRtn() {
     const add = appRoutines.map(r=>({type:'todo',category:r.category,text:r.text,state:0,hidden:false}));
     db.ref(`users/${userId}/todos/${dk}`).set([...items,...add]);
+    setAppliedRtns(true);
+  }
+  function addMessage() {
+    const text = msgInput.trim();
+    if (!text) return;
+    const entry = { time: Date.now(), text };
+    const next = [...messageLog, entry];
+    setMessageLog(next);
+    db.ref(`users/${userId}/messages/${dk}`).set(next);
+    setMsgInput('');
   }
   async function copyYesterday() {
     const prev = new Date(sel); prev.setDate(prev.getDate()-1);
@@ -527,7 +538,7 @@ function MainApp({userId, onLogout}) {
       color,
       note: noteText,
       todos: items,
-      message: partnerMsg,
+      messages: messageLog,
       timestamp: Date.now(),
     });
     alert('공유 완료!');
@@ -589,7 +600,6 @@ function MainApp({userId, onLogout}) {
       listeners.push([r,h]);
     };
     sub(`users/${partner.id}/shared/${dk}`, 'shared');
-    sub(`users/${partner.id}/message/${dk}`, 'message');
     return()=>listeners.forEach(([r,h])=>r.off('value',h));
   },[partner?.id, dk]);
 
@@ -598,7 +608,9 @@ function MainApp({userId, onLogout}) {
     const h=r.on('value',s=>setAllTodos(p=>({...p,[dk]:s.val()||[]})));
     setDismissedRtns(new Set());
     setCopiedYday(false);
+    setAppliedRtns(false);
     setMemoOpen(null);
+    setMsgInput('');
     return()=>r.off('value',h);
   },[dk,userId]);
 
@@ -615,9 +627,8 @@ function MainApp({userId, onLogout}) {
   },[dk,userId]);
 
   React.useEffect(()=>{
-    const r=db.ref(`users/${userId}/message/${dk}`);
-    const h=r.on('value',s=>setPartnerMsg(s.val()||''));
-    setMsgEdit(false);
+    const r=db.ref(`users/${userId}/messages/${dk}`);
+    const h=r.on('value',s=>setMessageLog(s.val()||[]));
     return()=>r.off('value',h);
   },[dk,userId]);
 
@@ -959,8 +970,8 @@ function MainApp({userId, onLogout}) {
                 })}
                 {(()=>{
                   const appliedTexts=new Set(items.map(it=>it.text));
-                  const hasUnappliedRtns=appRoutines.length>0&&appRoutines.some(r=>!appliedTexts.has(r.text));
-                  const showCopy = !copiedYday && items.length===0;
+                  const hasUnappliedRtns=!appliedRtns&&appRoutines.length>0&&appRoutines.some(r=>!appliedTexts.has(r.text));
+                  const showCopy = !copiedYday && (items.length===0 || appliedRtns);
                   if(!showCopy&&!hasUnappliedRtns) return null;
                   return(
                     <div style={{display:'flex',justifyContent:'flex-end',gap:'.35rem',marginTop:'.3rem'}}>
@@ -976,23 +987,29 @@ function MainApp({userId, onLogout}) {
                 {partner&&(
                 <div style={{marginTop:'1rem',paddingTop:'1rem',borderTop:'1px solid #f5f5f5'}}>
                   <span style={sectionLabel()}>{partner.name}에게 한마디</span>
-                  {(!msgEdit&&partnerMsg.trim())?(
-                    <div style={{whiteSpace:'pre-wrap',fontSize:'.82rem',color:'#555',lineHeight:1.6,cursor:'text',padding:'.1rem 0'}}
-                      onDoubleClick={()=>setMsgEdit(true)}
-                      onTouchEnd={e=>{e.preventDefault();setMsgEdit(true);}}>
-                      {partnerMsg}
+                  {messageLog.length>0&&(
+                    <div style={{marginBottom:'.5rem',maxHeight:'7rem',overflowY:'auto'}}>
+                      {messageLog.map((m,i)=>{
+                        const t=new Date(m.time);
+                        const ts=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+                        return(
+                          <div key={i} style={{fontSize:'.78rem',lineHeight:1.6,color:'#666',display:'flex',gap:'.4rem',alignItems:'baseline'}}>
+                            <span style={{flexShrink:0,fontFamily:'monospace',fontSize:'.68rem',color:'#bbb'}}>{ts}</span>
+                            <span style={{flex:1,whiteSpace:'pre-wrap'}}>{m.text}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ):(
-                    <textarea autoFocus={msgEdit} value={partnerMsg}
-                      onChange={e=>{setPartnerMsg(e.target.value);db.ref(`users/${userId}/message/${dk}`).set(e.target.value);}}
-                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();e.target.blur();}}}
-                      onBlur={()=>setMsgEdit(false)}
-                      onFocus={()=>setMsgEdit(true)}
-                      placeholder="파트너에게 보낼 메시지 (Enter 저장)"
-                      rows={2}
-                      style={{width:'100%',border:'1px solid #eee',padding:'.45rem .55rem',borderRadius:'.4rem',resize:'none',fontFamily:'inherit',fontSize:'.82rem',lineHeight:1.6,background:'#fafafa'}}
-                    />
                   )}
+                  <div style={{display:'flex',gap:'.4rem',alignItems:'center'}}>
+                    <input value={msgInput} onChange={e=>setMsgInput(e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addMessage();}}}
+                      placeholder="한마디 입력 후 ⏱ 클릭"
+                      style={{flex:1,border:'1px solid #eee',padding:'.38rem .5rem',borderRadius:'.4rem',fontFamily:'inherit',fontSize:'.82rem',background:'#fafafa',outline:'none'}}
+                    />
+                    <button onClick={addMessage}
+                      style={{flexShrink:0,background:color,color:'#fff',border:'none',borderRadius:'.4rem',padding:'.38rem .6rem',fontSize:'.85rem',cursor:'pointer'}}>⏱</button>
+                  </div>
                 </div>
                 )}
 
@@ -1028,7 +1045,7 @@ function MainApp({userId, onLogout}) {
 
           {/* ── SHARED ── */}
           {tab==='shared'&&(
-            <SharedTab dk={dk} myUser={myProfile} myShared={myShared} myMsg={partnerMsg}
+            <SharedTab dk={dk} myUser={myProfile} myShared={myShared}
               partner={partner} partnerData={partnerData}/>
           )}
 
@@ -1663,7 +1680,7 @@ function WeekTab({dColors,accent,userId,allTodos}) {
 /* ══════════════════════════════════════════════════════════
    SharedTab
 ══════════════════════════════════════════════════════════ */
-function SharedTab({dk, myUser, myShared, myMsg, partner, partnerData}) {
+function SharedTab({dk, myUser, myShared, partner, partnerData}) {
   if (!partner) {
     return (
       <div style={{...CARD, textAlign:'center', padding:'3rem 1.5rem', color:'#bbb'}}>
@@ -1694,7 +1711,9 @@ function SharedTab({dk, myUser, myShared, myMsg, partner, partnerData}) {
   const ptDone = partnerVisTodos.filter(it=>it.state===1).length;
   const ptPct  = partnerVisTodos.length ? Math.round(ptDone/partnerVisTodos.length*100) : 0;
 
-  const partnerMsg = partnerData?.message || '';
+  const myMessages      = (myShared?.messages      || []).map(m=>({...m, from:'me'}));
+  const partnerMessages = (partnerShared?.messages || []).map(m=>({...m, from:'partner'}));
+  const timeline = [...myMessages, ...partnerMessages].sort((a,b)=>a.time-b.time);
 
   return (
     <div style={CARD}>
@@ -1702,30 +1721,28 @@ function SharedTab({dk, myUser, myShared, myMsg, partner, partnerData}) {
         {new Date(dk).toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'})}
       </h2>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'1.5rem'}}>
+      <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:'1.5rem'}}>
         <UserSharedCard user={{...myUser, color:myColor}} todos={myTodos} note={myNote} isSelf notShared={!myShared}/>
         <UserSharedCard user={{...partner, color:partnerColor}} todos={partnerTodos} note={partnerNote} isSelf={false} notShared={!partnerShared}/>
       </div>
 
-      {(myMsg || partnerMsg) && (
+      {timeline.length>0 && (
         <div style={{marginTop:'1.5rem',paddingTop:'1.5rem',borderTop:'1px solid #f0f0f0'}}>
-          <span style={sectionLabel()}>서로에게 한마디</span>
-          {myMsg && (
-            <div style={{marginBottom:'.5rem',fontSize:'.85rem',lineHeight:1.7}}>
-              <span style={{color:myColor,fontWeight:'bold'}}>{myUser.name}</span>
-              <span style={{color:'#bbb',margin:'0 .3rem'}}>→</span>
-              <span style={{color:partnerColor,fontWeight:'bold'}}>{partner.name}</span>
-              <span style={{color:'#999',marginLeft:'.3rem'}}>: {myMsg}</span>
-            </div>
-          )}
-          {partnerMsg && (
-            <div style={{fontSize:'.85rem',lineHeight:1.7}}>
-              <span style={{color:partnerColor,fontWeight:'bold'}}>{partner.name}</span>
-              <span style={{color:'#bbb',margin:'0 .3rem'}}>→</span>
-              <span style={{color:myColor,fontWeight:'bold'}}>{myUser.name}</span>
-              <span style={{color:'#999',marginLeft:'.3rem'}}>: {partnerMsg}</span>
-            </div>
-          )}
+          <span style={sectionLabel()}>한마디</span>
+          {timeline.map((m,i)=>{
+            const isMe = m.from==='me';
+            const uColor = isMe ? myColor : partnerColor;
+            const uName  = isMe ? myUser.name : partner.name;
+            const t = new Date(m.time);
+            const ts = String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+            return (
+              <div key={i} style={{display:'flex',gap:'.5rem',alignItems:'baseline',marginBottom:'.35rem',fontSize:'.82rem',lineHeight:1.6}}>
+                <span style={{flexShrink:0,fontFamily:'monospace',fontSize:'.68rem',color:'#ccc'}}>{ts}</span>
+                <span style={{flexShrink:0,fontWeight:'bold',color:uColor}}>{uName}</span>
+                <span style={{color:'#666',flex:1,whiteSpace:'pre-wrap'}}>{m.text}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
