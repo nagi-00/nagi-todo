@@ -316,7 +316,7 @@ function LoginScreen({onLogin}) {
 async function handleSignup() {
   const go = confirm(
     'TwinTodo Protype는 신규 가입을 받지 않습니다.\n' +
-    '공개 사이트인 TwinTodo-Open에서 시작해주세요.\n\n' +
+    '공개 사이트인 TwinTodo Open에서 시작해주세요.\n\n' +
     'TwinTodo Open으로 이동할까요?'
   );
 
@@ -325,7 +325,23 @@ async function handleSignup() {
   }
 }
 
-  const switchTab = (t) => { setTab(t); setError(''); setUserId(''); setPassword(''); setDispName(''); };
+const switchTab = (t) => {
+  if (t === 'signup') {
+    const go = confirm(
+      'TwinTodo Protype는  신규 가입을 받지 않습니다.\n' +
+      '공개 사이트인 TwinTodo Open에서 시작해주세요.\n\n' +
+      'TwinTodo Open으로 이동할까요?'
+    );
+    if (go) window.location.href = 'https://twintodo-open.web.app/';
+    return;
+  }
+
+  setTab(t);
+  setError('');
+  setUserId('');
+  setPassword('');
+  setDispName('');
+};
 
   return (
     <div className="login-screen" style={{background:'linear-gradient(135deg,#f5f7fa 0%,#f8f8f8 100%)'}}>
