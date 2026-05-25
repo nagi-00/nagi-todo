@@ -313,21 +313,17 @@ function LoginScreen({onLogin}) {
     setLoading(false);
   }
 
-  async function handleSignup() {
-    const id = sanitize(userId);
-    if (!id) { setError('아이디를 입력해주세요.'); return; }
-    if (password.length < 4) { setError('비밀번호는 4자 이상이어야 합니다.'); return; }
-    setLoading(true); setError('');
-    try {
-      const snap = await db.ref(`users/${id}/profile`).once('value');
-      if (snap.exists()) { setError('이미 사용 중인 아이디입니다.'); setLoading(false); return; }
-      const profile = { name: dispName.trim() || id, color, password };
-      await db.ref(`users/${id}/profile`).set(profile);
-      saveSession({ userId: id });
-      onLogin(id, profile);
-    } catch(e) { setError('오류: ' + (e?.message || String(e))); }
-    setLoading(false);
+async function handleSignup() {
+  const go = confirm(
+    'TwinTodo Protype는 신규 가입을 받지 않습니다.\n' +
+    '공개 사이트인 TwinTodo-Open에서 시작해주세요.\n\n' +
+    'TwinTodo Open으로 이동할까요?'
+  );
+
+  if (go) {
+    window.location.href = 'https://twintodo-open.web.app/';
   }
+}
 
   const switchTab = (t) => { setTab(t); setError(''); setUserId(''); setPassword(''); setDispName(''); };
 
